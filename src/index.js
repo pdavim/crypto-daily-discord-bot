@@ -2,7 +2,6 @@ import cron from "node-cron";
 import { CFG } from "./config.js";
 import { ASSETS, TIMEFRAMES } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
-import { fetchOHLCV_TV } from "./data/tradingview.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { sendDiscordReport, sendDiscordAlert } from "./discord.js";
@@ -20,10 +19,7 @@ async function runOnceForAsset(asset) {
 
     for (const tf of TIMEFRAMES) {
         try {
-            const useTV = CFG.mode === "tv";
-            const candles = useTV
-                ? await fetchOHLCV_TV(asset.tv, tf) // ⚠️ só se permitido (TV ToS)
-                : await fetchOHLCV(asset.binance, tfToInterval(tf));
+            const candles = await fetchOHLCV(asset.binance, tfToInterval(tf));
             if (!candles || candles.length < 120) continue;
 
             const close = candles.map(c => c.c), vol = candles.map(c => c.v);
@@ -91,7 +87,7 @@ const ONCE = process.argv.includes("--once");
 if (!ONCE) {
     cron.schedule("0 * * * *", runAll, { timezone: CFG.tz });
     cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
-    console.log(`⏱️ Scheduled hourly (TZ=${CFG.tz}) | Mode=${CFG.mode}`);
+    console.log(`⏱️ Scheduled hourly (TZ=${CFG.tz})`);
     console.log(`⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
     runAll();
     runDailyAnalysis();
