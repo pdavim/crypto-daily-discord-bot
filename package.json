@@ -17,6 +17,8 @@
     "form-data": "^4.0.4",
     "luxon": "^3.7.2",
     "node-cron": "^3.0.3",
+    "openai": "^5.19.1",
+    "openrouter-ai": "^2.1.32",
     "puppeteer": "^24.19.0"
   }
 }

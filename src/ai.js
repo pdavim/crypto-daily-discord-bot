@@ -1,12 +1,15 @@
 // call openrouter ai
-import OpenRouter from "openrouter-ai";
+import OpenAi from "openai";
 import axios from "axios";
 import { CFG, config } from "./config.js";
 import { ASSETS } from "./assets.js";
 import { fetchOHLCV } from "./data/binance.js";
 import { sma, rsi } from "./indicators.js";
 
-const openrouter = new OpenRouter({ apiKey: CFG.openrouterApiKey });
+const openrouter = new OpenAi({
+    baseURL: 'https://openrouter.ai/api/v1',
+    apiKey: CFG.openrouterApiKey
+});
 
 export async function searchNews(asset) {
     if (!config.newsApiKey) return [];
@@ -31,11 +34,15 @@ export async function searchNews(asset) {
 }
 
 // OPnenRouter chat completion
-export async function callOpenRouter(messages) {
+export async function callOpenRouter(asset) {
+    let message = [
+        { role: "system", content: "You are a expert in trading analysis and investment. Your objective is help , giving advise to transform 10 euros into 1Million euros and grow from there" },
+        { role: "user", content: `You are a crypto trading assistant. You will be given metrics for a cryptocurrency asset including price, volume, moving averages (MA20, MA50), Relative Strength Index (RSI14), and average volume over 20 periods (VolumeAvg20). You may also receive recent news headlines related to the asset. Based on these inputs, provide a concise recommendation to buy, sell, or hold the asset along with a brief reasoning for your decision. Keep your response under 100 words. Do this analysis for this asset: ${asset}` },
+    ];
     try {
         const response = await openrouter.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: messages,
+            model: CFG.openrouterModel || "openrouter/sonoma-dusk-alpha",
+            messages: message,
         });
         return response.choices[0].message.content;
     } catch (error) {
