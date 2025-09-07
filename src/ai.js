@@ -1,6 +1,10 @@
 // call openrouter ai
 import OpenRouter from "openrouter-ai";
 import { config } from "./config.js";
+import { ASSETS } from "./assets.js";
+import { fetchOHLCV } from "./data/binance.js";
+import { sma, rsi } from "./indicators.js";
+
 const openrouter = new OpenRouter({ apiKey: config.openrouterApiKey });
 
 // OPnenRouter chat completion
@@ -17,32 +21,52 @@ export async function callOpenRouter(messages) {
     }
 }
 
-// add langchain agent logic here if needed (using openrouter as llm)
-// Get context
-// do llm analysis and use tolls - search
-// return result
-export async function runAgent(input) {
-    // implement agent logic here
-    const context = await getContext(input);
-    const analysis = await doLLMAnalysis(context);
-    const tooling = await useTools(analysis);
-    const result = await doLLMAnalysis(tooling);
-    return result;
-}
+// Gather metrics for several assets and use OpenRouter for a brief analysis
+export async function runAgent() {
+    const reports = [];
 
-// helper functions
-async function getContext(input) {
-    // fetch relevant data based on input
-    return input;
-}
+    for (const { key, binance } of ASSETS) {
+        try {
+            if (!binance) {
+                reports.push(`**${key}**\nNo Binance symbol configured.`);
+                continue;
+            }
 
-async function doLLMAnalysis(context) {
-    // call openrouter with context
-    const response = await callOpenRouter([{ role: "user", content: context }]);
-    return response;
-}
+            const candles = await fetchOHLCV(binance, "1h");
+            if (!candles.length) {
+                reports.push(`**${key}**\nNo candle data.`);
+                continue;
+            }
 
-async function useTools(analysis) {
-    // implement tool usage logic here
-    return "tool usage result";
-}  
+            const closes = candles.map(c => c.c);
+            const volumes = candles.map(c => c.v);
+            const last = candles.at(-1);
+
+            const ma20 = sma(closes, 20).at(-1);
+            const ma50 = sma(closes, 50).at(-1);
+            const rsi14 = rsi(closes, 14).at(-1);
+            const volAvg20 = sma(volumes, 20).at(-1);
+
+            const prompt = `Asset: ${key}\n` +
+                `Price: ${last.c}\n` +
+                `Volume: ${last.v}\n` +
+                `MA20: ${ma20}\n` +
+                `MA50: ${ma50}\n` +
+                `RSI14: ${rsi14}\n` +
+                `VolumeAvg20: ${volAvg20}\n` +
+                `Given these metrics, should we buy, sell, or hold ${key}? ` +
+                `Provide a short reasoning.`;
+
+            const analysis = await callOpenRouter([
+                { role: "system", content: "You are a crypto trading assistant." },
+                { role: "user", content: prompt }
+            ]);
+
+            reports.push(`**${key}**\n${analysis.trim()}`);
+        } catch (error) {
+            reports.push(`**${key}**\nError: ${error.message}`);
+        }
+    }
+
+    return reports.join("\n\n");
+}
