@@ -1,26 +1,17 @@
 import axios from "axios";
 import { CFG } from "./config.js";
 
-export async function sendDiscordReport(assetKey, tf, text) {
-    const targets = assetKey === "DAILY"
-        ? [CFG.webhookDaily || CFG.webhook].filter(Boolean)
-        : [
-            CFG.webhooks?.[assetKey],
-            CFG.webhookReports,
-            CFG.webhook
-        ].filter(Boolean);
-
+export async function postAnalysis(assetKey, tf, text) {
+    const url = CFG.webhookAnalysis;
     const attemptSend = async () => {
-        await Promise.all(
-            targets.map(url => axios.post(url, { content: text }))
-        );
+        await axios.post(url, { content: text });
     };
 
     try {
         await attemptSend();
         return true;
     } catch (err) {
-        console.error(`Failed to send report for ${assetKey} ${tf}`, err?.message || err);
+        console.error(`Failed to post analysis for ${assetKey} ${tf}`, err?.message || err);
         try {
             await attemptSend();
             return true;
