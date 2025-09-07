@@ -1,6 +1,9 @@
 // src/chart.js
 import { Chart, registerables } from "chart.js";
-import { CandlestickController, CandlestickElement } from "chartjs-chart-financial";
+import {
+    CandlestickController,
+    CandlestickElement
+} from "chartjs-chart-financial/dist/chartjs-chart-financial.esm.js";
 import "chartjs-adapter-luxon";
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "node:fs";
