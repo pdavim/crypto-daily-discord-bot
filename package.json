@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "once": "node src/index.js --once"
+    "once": "node src/index.js --once",
+    "test:chart": "node tests/render-chart.js"
   },
   "dependencies": {
     "axios": "^1.11.0",

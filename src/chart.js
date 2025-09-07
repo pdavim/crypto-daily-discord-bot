@@ -1,25 +1,19 @@
 // src/chart.js
-import { Chart, registerables } from "chart.js";
-import "chartjs-adapter-luxon";
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "node:fs";
-import {
-    CandlestickController,
-    CandlestickElement,
-} from "chartjs-chart-financial/dist/chartjs-chart-financial.esm.js";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const { Chart } = require("chart.js/auto");
+global.Chart = Chart;
+global.Chart.helpers = require("chart.js/helpers");
+await import("chartjs-chart-financial/dist/chartjs-chart-financial.js");
+delete global.Chart.helpers;
+delete global.Chart;
 
-// register Chart.js components
-Chart.register(
-    ...registerables,
-    CandlestickController,
-    CandlestickElement,
-);
-
-// injeta o Chart configurado no canvas
+// Canvas with Chart.js
 const canvas = new ChartJSNodeCanvas({
     width: 1280,
     height: 640,
-    chartJs: Chart,
 });
 
 // utilitários
@@ -33,8 +27,10 @@ const hasTimeAdapter = () => {
 // renderização
 export async function renderChartPNG(assetKey, tf, candles, indicators) {
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
-
-    const useTime = hasTimeAdapter();
+    const timeAdapter = hasTimeAdapter();
+    console.log("candlestick:", !!Chart.registry.controllers.get("candlestick"));
+    console.log("time adapter:", timeAdapter);
+    const useTime = timeAdapter;
     const labels = !useTime
         ? candles.map(c => new Date(toMs(c.t)).toISOString().slice(0, 16))
         : undefined;
