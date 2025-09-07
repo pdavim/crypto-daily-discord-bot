@@ -78,3 +78,78 @@ export function volumeDivergence(closes, volumes, period = 20) {
     }
     return out;
 }
+
+
+// ... (mantém SMA, RSI, MACD, Bollinger que já tens)
+
+export function atr14(ohlc) {
+    const tr = [];
+    for (let i = 0; i < ohlc.length; i++) {
+        if (i === 0) { tr.push(ohlc[i].h - ohlc[i].l); continue; }
+        const prevClose = ohlc[i - 1].c;
+        const a = ohlc[i].h - ohlc[i].l;
+        const b = Math.abs(ohlc[i].h - prevClose);
+        const c = Math.abs(ohlc[i].l - prevClose);
+        tr.push(Math.max(a, b, c));
+    }
+    // EMA ATR(14)
+    const n = 14, k = 2 / (n + 1);
+    const out = [];
+    tr.forEach((v, i) => out.push(i ? (v * k + out[i - 1] * (1 - k)) : v));
+    return out;
+}
+
+export function bollWidth(upper, lower, mid) {
+    return upper.map((u, i) => {
+        const l = lower[i], m = mid[i];
+        if (u == null || l == null || m == null || m === 0) return null;
+        return (u - l) / m; // largura relativa
+    });
+}
+
+export function isBBSqueeze(widthSeries, lookback = 40, pct = 0.15) {
+    // squeeze se o valor atual <= percentil 15% dos últimos N
+    const arr = widthSeries.slice(-lookback).filter(x => x != null);
+    if (arr.length < 10) return false;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const threshold = sorted[Math.floor(sorted.length * pct)];
+    const last = widthSeries[widthSeries.length - 1];
+    return last != null && last <= threshold;
+}
+
+export function crossUp(a, b) { const n = a.length; return n > 1 && a[n - 2] < b[n - 2] && a[n - 1] >= b[n - 1]; }
+export function crossDown(a, b) { const n = a.length; return n > 1 && a[n - 2] > b[n - 2] && a[n - 1] <= b[n - 1]; }
+
+export function sparkline(values, points = 20) {
+    const chars = "▁▂▃▄▅▆▇█";
+    const arr = values.slice(-points);
+    const min = Math.min(...arr), max = Math.max(...arr);
+    if (max === min) return chars[0].repeat(arr.length);
+    return arr.map(v => {
+        const idx = Math.floor(((v - min) / (max - min)) * (chars.length - 1));
+        return chars[idx];
+    }).join("");
+}
+
+export function trendFromMAs(ma20, ma50, ma200) {
+    const m20 = ma20.at(-1), m50 = ma50.at(-1), m200 = ma200?.at(-1);
+    if (m20 == null || m50 == null) return "Neutro";
+    if (m20 > m50 && (m200 == null || m50 > m200)) return "Alta";
+    if (m20 < m50 && (m200 == null || m50 < m200)) return "Baixa";
+    return "Neutro";
+}
+
+export function scoreHeuristic({ rsi, macdHist, width, trend }) {
+    let s = 50;
+    if (rsi != null) { if (rsi > 70) s -= 10; else if (rsi < 30) s += 10; }
+    if (macdHist != null) { if (macdHist > 0) s += 5; else s -= 5; }
+    if (width != null) { if (width < 0.1) s += 3; } // squeeze pode anteceder movimento
+    if (trend === "Alta") s += 7; else if (trend === "Baixa") s -= 7;
+    return Math.max(0, Math.min(100, Math.round(s)));
+}
+
+export function semaforo(score) {
+    if (score >= 66) return "🟢";
+    if (score >= 33) return "🟡";
+    return "🔴";
+}
