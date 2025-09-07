@@ -1,5 +1,4 @@
 import axios from "axios";
-import FormData from "form-data";
 import { CFG } from "./config.js";
 
 export async function sendDiscordReport(assetKey, tf, text) {
@@ -31,8 +30,6 @@ export async function sendDiscordReport(assetKey, tf, text) {
 }
 
 export async function sendDiscordAlert(text) {
-    const form = new FormData();
-    form.append("payload_json", JSON.stringify({ content: text }));
     const url = CFG.webhookAlerts ?? CFG.webhook;
-    await axios.post(url, form, { headers: form.getHeaders() });
+    await axios.post(url, { content: text });
 }
