@@ -1,11 +1,9 @@
 import cron from "node-cron";
-import fs from "node:fs";
 import { CFG } from "./config.js";
 import { ASSETS, TIMEFRAMES } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { fetchOHLCV_TV } from "./data/tradingview.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth } from "./indicators.js";
-import { renderChartPNG } from "./chart.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { sendDiscordReport, sendDiscordAlert } from "./discord.js";
 import { buildAlerts } from "./alerts.js";
@@ -17,7 +15,6 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function runOnceForAsset(asset) {
     const daily = await fetchDailyCloses(asset.binance, 32);
 
-    let chartPath = null;
     const snapshots = {};
 
     for (const tf of TIMEFRAMES) {
@@ -41,12 +38,7 @@ async function runOnceForAsset(asset) {
             });
             snapshots[tf] = snapshot;
 
-            if (tf === "4h") {
-                if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
-                chartPath = await renderChartPNG(asset.key, tf, candles, {
-                    ma20, ma50, ma200, bbUpper: bb.upper, bbLower: bb.lower
-                });
-            }
+            // Chart rendering removed
 
             // Alertas
             const alerts = buildAlerts({
@@ -68,7 +60,7 @@ async function runOnceForAsset(asset) {
 
     const summary = buildSummary({ assetKey: asset.key, snapshots });
 
-    const sent = await sendDiscordReport(asset.key, "4h", summary, chartPath);
+    const sent = await sendDiscordReport(asset.key, "4h", summary);
     if (!sent) {
         console.warn(`[${asset.key}] report upload failed`);
     }
