@@ -33,16 +33,12 @@ export async function searchNews(asset) {
     }
 }
 
-// OPnenRouter chat completion
-export async function callOpenRouter(asset) {
-    let message = [
-        { role: "system", content: "You are a expert in trading analysis and investment. Your objective is help , giving advise to transform 10 euros into 1Million euros and grow from there" },
-        { role: "user", content: `You are a crypto trading assistant. You will be given metrics for a cryptocurrency asset including price, volume, moving averages (MA20, MA50), Relative Strength Index (RSI14), and average volume over 20 periods (VolumeAvg20). You may also receive recent news headlines related to the asset. Based on these inputs, provide a concise recommendation to buy, sell, or hold the asset along with a brief reasoning for your decision. Keep your response under 100 words. Do this analysis for this asset: ${asset}` },
-    ];
+// OpenRouter chat completion
+export async function callOpenRouter(messages) {
     try {
         const response = await openrouter.chat.completions.create({
             model: CFG.openrouterModel || "openrouter/sonoma-dusk-alpha",
-            messages: message,
+            messages,
         });
         return response.choices[0].message.content;
     } catch (error) {
@@ -93,10 +89,12 @@ export async function runAgent() {
                 `Given these metrics and news, should we buy, sell, or hold ${key}? ` +
                 `Provide a short reasoning.`;
 
-            const analysis = await callOpenRouter([
+            const messages = [
                 { role: "system", content: "You are a crypto trading assistant." },
                 { role: "user", content: prompt }
-            ]);
+            ];
+
+            const analysis = await callOpenRouter(messages);
 
             reports.push(`**${key}**\n${analysis.trim()}`);
         } catch (error) {
