@@ -34,18 +34,30 @@ const hasTimeAdapter = () => {
 export async function renderChartPNG(assetKey, tf, candles, indicators) {
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
 
-    const xs = candles.map(c => toMs(c.t));
-    const labels = xs.map(t => new Date(t).toISOString().slice(0,16));
     const useTime = hasTimeAdapter();
+    const labels = !useTime
+        ? candles.map(c => new Date(toMs(c.t)).toISOString().slice(0, 16))
+        : undefined;
 
     const datasets = [];
     if (useTime) {
         const ohlc = candles.map(c => ({
             x: toMs(c.t), o: c.o, h: c.h, l: c.l, c: c.c,
         }));
-        datasets.push({ type: "candlestick", label: `${assetKey} ${tf}`, data: ohlc, borderWidth: 1 });
+        datasets.push({
+            type: "candlestick",
+            label: `${assetKey} ${tf}`,
+            data: ohlc,
+            borderWidth: 1,
+        });
     } else {
-        datasets.push({ type: "line", label: `${assetKey} ${tf}`, data: candles.map(c => c.c), borderWidth: 1, pointRadius: 0 });
+        const ohlc = candles.map(c => ({ o: c.o, h: c.h, l: c.l, c: c.c }));
+        datasets.push({
+            type: "candlestick",
+            label: `${assetKey} ${tf}`,
+            data: ohlc,
+            borderWidth: 1,
+        });
     }
 
     // linhas de indicadores (SMA, Bollinger, etc.)
@@ -96,7 +108,7 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
     };
 
     const cfg = {
-        type: useTime ? "candlestick" : "line",
+        type: "candlestick",
         data: useTime ? { datasets } : { labels, datasets },
         options,
     };
