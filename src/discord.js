@@ -15,10 +15,19 @@ export async function sendDiscordReport(assetKey, tf, text, chartPath) {
         return f;
     };
 
-    const url = CFG.webhooks?.[assetKey] ?? CFG.webhook;
+    const urls = [
+        CFG.webhooks?.[assetKey],
+        CFG.webhookReports,
+        CFG.webhook
+    ].filter(Boolean);
+
     const attemptSend = async () => {
-        const form = buildForm();
-        await axios.post(url, form, { headers: form.getHeaders() });
+        await Promise.all(
+            urls.map(u => {
+                const form = buildForm();
+                return axios.post(u, form, { headers: form.getHeaders() });
+            })
+        );
     };
 
     try {
