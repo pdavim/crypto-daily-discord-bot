@@ -55,7 +55,10 @@ async function runOnceForAsset(asset) {
             const chartPath = await renderChartPNG(asset.key, tf, candles, {
                 ma20, ma50, ma200, bbUpper: bb.upper, bbLower: bb.lower
             });
-            await sendDiscordReport(asset.key, tf, summary, chartPath);
+            const sent = await sendDiscordReport(asset.key, tf, summary, chartPath);
+            if (!sent) {
+                console.warn(`[${asset.key} ${tf}] report upload failed`);
+            }
 
             // Alertas
             const alerts = buildAlerts({
@@ -68,7 +71,10 @@ async function runOnceForAsset(asset) {
             if (hasSignals) {
                 const mention = "@here";
                 const alertMsg = [`**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`, ...alerts.map(a => `• ${a}`)].join("\n");
-                await sendDiscordReport(asset.key, tf, alertMsg, null);
+                const alertSent = await sendDiscordReport(asset.key, tf, alertMsg, null);
+                if (!alertSent) {
+                    console.warn(`[${asset.key} ${tf}] alert upload failed`);
+                }
             }
         } catch (e) {
             console.error(`[${asset.key} ${tf}]`, e?.message || e);
