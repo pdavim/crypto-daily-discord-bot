@@ -8,6 +8,8 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
     const last = candles.at(-1);
     const closeSeries = candles.map(c => c.c);
     const spark = sparkline(closeSeries, 28);
+    const prev = candles.at(-2);
+    const varTf = (last?.c != null && prev?.c != null) ? (last.c / prev.c - 1) : null;
 
     const d = daily;
     const lastD = d.at(-1)?.c, d1 = d.at(-2)?.c, d7 = d.at(-8)?.c, d30 = d.at(-31)?.c;
@@ -29,18 +31,28 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
     return {
         last,
         kpis: {
-            price: last.c, var24h, var7d, var30d, rsi: rsiNow, macdHist,
+            price: last.c, var24h, var7d, var30d, var: varTf, rsi: rsiNow, macdHist,
             sma20: ma20.at(-1), sma50: ma50.at(-1), sma100: ma100.at(-1), sma200: ma200?.at(-1),
             bw, atr14: atr.at(-1), vol: last.v, fearGreed: '—', trend, reco, sem, score, spark
         }
     };
 }
 
-export function buildSummary({ assetKey, tf, snapshot }) {
-    const k = snapshot.kpis;
-    return [
-        `${assetKey} | Preço ${num(k.price)} | Var24h ${pct(k.var24h)} | Var7d ${pct(k.var7d)} | Var30d ${pct(k.var30d)}`,
-        `${tf} | RSI14 ${num(k.rsi, 2)} | MACD_Hist ${num(k.macdHist, 4)} | SMA20/50/100/200 ${num(k.sma20, 2)}/${num(k.sma50, 2)}/${num(k.sma100, 2)}/${k.sma200 ? num(k.sma200, 2) : '—'}`,
-        `BollWidth ${num(k.bw, 4)} | ATR14 ${num(k.atr14, 4)} | Volume ${fmt(k.vol)} | FearGreed ${k.fearGreed} | Tendência ${k.trend} | Recomendação ${k.reco} | Semáforo ${k.sem} | Score ${k.score}/100`
-    ].join("\n");
+export function buildSummary({ assetKey, snapshots }) {
+    const lines = [];
+    const snap4h = snapshots?.["4h"];
+    if (snap4h) {
+        const k = snap4h.kpis;
+        lines.push(`${assetKey} | Preço ${num(k.price)} | Var24h ${pct(k.var24h)} | Var7d ${pct(k.var7d)} | Var30d ${pct(k.var30d)}`);
+    } else {
+        lines.push(assetKey);
+    }
+
+    for (const [tf, snapshot] of Object.entries(snapshots)) {
+        const k = snapshot.kpis;
+        lines.push(`${tf} | Var ${pct(k.var)} | RSI14 ${num(k.rsi, 2)} | MACD_Hist ${num(k.macdHist, 4)} | SMA20/50/100/200 ${num(k.sma20, 2)}/${num(k.sma50, 2)}/${num(k.sma100, 2)}/${k.sma200 ? num(k.sma200, 2) : '—'}`);
+        lines.push(`BollWidth ${num(k.bw, 4)} | ATR14 ${num(k.atr14, 4)} | Volume ${fmt(k.vol)} | FearGreed ${k.fearGreed} | Tendência ${k.trend} | Recomendação ${k.reco} | Semáforo ${k.sem} | Score ${k.score}/100`);
+    }
+
+    return lines.join("\n");
 }
