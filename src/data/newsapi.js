@@ -1,10 +1,5 @@
-// call openrouter ai
-import OpenRouter from "openrouter-ai";
 import axios from "axios";
-import { config } from "./config.js";
-import { ASSETS } from "./assets.js";
-
-
+import { config } from "../config.js";
 
 export async function searchNews(asset) {
     if (!config.newsApiKey) return [];

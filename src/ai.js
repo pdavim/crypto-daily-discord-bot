@@ -1,37 +1,15 @@
 // call openrouter ai
 import OpenAi from "openai";
-import axios from "axios";
-import { CFG, config } from "./config.js";
+import { CFG } from "./config.js";
 import { ASSETS } from "./assets.js";
 import { fetchOHLCV } from "./data/binance.js";
+import { searchNews } from "./data/newsapi.js";
 import { sma, rsi } from "./indicators.js";
 
 const openrouter = new OpenAi({
     baseURL: 'https://openrouter.ai/api/v1',
     apiKey: CFG.openrouterApiKey
 });
-
-export async function searchNews(asset) {
-    if (!config.newsApiKey) return [];
-    try {
-        const resp = await axios.get("https://newsapi.org/v2/everything", {
-            params: {
-                q: asset,
-                language: "en",
-                sortBy: "publishedAt",
-                pageSize: 3,
-                apiKey: config.newsApiKey,
-            },
-        });
-        return resp.data.articles.map(a => ({
-            title: a.title,
-            description: a.description || "",
-        }));
-    } catch (error) {
-        console.error("Error fetching news:", error.message);
-        return [];
-    }
-}
 
 // OpenRouter chat completion
 export async function callOpenRouter(messages) {
