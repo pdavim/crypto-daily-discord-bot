@@ -65,16 +65,73 @@ export function bollinger(closes, period = 20, mult = 2) {
     return out;
 }
 
-// Parabolic SAR & divergência de volume: versões simples (SAR passo 0.02, máx 0.2)
-export function parabolicSAR(ohlc, step = 0.02, max = 0.2) { /* implementação simplificada */ return Array(ohlc.length).fill(null); }
+// Parabolic SAR (passo padrão 0.02, aceleração máx 0.2)
+export function parabolicSAR(ohlc, step = 0.02, max = 0.2) {
+    const out = Array(ohlc.length).fill(null);
+    if (!ohlc || ohlc.length < 2) return out;
 
+    let up = ohlc[1].c > ohlc[0].c; // tendência inicial
+    let sar = up ? ohlc[0].l : ohlc[0].h;
+    let ep = up ? Math.max(ohlc[0].h, ohlc[1].h) : Math.min(ohlc[0].l, ohlc[1].l);
+    let af = step;
+
+    out[1] = sar;
+
+    for (let i = 2; i < ohlc.length; i++) {
+        sar = sar + af * (ep - sar);
+
+        if (up) {
+            sar = Math.min(sar, ohlc[i - 1].l, ohlc[i - 2].l);
+            if (ohlc[i].h > ep) {
+                ep = ohlc[i].h;
+                af = Math.min(af + step, max);
+            }
+            if (sar > ohlc[i].l) { // reversão para baixa
+                up = false;
+                sar = Math.max(ep, ohlc[i - 1].h, ohlc[i - 2].h);
+                ep = ohlc[i].l;
+                af = step;
+            }
+        } else {
+            sar = Math.max(sar, ohlc[i - 1].h, ohlc[i - 2].h);
+            if (ohlc[i].l < ep) {
+                ep = ohlc[i].l;
+                af = Math.min(af + step, max);
+            }
+            if (sar < ohlc[i].h) { // reversão para alta
+                up = true;
+                sar = Math.min(ep, ohlc[i - 1].l, ohlc[i - 2].l);
+                ep = ohlc[i].h;
+                af = step;
+            }
+        }
+        out[i] = sar;
+    }
+
+    return out;
+}
+
+// Divergência de volume normalizada por EMA
 export function volumeDivergence(closes, volumes, period = 20) {
-    // Sinal simples: preço sobe com volume a cair (bearish) ou vice-versa (bullish)
     const out = Array(closes.length).fill(null);
+    if (!closes || closes.length !== volumes.length) return out;
+
+    const ema = (arr, p) => {
+        const k = 2 / (p + 1);
+        const res = [];
+        let prev;
+        arr.forEach((v, i) => { prev = i ? (v * k + prev * (1 - k)) : v; res.push(prev); });
+        return res;
+    };
+
+    const pEma = ema(closes, period);
+    const vEma = ema(volumes, period);
+
     for (let i = period; i < closes.length; i++) {
-        const pc = closes[i] - closes[i - period];
-        const vc = volumes[i] - volumes[i - period];
-        out[i] = (pc > 0 && vc < 0) ? "bear" : (pc < 0 && vc > 0) ? "bull" : null;
+        const pRel = pEma[i] ? (closes[i] - pEma[i]) / pEma[i] : 0;
+        const vRel = vEma[i] ? (volumes[i] - vEma[i]) / vEma[i] : 0;
+        if (pRel > 0 && vRel < 0) out[i] = "bear";
+        else if (pRel < 0 && vRel > 0) out[i] = "bull";
     }
     return out;
 }

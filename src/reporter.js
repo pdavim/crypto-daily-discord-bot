@@ -1,4 +1,4 @@
-import { semaforo, scoreHeuristic, trendFromMAs, sparkline } from "./indicators.js";
+import { semaforo, scoreHeuristic, trendFromMAs, sparkline, parabolicSAR, volumeDivergence } from "./indicators.js";
 
 export function pct(v) { return v == null ? '—' : `${(v * 100).toFixed(2)}%`; }
 export function num(v, p = 4) { return v == null ? '—' : `${(+v).toFixed(p)}`; }
@@ -12,10 +12,25 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
     const varTf = (last?.c != null && prev?.c != null) ? (last.c / prev.c - 1) : null;
 
     const d = daily;
-    const lastD = d.at(-1)?.c, d1 = d.at(-2)?.c, d7 = d.at(-8)?.c, d30 = d.at(-31)?.c;
-    const var24h = (lastD != null && d1 != null) ? (lastD / d1 - 1) : null;
-    const var7d = (lastD != null && d7 != null) ? (lastD / d7 - 1) : null;
-    const var30d = (lastD != null && d30 != null) ? (lastD / d30 - 1) : null;
+    const lastDaily = d.at(-1);
+    const getReturn = ms => {
+        if (!lastDaily) return null;
+        const target = lastDaily.t.getTime() - ms;
+        for (let i = d.length - 1; i >= 0; i--) {
+            const t = d[i].t.getTime();
+            if (t <= target) return lastDaily.c / d[i].c - 1;
+        }
+        return null;
+    };
+    const dayMs = 24 * 60 * 60 * 1000;
+    const var24h = getReturn(dayMs);
+    const var7d = getReturn(7 * dayMs);
+    const var30d = getReturn(30 * dayMs);
+
+    const sarSeries = parabolicSAR(candles);
+    const sar = sarSeries.at(-1);
+    const volDivSeries = volumeDivergence(closeSeries, volSeries);
+    const volDiv = volDivSeries.at(-1);
 
     const rsiNow = rsi.at(-1);
     const macdHist = macdObj.hist.at(-1);
@@ -33,7 +48,7 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
         kpis: {
             price: last.c, var24h, var7d, var30d, var: varTf, rsi: rsiNow, macdHist,
             sma20: ma20.at(-1), sma50: ma50.at(-1), sma100: ma100.at(-1), sma200: ma200?.at(-1),
-            bw, atr14: atr.at(-1), vol: last.v, fearGreed: '—', trend, reco, sem, score, spark
+            bw, atr14: atr.at(-1), vol: last.v, sar, volDiv, fearGreed: '—', trend, reco, sem, score, spark
         }
     };
 }
