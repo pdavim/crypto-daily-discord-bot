@@ -1,11 +1,34 @@
 // call openrouter ai
 import OpenRouter from "openrouter-ai";
+import axios from "axios";
 import { config } from "./config.js";
 import { ASSETS } from "./assets.js";
 import { fetchOHLCV } from "./data/binance.js";
 import { sma, rsi } from "./indicators.js";
 
 const openrouter = new OpenRouter({ apiKey: config.openrouterApiKey });
+
+export async function searchNews(asset) {
+    if (!config.newsApiKey) return [];
+    try {
+        const resp = await axios.get("https://newsapi.org/v2/everything", {
+            params: {
+                q: asset,
+                language: "en",
+                sortBy: "publishedAt",
+                pageSize: 3,
+                apiKey: config.newsApiKey,
+            },
+        });
+        return resp.data.articles.map(a => ({
+            title: a.title,
+            description: a.description || "",
+        }));
+    } catch (error) {
+        console.error("Error fetching news:", error.message);
+        return [];
+    }
+}
 
 // OPnenRouter chat completion
 export async function callOpenRouter(messages) {
@@ -47,6 +70,11 @@ export async function runAgent() {
             const rsi14 = rsi(closes, 14).at(-1);
             const volAvg20 = sma(volumes, 20).at(-1);
 
+            const news = await searchNews(key);
+            const newsPrompt = news.length
+                ? `News:\n${news.map(n => `- ${n.title}: ${n.description}`).join("\n")}\n`
+                : "";
+
             const prompt = `Asset: ${key}\n` +
                 `Price: ${last.c}\n` +
                 `Volume: ${last.v}\n` +
@@ -54,7 +82,8 @@ export async function runAgent() {
                 `MA50: ${ma50}\n` +
                 `RSI14: ${rsi14}\n` +
                 `VolumeAvg20: ${volAvg20}\n` +
-                `Given these metrics, should we buy, sell, or hold ${key}? ` +
+                newsPrompt +
+                `Given these metrics and news, should we buy, sell, or hold ${key}? ` +
                 `Provide a short reasoning.`;
 
             const analysis = await callOpenRouter([
