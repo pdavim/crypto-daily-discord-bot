@@ -2,11 +2,13 @@ import axios from "axios";
 import { CFG } from "./config.js";
 
 export async function sendDiscordReport(assetKey, tf, text) {
-    const targets = [
-        CFG.webhooks?.[assetKey],
-        CFG.webhookReports,
-        CFG.webhook
-    ].filter(Boolean);
+    const targets = assetKey === "DAILY"
+        ? [CFG.webhookDaily || CFG.webhook].filter(Boolean)
+        : [
+            CFG.webhooks?.[assetKey],
+            CFG.webhookReports,
+            CFG.webhook
+        ].filter(Boolean);
 
     const attemptSend = async () => {
         await Promise.all(

@@ -7,6 +7,7 @@ import { sma, rsi, macd, bollinger, atr14, bollWidth } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { sendDiscordReport, sendDiscordAlert } from "./discord.js";
 import { buildAlerts } from "./alerts.js";
+import { runAgent } from "./ai.js";
 
 function tfToInterval(tf) { return tf; }
 
@@ -73,12 +74,28 @@ async function runAll() {
     );
 }
 
+async function runDailyAnalysis() {
+    try {
+        const report = await runAgent();
+        const sent = await sendDiscordReport("DAILY", "1d", report);
+        if (!sent) {
+            console.warn("[DAILY] report upload failed");
+        }
+    } catch (e) {
+        console.error("[DAILY]", e?.message || e);
+    }
+}
+
 const ONCE = process.argv.includes("--once");
 
 if (!ONCE) {
     cron.schedule("0 * * * *", runAll, { timezone: CFG.tz });
+    cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
     console.log(`⏱️ Scheduled hourly (TZ=${CFG.tz}) | Mode=${CFG.mode}`);
+    console.log(`⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
     runAll();
+    runDailyAnalysis();
 } else {
     runAll();
+    runDailyAnalysis();
 }
