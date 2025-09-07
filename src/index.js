@@ -10,7 +10,7 @@ import {
 } from "./indicators.js";
 import { renderChartPNG } from "./chart.js";
 import { buildSummary, buildSnapshotForReport } from "./reporter.js";
-import { sendDiscordReport } from "./discord.js";
+import { sendDiscordReport, sendDiscordAlert } from "./discord.js";
 import { buildAlerts } from "./alerts.js";
 
 function tfToInterval(tf) { return tf; }
@@ -71,10 +71,7 @@ async function runOnceForAsset(asset) {
             if (hasSignals) {
                 const mention = "@here";
                 const alertMsg = [`**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`, ...alerts.map(a => `• ${a}`)].join("\n");
-                const alertSent = await sendDiscordReport(asset.key, tf, alertMsg, null);
-                if (!alertSent) {
-                    console.warn(`[${asset.key} ${tf}] alert upload failed`);
-                }
+                await sendDiscordAlert(alertMsg);
             }
         } catch (e) {
             console.error(`[${asset.key} ${tf}]`, e?.message || e);

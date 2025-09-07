@@ -35,3 +35,10 @@ export async function sendDiscordReport(assetKey, tf, text, chartPath) {
         }
     }
 }
+
+export async function sendDiscordAlert(text) {
+    const form = new FormData();
+    form.append("payload_json", JSON.stringify({ content: text }));
+    const url = CFG.webhookAlerts ?? CFG.webhook;
+    await axios.post(url, form, { headers: form.getHeaders() });
+}
