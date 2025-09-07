@@ -1,12 +1,12 @@
 // call openrouter ai
 import OpenRouter from "openrouter-ai";
 import axios from "axios";
-import { config } from "./config.js";
+import { CFG, config } from "./config.js";
 import { ASSETS } from "./assets.js";
 import { fetchOHLCV } from "./data/binance.js";
 import { sma, rsi } from "./indicators.js";
 
-const openrouter = new OpenRouter({ apiKey: config.openrouterApiKey });
+const openrouter = new OpenRouter({ apiKey: CFG.openrouterApiKey });
 
 export async function searchNews(asset) {
     if (!config.newsApiKey) return [];
