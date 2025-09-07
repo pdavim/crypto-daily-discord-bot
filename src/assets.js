@@ -7,5 +7,5 @@ export const ASSETS = [
     { key: "SUI", tv: process.env.TV_SYMBOL_SUI, binance: process.env.BINANCE_SYMBOL_SUI }
 ];
 
-export const TIMEFRAMES = ["4h", "2h", "1h",  "30m", "15m", "5m"];
-// Mapa para Binance (klines): 4h->4h, 2h->2h, 1h->1h, 45m->45m, 30m->30m, 15m->15m, 5m->5m
+export const TIMEFRAMES = ["4h", "1h", "45m", "30m", "15m", "5m"];
+// Mapa para Binance (klines): 4h->4h, 1h->1h, 45m->45m, 30m->30m, 15m->15m, 5m->5m
