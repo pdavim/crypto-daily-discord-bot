@@ -39,11 +39,8 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
 export function buildSummary({ assetKey, tf, snapshot }) {
     const k = snapshot.kpis;
     return [
-        `### ${assetKey} — ${tf}`,
-        `**Preço** ${num(k.price)}  •  **Var24h** ${pct(k.var24h)}  •  **Var7d** ${pct(k.var7d)}  •  **Var30d** ${pct(k.var30d)}`,
-        `**RSI14** ${num(k.rsi, 2)}  •  **MACD_Hist** ${num(k.macdHist, 4)}  •  **SMA20/50/100/200** ${num(k.sma20, 2)}/${num(k.sma50, 2)}/${num(k.sma100, 2)}/${k.sma200 ? num(k.sma200, 2) : '—'}`,
-        `**BollWidth** ${num(k.bw, 4)}  •  **ATR14** ${num(k.atr14, 4)}  •  **Volume** ${fmt(k.vol)}  •  **FearGreed** ${k.fearGreed}`,
-        `**Tendência** ${k.trend}  •  **Recomendação** ${k.reco}  •  **Semáforo** ${k.sem}  •  **Score** ${k.score}/100`,
-        `**Preço (sparkline)** ${k.spark}`
+        `${assetKey} | Preço ${num(k.price)} | Var24h ${pct(k.var24h)} | Var7d ${pct(k.var7d)} | Var30d ${pct(k.var30d)}`,
+        `${tf} | RSI14 ${num(k.rsi, 2)} | MACD_Hist ${num(k.macdHist, 4)} | SMA20/50/100/200 ${num(k.sma20, 2)}/${num(k.sma50, 2)}/${num(k.sma100, 2)}/${k.sma200 ? num(k.sma200, 2) : '—'}`,
+        `BollWidth ${num(k.bw, 4)} | ATR14 ${num(k.atr14, 4)} | Volume ${fmt(k.vol)} | FearGreed ${k.fearGreed} | Tendência ${k.trend} | Recomendação ${k.reco} | Semáforo ${k.sem} | Score ${k.score}/100`
     ].join("\n");
 }
