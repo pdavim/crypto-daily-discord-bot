@@ -6,7 +6,11 @@ export const CFG = {
     webhookReports: process.env.DISCORD_WEBHOOK_REPORTS_URL,
     webhooks: {
         BTC: process.env.DISCORD_WEBHOOK_BTC,
-        ETH: process.env.DISCORD_WEBHOOK_ETH
+        ETH: process.env.DISCORD_WEBHOOK_ETH,
+        POL: process.env.DISCORD_WEBHOOK_POL,
+        SUI: process.env.DISCORD_WEBHOOK_SUI,
+        SOL: process.env.DISCORD_WEBHOOK_SOL,
+        TRX: process.env.DISCORD_WEBHOOK_TRX
     },
     tz: process.env.TZ || 'Europe/Lisbon'
 };
