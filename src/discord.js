@@ -4,28 +4,24 @@ import FormData from "form-data";
 import { CFG } from "./config.js";
 
 export async function sendDiscordReport(assetKey, tf, text, chartPath) {
-    const buildForm = () => {
-        const f = new FormData();
-        if (chartPath && fs.existsSync(chartPath)) {
-            f.append("file", fs.createReadStream(chartPath));
-        }
-        f.append("payload_json", JSON.stringify({
-            content: text
-        }));
-        return f;
-    };
-
-    const urls = [
-        CFG.webhooks?.[assetKey],
-        CFG.webhookReports,
-        CFG.webhook
-    ].filter(Boolean);
+    const targets = [
+        { url: CFG.webhooks?.[assetKey], includeImage: true },
+        { url: CFG.webhookReports, includeImage: false },
+        { url: CFG.webhook, includeImage: true }
+    ].filter(t => t.url);
 
     const attemptSend = async () => {
         await Promise.all(
-            urls.map(u => {
-                const form = buildForm();
-                return axios.post(u, form, { headers: form.getHeaders() });
+            targets.map(t => {
+                const form = new FormData();
+                if (t.includeImage && chartPath && fs.existsSync(chartPath)) {
+                    form.append("file", fs.createReadStream(chartPath));
+                }
+                form.append(
+                    "payload_json",
+                    JSON.stringify({ content: text })
+                );
+                return axios.post(t.url, form, { headers: form.getHeaders() });
             })
         );
     };
