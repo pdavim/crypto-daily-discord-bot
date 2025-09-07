@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const BASE = "https://api.binance.com/api/v3/klines";
-const CANDLES = 300;
+const CANDLES = 200; // solicitamos pelo menos 200 barras
 
 export async function fetchOHLCV(symbol, interval) {
     const url = `${BASE}?symbol=${symbol}&interval=${interval}&limit=${CANDLES}`;
