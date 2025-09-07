@@ -4,7 +4,9 @@ import { ASSETS, TIMEFRAMES } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
-import { sendDiscordReport, sendDiscordAlert } from "./discord.js";
+import { postAnalysis, sendDiscordAlert } from "./discord.js";
+import { postCharts } from "./discordBot.js";
+import { renderChartPNG } from "./chart.js";
 import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 
@@ -16,6 +18,7 @@ async function runOnceForAsset(asset) {
     const daily = await fetchDailyCloses(asset.binance, 32);
 
     const snapshots = {};
+    const chartPaths = [];
 
     for (const tf of TIMEFRAMES) {
         try {
@@ -35,7 +38,12 @@ async function runOnceForAsset(asset) {
             });
             snapshots[tf] = snapshot;
 
-            // Chart rendering removed
+            const chartPath = await renderChartPNG(asset.key, tf, candles, {
+                ma20, ma50, ma200,
+                bbUpper: bb.upper,
+                bbLower: bb.lower,
+            });
+            chartPaths.push(chartPath);
 
             // Alertas
             const alerts = buildAlerts({
@@ -57,10 +65,12 @@ async function runOnceForAsset(asset) {
 
     const summary = buildSummary({ assetKey: asset.key, snapshots });
 
-    const sent = await sendDiscordReport(asset.key, "4h", summary);
+    const sent = await postAnalysis(asset.key, "4h", summary);
     if (!sent) {
         console.warn(`[${asset.key}] report upload failed`);
     }
+
+    await postCharts(chartPaths);
 }
 
 async function runAll() {
@@ -73,7 +83,7 @@ async function runAll() {
 async function runDailyAnalysis() {
     try {
         const report = await runAgent();
-        const sent = await sendDiscordReport("DAILY", "1d", report);
+        const sent = await postAnalysis("DAILY", "1d", report);
         if (!sent) {
             console.warn("[DAILY] report upload failed");
         }

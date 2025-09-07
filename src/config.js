@@ -4,6 +4,9 @@ export const CFG = {
     webhookAlerts: process.env.DISCORD_WEBHOOK_ALERTS_URL,
     webhookReports: process.env.DISCORD_WEBHOOK_REPORTS_URL,
     webhookDaily: process.env.DISCORD_WEBHOOK_DAILY,
+    webhookAnalysis: process.env.DISCORD_WEBHOOK_ANALYSIS_URL,
+    botToken: process.env.DISCORD_BOT_TOKEN,
+    channelChartsId: process.env.DISCORD_CHANNEL_CHARTS_ID,
     webhooks: {
         BTC: process.env.DISCORD_WEBHOOK_BTC,
         ETH: process.env.DISCORD_WEBHOOK_ETH,
