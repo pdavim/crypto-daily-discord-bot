@@ -1,23 +1,12 @@
 // src/chart.js
-// src/chart.js
-import { Chart } from "chart.js";
-import {
-    LineController, LineElement, PointElement,
-    LinearScale, CategoryScale, TimeScale, TimeSeriesScale,
-    Filler, Tooltip, Legend
-} from "chart.js";
+import { Chart, registerables } from "chart.js";
+import { CandlestickController, CandlestickElement } from "chartjs-chart-financial";
 import "chartjs-adapter-luxon";
-// usa a versão ESM do plugin para registar candlestick/ohlc
-import "chartjs-chart-financial/dist/chartjs-chart-financial.esm.js";
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "node:fs";
 
-// registar componentes base
-Chart.register(
-    LineController, LineElement, PointElement,
-    LinearScale, CategoryScale, TimeScale, TimeSeriesScale,
-    Filler, Tooltip, Legend
-);
+// register Chart.js components and financial controllers
+Chart.register(...registerables, CandlestickController, CandlestickElement);
 
 // injeta o Chart configurado no canvas
 const canvas = new ChartJSNodeCanvas({
@@ -33,7 +22,8 @@ const hasTimeAdapter = () => {
     const a = Chart?._adapters?.date;
     return !!(a && typeof a.parse === "function");
 };
-const hasCandlestick = () => {
+// diagnostics: check if candlestick controller is registered
+const isCandlestickRegistered = () => {
     try { return !!Chart.registry.controllers.get("candlestick"); }
     catch { return false; }
 };
@@ -43,24 +33,13 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
 
     const xs = candles.map(c => toMs(c.t));
-    const useCandle = hasCandlestick();
     const useTime = hasTimeAdapter();
 
     const datasets = [];
-
-    if (useCandle) {
-        const ohlc = candles.map(c => ({
-            x: toMs(c.t), o: c.o, h: c.h, l: c.l, c: c.c,
-        }));
-        datasets.push({ type: "candlestick", label: `${assetKey} ${tf}`, data: ohlc, borderWidth: 1 });
-    } else {
-        // fallback: linha do preço de fecho
-        datasets.push({
-            type: "line", label: `${assetKey} ${tf} (Close)`,
-            data: candles.map(c => ({ x: toMs(c.t), y: c.c })),
-            borderWidth: 1, pointRadius: 0,
-        });
-    }
+    const ohlc = candles.map(c => ({
+        x: toMs(c.t), o: c.o, h: c.h, l: c.l, c: c.c,
+    }));
+    datasets.push({ type: "candlestick", label: `${assetKey} ${tf}`, data: ohlc, borderWidth: 1 });
 
     // linhas de indicadores (SMA, Bollinger, etc.)
     if (indicators?.ma20) {
@@ -110,8 +89,8 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
             : { x: { type: "category", labels: xs.map(t => new Date(t).toISOString().slice(0, 16)) }, y: { type: "linear" } },
     };
 
-    console.log(useCandle ? "Using candlestick chart" : "Using line chart");
-    const cfg = { type: useCandle ? "candlestick" : "line", data: { datasets }, options };
+    console.log("Using candlestick chart", isCandlestickRegistered() ? "(registered)" : "(missing)");
+    const cfg = { type: "candlestick", data: { datasets }, options };
     const buffer = await canvas.renderToBuffer(cfg);
     const outPath = `charts/${assetKey}_${tf}.png`;
     fs.writeFileSync(outPath, buffer);
