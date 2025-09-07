@@ -39,20 +39,37 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
 }
 
 export function buildSummary({ assetKey, snapshots }) {
-    const lines = [];
-    const snap4h = snapshots?.["4h"];
-    if (snap4h) {
-        const k = snap4h.kpis;
-        lines.push(`${assetKey} | Preço ${num(k.price)} | Var24h ${pct(k.var24h)} | Var7d ${pct(k.var7d)} | Var30d ${pct(k.var30d)}`);
-    } else {
-        lines.push(assetKey);
-    }
+    const s = snapshots;
 
-    for (const [tf, snapshot] of Object.entries(snapshots)) {
-        const k = snapshot.kpis;
-        lines.push(`${tf} | Var ${pct(k.var)} | RSI14 ${num(k.rsi, 2)} | MACD_Hist ${num(k.macdHist, 4)} | SMA20/50/100/200 ${num(k.sma20, 2)}/${num(k.sma50, 2)}/${num(k.sma100, 2)}/${k.sma200 ? num(k.sma200, 2) : '—'}`);
-        lines.push(`BollWidth ${num(k.bw, 4)} | ATR14 ${num(k.atr14, 4)} | Volume ${fmt(k.vol)} | FearGreed ${k.fearGreed} | Tendência ${k.trend} | Recomendação ${k.reco} | Semáforo ${k.sem} | Score ${k.score}/100`);
-    }
+    const pctOf = (tf, key) => {
+        const v = s[tf]?.kpis?.[key];
+        return v == null ? '??' : pct(v);
+        };
+    const numOf = (tf, key, p) => {
+        const v = s[tf]?.kpis?.[key];
+        return v == null ? '??' : num(v, p);
+        };
+    const rawOf = (tf, key) => {
+        const v = s[tf]?.kpis?.[key];
+        return v == null ? '??' : v;
+        };
 
-    return lines.join("\n");
+    const lines = [
+        `- Asset name: ${assetKey}`,
+        `- Preço: ${numOf('4h', 'price')}`,
+        `- Variação:`,
+        `-- 5m - ${pctOf('5m', 'var')} / 15m - ${pctOf('15m', 'var')} / 30m - ${pctOf('30m', 'var')} / 1h - ${pctOf('1h', 'var')} / 4h - ${pctOf('4h', 'var')} / 24h ${pctOf('4h', 'var24h')} / 7d ${pctOf('4h', 'var7d')} / 30d ${pctOf('4h', 'var30d')}`,
+        `- FearGreed`,
+        `-- 5m - ${rawOf('5m', 'fearGreed')} / 15m - ${rawOf('15m', 'fearGreed')} / 30m - ${rawOf('30m', 'fearGreed')} / 1h - ${rawOf('1h', 'fearGreed')} / 4h - ${rawOf('4h', 'fearGreed')}`,
+        `- Tendência`,
+        `-- 5m - ${rawOf('5m', 'trend')} / 15m - ${rawOf('15m', 'trend')} / 30m - ${rawOf('30m', 'trend')} / 1h - ${rawOf('1h', 'trend')} / 4h - ${rawOf('4h', 'trend')}`,
+        `- Recomendação`,
+        `-- 5m - ${rawOf('5m', 'reco')} / 15m - ${rawOf('15m', 'reco')} / 30m - ${rawOf('30m', 'reco')} / 1h - ${rawOf('1h', 'reco')} / 4h - ${rawOf('4h', 'reco')}`,
+        `- Semáforo`,
+        `-- 5m - ${rawOf('5m', 'sem')} / 15m - ${rawOf('15m', 'sem')} / 30m - ${rawOf('30m', 'sem')} / 1h - ${rawOf('1h', 'sem')} / 4h - ${rawOf('4h', 'sem')}`,
+        `- Score`,
+        `-- 5m - ${numOf('5m', 'score', 0)} / 15m - ${numOf('15m', 'score', 0)} / 30m - ${numOf('30m', 'score', 0)} / 1h - ${numOf('1h', 'score', 0)} / 4h - ${numOf('4h', 'score', 0)}`
+    ];
+
+    return lines.join('\n');
 }
