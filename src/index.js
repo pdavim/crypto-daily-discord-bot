@@ -18,7 +18,7 @@ async function runOnceForAsset(asset) {
     const daily = await fetchDailyCloses(asset.binance, 32);
 
     let chartPath = null;
-    let reportSnapshot = null;
+    const snapshots = {};
 
     for (const tf of TIMEFRAMES) {
         try {
@@ -39,9 +39,9 @@ async function runOnceForAsset(asset) {
             const snapshot = buildSnapshotForReport({
                 candles, daily, ma20, ma50, ma100, ma200, rsi: r, macdObj: m, bb, atr, volSeries: vol
             });
+            snapshots[tf] = snapshot;
 
             if (tf === "4h") {
-                reportSnapshot = snapshot;
                 if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
                 chartPath = await renderChartPNG(asset.key, tf, candles, {
                     ma20, ma50, ma200, bbUpper: bb.upper, bbLower: bb.lower
@@ -66,9 +66,7 @@ async function runOnceForAsset(asset) {
         }
     }
 
-    const summary = reportSnapshot
-        ? buildSummary({ assetKey: asset.key, tf: "4h", snapshot: reportSnapshot })
-        : "";
+    const summary = buildSummary({ assetKey: asset.key, snapshots });
 
     const sent = await sendDiscordReport(asset.key, "4h", summary, chartPath);
     if (!sent) {
