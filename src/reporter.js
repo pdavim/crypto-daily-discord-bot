@@ -63,9 +63,9 @@ export function buildSummary({ assetKey, snapshots }) {
         `-- 5m - ${rawOf('5m', 'fearGreed')} / 15m - ${rawOf('15m', 'fearGreed')} / 30m - ${rawOf('30m', 'fearGreed')} / 1h - ${rawOf('1h', 'fearGreed')} / 4h - ${rawOf('4h', 'fearGreed')}`,
         `- Tendência`,
         `-- 5m - ${rawOf('5m', 'trend')} / 15m - ${rawOf('15m', 'trend')} / 30m - ${rawOf('30m', 'trend')} / 1h - ${rawOf('1h', 'trend')} / 4h - ${rawOf('4h', 'trend')}`,
-        `- Recomendação`,
+        `- Recomendação 🔁`,
         `-- 5m - ${rawOf('5m', 'reco')} / 15m - ${rawOf('15m', 'reco')} / 30m - ${rawOf('30m', 'reco')} / 1h - ${rawOf('1h', 'reco')} / 4h - ${rawOf('4h', 'reco')}`,
-        `- Semáforo`,
+        `- Semáforo 🟡`,
         `-- 5m - ${rawOf('5m', 'sem')} / 15m - ${rawOf('15m', 'sem')} / 30m - ${rawOf('30m', 'sem')} / 1h - ${rawOf('1h', 'sem')} / 4h - ${rawOf('4h', 'sem')}`,
         `- Score`,
         `-- 5m - ${numOf('5m', 'score', 0)} / 15m - ${numOf('15m', 'score', 0)} / 30m - ${numOf('30m', 'score', 0)} / 1h - ${numOf('1h', 'score', 0)} / 4h - ${numOf('4h', 'score', 0)}`
