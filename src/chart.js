@@ -33,19 +33,24 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
 
     const xs = candles.map(c => toMs(c.t));
+    const labels = xs.map(t => new Date(t).toISOString().slice(0,16));
     const useTime = hasTimeAdapter();
 
     const datasets = [];
-    const ohlc = candles.map(c => ({
-        x: toMs(c.t), o: c.o, h: c.h, l: c.l, c: c.c,
-    }));
-    datasets.push({ type: "candlestick", label: `${assetKey} ${tf}`, data: ohlc, borderWidth: 1 });
+    if (useTime) {
+        const ohlc = candles.map(c => ({
+            x: toMs(c.t), o: c.o, h: c.h, l: c.l, c: c.c,
+        }));
+        datasets.push({ type: "candlestick", label: `${assetKey} ${tf}`, data: ohlc, borderWidth: 1 });
+    } else {
+        datasets.push({ type: "line", label: `${assetKey} ${tf}`, data: candles.map(c => c.c), borderWidth: 1, pointRadius: 0 });
+    }
 
     // linhas de indicadores (SMA, Bollinger, etc.)
     if (indicators?.ma20) {
         datasets.push({
             type: "line", label: "SMA20",
-            data: candles.map((c, i) => ({ x: toMs(c.t), y: safe(indicators.ma20[i]) })),
+            data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.ma20[i]) }) : safe(indicators.ma20[i])),
             borderWidth: 1, pointRadius: 0,
         });
     }
@@ -53,28 +58,28 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
     if (indicators?.ma50) {
         datasets.push({
             type: "line", label: "SMA50",
-            data: candles.map((c, i) => ({ x: toMs(c.t), y: safe(indicators.ma50[i]) })),
+            data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.ma50[i]) }) : safe(indicators.ma50[i])),
             borderWidth: 1, pointRadius: 0
         });
     }
     if (indicators?.ma200) {
         datasets.push({
             type: "line", label: "SMA200",
-            data: candles.map((c, i) => ({ x: toMs(c.t), y: safe(indicators.ma200[i]) })),
+            data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.ma200[i]) }) : safe(indicators.ma200[i])),
             borderWidth: 1, pointRadius: 0
         });
     }
     if (indicators?.bbUpper) {
         datasets.push({
             type: "line", label: "BB Upper",
-            data: candles.map((c, i) => ({ x: toMs(c.t), y: safe(indicators.bbUpper[i]) })),
+            data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.bbUpper[i]) }) : safe(indicators.bbUpper[i])),
             borderWidth: 1, pointRadius: 0
         });
     }
     if (indicators?.bbLower) {
         datasets.push({
             type: "line", label: "BB Lower",
-            data: candles.map((c, i) => ({ x: toMs(c.t), y: safe(indicators.bbLower[i]) })),
+            data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.bbLower[i]) }) : safe(indicators.bbLower[i])),
             borderWidth: 1, pointRadius: 0
         });
     }
@@ -82,15 +87,19 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
 
     const options = {
         responsive: false,
-        parsing: false,
         plugins: { legend: { display: true } },
+        ...(useTime ? { parsing: false } : {}),
         scales: useTime
             ? { x: { type: "time", time: { tooltipFormat: "yyyy-LL-dd HH:mm" } }, y: { type: "linear" } }
-            : { x: { type: "category", labels: xs.map(t => new Date(t).toISOString().slice(0, 16)) }, y: { type: "linear" } },
+            : { x: { type: "category" }, y: { type: "linear" } },
     };
 
     console.log("Using candlestick chart", isCandlestickRegistered() ? "(registered)" : "(missing)");
-    const cfg = { type: "candlestick", data: { datasets }, options };
+    const cfg = {
+        type: useTime ? "candlestick" : "line",
+        data: useTime ? { datasets } : { labels, datasets },
+        options,
+    };
     const buffer = await canvas.renderToBuffer(cfg);
     const outPath = `charts/${assetKey}_${tf}.png`;
     fs.writeFileSync(outPath, buffer);
