@@ -36,7 +36,7 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
 
     const xs = candles.map(c => toMs(c.t));
-    const labels = xs.map(t => new Date(t).toISOString().slice(0,16));
+    const labels = xs.map(t => new Date(t).toISOString().slice(0, 16));
     const useTime = hasTimeAdapter();
 
     const datasets = [];
@@ -97,7 +97,6 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
             : { x: { type: "category" }, y: { type: "linear" } },
     };
 
-    console.log("Using candlestick chart", isCandlestickRegistered() ? "(registered)" : "(missing)");
     const cfg = {
         type: useTime ? "candlestick" : "line",
         data: useTime ? { datasets } : { labels, datasets },

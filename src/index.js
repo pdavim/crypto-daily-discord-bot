@@ -50,11 +50,9 @@ async function runOnceForAsset(asset) {
 
 
             if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
-            console.log("im here")
             const chartPath = await renderChartPNG(asset.key, tf, candles, {
                 ma20, ma50, ma200, bbUpper: bb.upper, bbLower: bb.lower
             });
-            console.log("im here 2")
             await sendDiscordReport(asset.key, tf, summary, chartPath);
 
             // Alertas
