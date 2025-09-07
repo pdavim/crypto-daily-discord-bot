@@ -6,7 +6,7 @@ import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { fetchOHLCV_TV } from "./data/tradingview.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth } from "./indicators.js";
 import { renderChartPNG } from "./chart.js";
-import { buildSnapshotForReport, pct, num } from "./reporter.js";
+import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { sendDiscordReport, sendDiscordAlert } from "./discord.js";
 import { buildAlerts } from "./alerts.js";
 
@@ -17,12 +17,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function runOnceForAsset(asset) {
     const daily = await fetchDailyCloses(asset.binance, 32);
 
-    const metrics = { var: {}, reco: {}, sem: {}, score: {} };
-    let price = null;
-    let spark = "";
-    let fearGreed = "—";
-    let trend = "—";
     let chartPath = null;
+    let reportSnapshot = null;
 
     for (const tf of TIMEFRAMES) {
         try {
@@ -44,22 +40,13 @@ async function runOnceForAsset(asset) {
                 candles, daily, ma20, ma50, ma100, ma200, rsi: r, macdObj: m, bb, atr, volSeries: vol
             });
 
-            if (price == null) price = snapshot.kpis.price;
             if (tf === "4h") {
-                spark = snapshot.kpis.spark;
-                fearGreed = snapshot.kpis.fearGreed;
-                trend = snapshot.kpis.trend;
+                reportSnapshot = snapshot;
                 if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
                 chartPath = await renderChartPNG(asset.key, tf, candles, {
                     ma20, ma50, ma200, bbUpper: bb.upper, bbLower: bb.lower
                 });
             }
-
-            const prev = candles.at(-2)?.c;
-            metrics.var[tf] = prev ? (snapshot.kpis.price / prev - 1) : null;
-            metrics.reco[tf] = snapshot.kpis.reco;
-            metrics.sem[tf] = snapshot.kpis.sem;
-            metrics.score[tf] = snapshot.kpis.score;
 
             // Alertas
             const alerts = buildAlerts({
@@ -79,27 +66,11 @@ async function runOnceForAsset(asset) {
         }
     }
 
-    const lastD = daily.at(-1)?.c, d1 = daily.at(-2)?.c, d7 = daily.at(-8)?.c, d30 = daily.at(-31)?.c;
-    metrics.var["24h"] = (lastD != null && d1 != null) ? (lastD / d1 - 1) : null;
-    metrics.var["7d"] = (lastD != null && d7 != null) ? (lastD / d7 - 1) : null;
-    metrics.var["30d"] = (lastD != null && d30 != null) ? (lastD / d30 - 1) : null;
+    const summary = reportSnapshot
+        ? buildSummary({ assetKey: asset.key, tf: "4h", snapshot: reportSnapshot })
+        : "";
 
-    const tfList = ["5m", "15m", "30m", "45m", "1h", "4h", "24h", "7d", "30d"];
-
-    const summary = [
-        `## 📊 ${asset.key}`,
-        `**Preço** ${num(price)}`,
-        `**Variações** ${tfList.map(tf => `${tf} ${pct(metrics.var[tf])}`).join("  •  ")}`,
-        `**Preço (sparkline)** ${spark}`,
-        `**FearGreed/Tendência** ${fearGreed} / ${trend}`,
-        `**Recomendação** ${tfList.map(tf => `${tf} ${metrics.reco[tf] ?? '—'}`).join("  •  ")}`,
-        `**Semáforo** ${tfList.map(tf => `${tf} ${metrics.sem[tf] ?? '—'}`).join("  •  ")}`,
-        `**Score** ${tfList.map(tf => `${tf} ${metrics.score[tf] ?? '—'}`).join("  •  ")}`,
-        "—",
-        "_Disclaimer: informativo e não constitui aconselhamento financeiro._"
-    ].join("\n");
-
-    const sent = await sendDiscordReport(asset.key, "multi", summary, chartPath);
+    const sent = await sendDiscordReport(asset.key, "4h", summary, chartPath);
     if (!sent) {
         console.warn(`[${asset.key}] report upload failed`);
     }
