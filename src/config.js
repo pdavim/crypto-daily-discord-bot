@@ -14,11 +14,11 @@ export const CFG = {
         TRX: process.env.DISCORD_WEBHOOK_TRX
     },
     tz: process.env.TZ || 'Europe/Lisbon',
-    dailyReportHour: process.env.DAILY_REPORT_HOUR || '8'
+    dailyReportHour: process.env.DAILY_REPORT_HOUR || '8',
+    openrouterApiKey: process.env.OPENROUTER_API_KEY,
 };
 
 export const config = {
-    openrouterApiKey: process.env.OPENROUTER_API_KEY,
     newsApiKey: process.env.NEWS_API_KEY,
 };
 
