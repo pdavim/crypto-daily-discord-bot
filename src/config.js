@@ -4,6 +4,7 @@ export const CFG = {
     webhook: process.env.DISCORD_WEBHOOK_URL,
     webhookAlerts: process.env.DISCORD_WEBHOOK_ALERTS_URL,
     webhookReports: process.env.DISCORD_WEBHOOK_REPORTS_URL,
+    webhookDaily: process.env.DISCORD_WEBHOOK_DAILY,
     webhooks: {
         BTC: process.env.DISCORD_WEBHOOK_BTC,
         ETH: process.env.DISCORD_WEBHOOK_ETH,
@@ -12,7 +13,8 @@ export const CFG = {
         SOL: process.env.DISCORD_WEBHOOK_SOL,
         TRX: process.env.DISCORD_WEBHOOK_TRX
     },
-    tz: process.env.TZ || 'Europe/Lisbon'
+    tz: process.env.TZ || 'Europe/Lisbon',
+    dailyReportHour: process.env.DAILY_REPORT_HOUR || '8'
 };
 
 export const config = {
