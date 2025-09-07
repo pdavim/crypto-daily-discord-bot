@@ -9,6 +9,7 @@ import { postCharts } from "./discordBot.js";
 import { renderChartPNG } from "./chart.js";
 import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
+import { getSignature, updateSignature, saveStore } from "./store.js";
 
 function tfToInterval(tf) { return tf; }
 
@@ -24,6 +25,15 @@ async function runOnceForAsset(asset) {
         try {
             const candles = await fetchOHLCV(asset.binance, tfToInterval(tf));
             if (!candles || candles.length < 120) continue;
+
+            const lastCandleTime = candles.at(-1)?.t?.getTime?.();
+            const key = `${asset.key}:${tf}`;
+            if (lastCandleTime != null && getSignature(key) === lastCandleTime) {
+                continue;
+            }
+            if (lastCandleTime != null) {
+                updateSignature(key, lastCandleTime);
+            }
 
             const close = candles.map(c => c.c), vol = candles.map(c => c.v);
 
@@ -62,15 +72,20 @@ async function runOnceForAsset(asset) {
             console.error(`[${asset.key} ${tf}]`, e?.message || e);
         }
     }
+    saveStore();
 
-    const summary = buildSummary({ assetKey: asset.key, snapshots });
+    if (snapshots["4h"]) {
+        const summary = buildSummary({ assetKey: asset.key, snapshots });
 
-    const sent = await postAnalysis(asset.key, "4h", summary);
-    if (!sent) {
-        console.warn(`[${asset.key}] report upload failed`);
+        const sent = await postAnalysis(asset.key, "4h", summary);
+        if (!sent) {
+            console.warn(`[${asset.key}] report upload failed`);
+        }
     }
 
-    await postCharts(chartPaths);
+    if (chartPaths.length > 0) {
+        await postCharts(chartPaths);
+    }
 }
 
 async function runAll() {
@@ -82,6 +97,17 @@ async function runAll() {
 
 async function runDailyAnalysis() {
     try {
+        const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 2);
+        const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
+        const key = "DAILY:1d";
+        if (lastTime != null && getSignature(key) === lastTime) {
+            return;
+        }
+        if (lastTime != null) {
+            updateSignature(key, lastTime);
+            saveStore();
+        }
+
         const report = await runAgent();
         const sent = await postAnalysis("DAILY", "1d", report);
         if (!sent) {
