@@ -15,4 +15,8 @@ export const CFG = {
     tz: process.env.TZ || 'Europe/Lisbon'
 };
 
+export const config = {
+    openrouterApiKey: process.env.OPENROUTER_API_KEY,
+    newsApiKey: process.env.NEWS_API_KEY,
+};
 
