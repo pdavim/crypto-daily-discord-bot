@@ -33,5 +33,21 @@ export async function sendDiscordReport(assetKey, tf, text) {
 
 export async function sendDiscordAlert(text) {
     const url = CFG.webhookAlerts ?? CFG.webhook;
-    await axios.post(url, { content: text });
+    const attemptSend = async () => {
+        await axios.post(url, { content: text });
+    };
+
+    try {
+        await attemptSend();
+        return true;
+    } catch (err) {
+        console.error("Failed to send alert", err?.message || err);
+        try {
+            await attemptSend();
+            return true;
+        } catch (retryErr) {
+            console.error("Retry failed for alert", retryErr?.message || retryErr);
+            return false;
+        }
+    }
 }
