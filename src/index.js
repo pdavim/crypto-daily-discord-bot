@@ -15,6 +15,8 @@ import { buildAlerts } from "./alerts.js";
 
 function tfToInterval(tf) { return tf; }
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 async function runOnceForAsset(asset) {
     const daily = await fetchDailyCloses(asset.binance, 32);
 
@@ -75,7 +77,10 @@ async function runOnceForAsset(asset) {
 }
 
 async function runAll() {
-    for (const a of ASSETS) { await runOnceForAsset(a); }
+    const THROTTLE_MS = 1000; // adjust to respect upstream rate limits
+    await Promise.all(
+        ASSETS.map((a, i) => sleep(i * THROTTLE_MS).then(() => runOnceForAsset(a)))
+    );
 }
 
 const ONCE = process.argv.includes("--once");
