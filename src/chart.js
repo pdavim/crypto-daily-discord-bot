@@ -3,9 +3,17 @@ import { Chart, registerables } from "chart.js";
 import "chartjs-adapter-luxon";
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "node:fs";
+import {
+    CandlestickController,
+    CandlestickElement,
+} from "chartjs-chart-financial/dist/chartjs-chart-financial.esm.js";
 
 // register Chart.js components
-Chart.register(...registerables);
+Chart.register(
+    ...registerables,
+    CandlestickController,
+    CandlestickElement,
+);
 
 // injeta o Chart configurado no canvas
 const canvas = new ChartJSNodeCanvas({
@@ -20,11 +28,6 @@ const safe = (y) => (y == null ? null : y);
 const hasTimeAdapter = () => {
     const a = Chart?._adapters?.date;
     return !!(a && typeof a.parse === "function");
-};
-// diagnostics: check if candlestick controller is registered
-const isCandlestickRegistered = () => {
-    try { return !!Chart.registry.controllers.get("candlestick"); }
-    catch { return false; }
 };
 
 // renderização
