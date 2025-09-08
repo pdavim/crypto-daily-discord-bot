@@ -1,5 +1,6 @@
 import axios from "axios";
 import { config } from "./config.js";
+import { fetchWithRetry } from "./utils.js";
 
 export const WEB_SNIPPETS = [];
 
@@ -20,7 +21,7 @@ async function fetchOfficialBlog(asset) {
     const url = BLOG_SOURCES[asset];
     if (!url) return null;
     try {
-        const { data } = await axios.get(url);
+        const { data } = await fetchWithRetry(() => axios.get(url));
         const match = data.match(/<h[12][^>]*>\s*<a[^>]*>(.*?)<\/a>/i);
         if (match) {
             return `Official ${asset} blog: ${stripHtml(match[1])}`;
@@ -43,7 +44,7 @@ export async function searchWeb(asset) {
             api_key: config.serpapiApiKey,
             num: 5,
         };
-        const { data } = await axios.get("https://serpapi.com/search", { params });
+        const { data } = await fetchWithRetry(() => axios.get("https://serpapi.com/search", { params }));
         const results = data.organic_results || [];
         results.slice(0, 5).forEach(r => {
             if (r.snippet) {
