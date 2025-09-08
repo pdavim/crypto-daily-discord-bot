@@ -15,6 +15,13 @@ function tfToInterval(tf) { return tf; }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+function buildCron(minute) {
+    if (CFG.analysisFrequency === "twice-daily") {
+        return `${minute} 0,12 * * *`;
+    }
+    return `${minute} * * * *`;
+}
+
 async function runOnceForAsset(asset) {
     const daily = await fetchDailyCloses(asset.binance, 32);
 
@@ -89,10 +96,12 @@ async function runOnceForAsset(asset) {
 }
 
 async function runAll() {
-    const THROTTLE_MS = 1000; // adjust to respect upstream rate limits
-    await Promise.all(
-        ASSETS.map((a, i) => sleep(i * THROTTLE_MS).then(() => runOnceForAsset(a)))
-    );
+    for (let i = 0; i < ASSETS.length; i++) {
+        await runOnceForAsset(ASSETS[i]);
+        if (i < ASSETS.length - 1) {
+            await sleep(1000);
+        }
+    }
 }
 
 async function runDailyAnalysis() {
@@ -121,9 +130,13 @@ async function runDailyAnalysis() {
 const ONCE = process.argv.includes("--once");
 
 if (!ONCE) {
-    cron.schedule("0 * * * *", runAll, { timezone: CFG.tz });
+    ASSETS.forEach((asset, idx) => {
+        const minute = idx * 2;
+        const pattern = buildCron(minute);
+        cron.schedule(pattern, () => runOnceForAsset(asset), { timezone: CFG.tz });
+        console.log(`⏱️ Scheduled ${asset.key} at '${pattern}' (TZ=${CFG.tz})`);
+    });
     cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
-    console.log(`⏱️ Scheduled hourly (TZ=${CFG.tz})`);
     console.log(`⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
     runAll();
     runDailyAnalysis();

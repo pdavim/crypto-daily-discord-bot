@@ -17,6 +17,7 @@ export const CFG = {
     },
     tz: process.env.TZ || 'Europe/Lisbon',
     dailyReportHour: process.env.DAILY_REPORT_HOUR || '8',
+    analysisFrequency: process.env.ANALYSIS_FREQUENCY || 'hourly',
     openrouterApiKey: process.env.OPENROUTER_API_KEY,
     openrouterModel: process.env.OPENROUTER_MODEL || 'openrouter/sonoma-dusk-alpha',
 };

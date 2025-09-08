@@ -1,6 +1,7 @@
 import axios from "axios";
 import { config, CFG } from "./config.js";
 import { callOpenRouter } from "./ai.js";
+import { fetchWithRetry } from "./utils.js";
 
 const REPUTABLE_DOMAINS = [
     "coindesk.com",
@@ -66,7 +67,7 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
             api_key: config.serpapiApiKey,
             num: limit * 2,
         };
-        const resp = await axios.get("https://serpapi.com/search", { params });
+        const resp = await fetchWithRetry(() => axios.get("https://serpapi.com/search", { params }));
         const now = Date.now();
         const cutoff = now - lookbackHours * 60 * 60 * 1000;
         let items = (resp.data.news_results || []).map(n => {
