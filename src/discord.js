@@ -3,6 +3,10 @@ import { CFG } from "./config.js";
 
 export async function postAnalysis(assetKey, tf, text) {
     const url = CFG.webhookAnalysis;
+    if (!url) {
+        console.warn("DISCORD_WEBHOOK_ANALYSIS_URL not configured—skipping post.");
+        return false;
+    }
     const attemptSend = async () => {
         await axios.post(url, { content: text });
     };
