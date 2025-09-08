@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { CFG } from "./config.js";
-import { ASSETS, TIMEFRAMES } from "./assets.js";
+import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
@@ -11,7 +11,23 @@ import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore } from "./store.js";
 
-function tfToInterval(tf) { return tf; }
+function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
+
+function build45mCandles(candles15m) {
+    const out = [];
+    for (let i = 0; i + 3 <= candles15m.length; i += 3) {
+        const slice = candles15m.slice(i, i + 3);
+        out.push({
+            t: slice[0].t,
+            o: slice[0].o,
+            h: Math.max(...slice.map(c => c.h)),
+            l: Math.min(...slice.map(c => c.l)),
+            c: slice[slice.length - 1].c,
+            v: slice.reduce((sum, c) => sum + c.v, 0)
+        });
+    }
+    return out;
+}
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -30,8 +46,12 @@ async function runOnceForAsset(asset) {
 
     for (const tf of TIMEFRAMES) {
         try {
-            const candles = await fetchOHLCV(asset.binance, tfToInterval(tf));
-            if (!candles || candles.length < 120) continue;
+            let candles = await fetchOHLCV(asset.binance, tfToInterval(tf));
+            if (tf === "45m") {
+                candles = build45mCandles(candles);
+            }
+            const min = tf === "45m" ? 40 : 120;
+            if (!candles || candles.length < min) continue;
 
             const lastCandleTime = candles.at(-1)?.t?.getTime?.();
             const key = `${asset.key}:${tf}`;
