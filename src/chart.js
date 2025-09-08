@@ -1,27 +1,41 @@
 // src/chart.js
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "node:fs";
+import "chartjs-adapter-luxon";
+import {
+    CandlestickController,
+    CandlestickElement,
+    OhlcController,
+    OhlcElement,
+} from "chartjs-chart-financial/dist/chartjs-chart-financial.esm.js";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const { Chart } = require("chart.js/auto");
-global.Chart = Chart;
-global.Chart.helpers = require("chart.js/helpers");
-await import("chartjs-chart-financial/dist/chartjs-chart-financial.js");
-delete global.Chart.helpers;
-delete global.Chart;
+const chartAutoPath = require.resolve("chart.js/auto");
+const chartModule = await import("chart.js/auto");
+const coreModule = await import("chart.js");
+chartModule._adapters._date = coreModule._adapters._date;
+const Chart = Object.assign(chartModule.Chart, chartModule);
+require.cache[chartAutoPath] = { exports: Chart };
+Chart.register(
+    CandlestickController,
+    CandlestickElement,
+    OhlcController,
+    OhlcElement,
+);
 
 // Canvas with Chart.js
 const canvas = new ChartJSNodeCanvas({
     width: 1280,
     height: 640,
+    chartJs: Chart,
 });
 
 // utilitários
 const toMs = (x) => (x instanceof Date ? x.getTime() : +x);
 const safe = (y) => (y == null ? null : y);
 const hasTimeAdapter = () => {
-    const a = Chart?._adapters?.date;
-    return !!(a && typeof a.parse === "function");
+    const proto = Chart?._adapters?._date?.prototype;
+    return !!(proto && typeof proto.parse === "function");
 };
 
 // renderização
