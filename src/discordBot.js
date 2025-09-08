@@ -3,6 +3,10 @@ import { CFG } from './config.js';
 
 let clientPromise;
 function getClient() {
+    if (!CFG.botToken || !CFG.channelChartsId) {
+        console.warn('Missing bot token or channel ID; skipping Discord chart upload');
+        return null;
+    }
     if (!clientPromise) {
         const client = new Client({ intents: [GatewayIntentBits.Guilds] });
         clientPromise = client.login(CFG.botToken).then(() => client);
@@ -14,6 +18,14 @@ function getClient() {
 export async function postCharts(files) {
     if (!Array.isArray(files)) files = [files];
     const client = await getClient();
-    const channel = await client.channels.fetch(CFG.channelChartsId);
-    await channel.send({ files });
+    if (!client) return false;
+    try {
+        const channel = await client.channels.fetch(CFG.channelChartsId);
+        await channel.send({ files });
+        return true;
+    } catch (e) {
+        console.error('Failed to post charts to Discord', e);
+        return false;
+    }
 }
+
