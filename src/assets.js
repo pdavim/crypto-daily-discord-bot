@@ -8,4 +8,5 @@ export const ASSETS = [
 ];
 
 export const TIMEFRAMES = ["4h", "1h", "45m", "30m", "15m", "5m"];
-// Mapa para Binance (klines): 4h->4h, 1h->1h, 45m->45m, 30m->30m, 15m->15m, 5m->5m
+// Binance intervals: 45m aggregated from 15m
+export const BINANCE_INTERVALS = { "45m": "15m" };
