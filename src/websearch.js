@@ -8,7 +8,7 @@ const BLOG_SOURCES = {
     BTC: "https://bitcoin.org/en/blog",
     ETH: "https://blog.ethereum.org",
     SOL: "https://solana.com/news",
-    TRX: "https://blog.tron.network",
+    TRX: "https://medium.com/tron-foundation",
     POL: "https://polygon.technology/blog",
     SUI: "https://blog.sui.io"
 };
@@ -27,6 +27,9 @@ async function fetchOfficialBlog(asset) {
             return `Official ${asset} blog: ${stripHtml(match[1])}`;
         }
     } catch (err) {
+        if (err.code === "ENOTFOUND" || err.code === "EAI_AGAIN") {
+            return null;
+        }
         console.error(`Error fetching official blog for ${asset}:`, err.message);
     }
     return null;
@@ -54,7 +57,14 @@ export async function searchWeb(asset) {
     } catch (err) {
         console.error("Error fetching web results:", err.message);
     }
-    const official = await fetchOfficialBlog(asset);
+    let official = null;
+    try {
+        official = await fetchOfficialBlog(asset);
+    } catch (err) {
+        if (err.code !== "ENOTFOUND" && err.code !== "EAI_AGAIN") {
+            console.error(`Error fetching official blog for ${asset}:`, err.message);
+        }
+    }
     if (official) {
         WEB_SNIPPETS.unshift(official);
     }
