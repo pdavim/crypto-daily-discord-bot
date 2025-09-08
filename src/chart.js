@@ -42,7 +42,8 @@ const hasTimeAdapter = () => {
 export async function renderChartPNG(assetKey, tf, candles, indicators) {
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
     const timeAdapter = hasTimeAdapter();
-    console.log("candlestick:", !!Chart.registry.controllers.get("candlestick"));
+    const candlestickAvailable = !!Chart.registry.controllers.get("candlestick");
+    console.log("candlestick:", candlestickAvailable);
     console.log("time adapter:", timeAdapter);
     const useTime = timeAdapter;
     const labels = !useTime
@@ -60,13 +61,24 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
             data: ohlc,
             borderWidth: 1,
         });
-    } else {
-        const ohlc = candles.map(c => ({ o: c.o, h: c.h, l: c.l, c: c.c }));
+    } else if (candlestickAvailable) {
+        const ohlc = candles.map((c, i) => ({ x: i, o: c.o, h: c.h, l: c.l, c: c.c }));
         datasets.push({
             type: "candlestick",
             label: `${assetKey} ${tf}`,
             data: ohlc,
             borderWidth: 1,
+            parsing: false,
+        });
+    } else {
+        const lineData = candles.map((c, i) => ({ x: i, y: c.c }));
+        datasets.push({
+            type: "line",
+            label: `${assetKey} ${tf}`,
+            data: lineData,
+            borderWidth: 1,
+            pointRadius: 0,
+            parsing: false,
         });
     }
 
@@ -111,14 +123,16 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
 
     const options = {
         responsive: false,
+        ...(useTime ? {} : { parsing: false }),
         plugins: { legend: { display: true } },
         scales: useTime
             ? { x: { type: "time", time: { tooltipFormat: "yyyy-LL-dd HH:mm" } }, y: { type: "linear" } }
             : { x: { type: "category" }, y: { type: "linear" } },
     };
 
+    const chartType = useTime || candlestickAvailable ? "candlestick" : "line";
     const cfg = {
-        type: "candlestick",
+        type: chartType,
         data: useTime ? { datasets } : { labels, datasets },
         options,
     };
