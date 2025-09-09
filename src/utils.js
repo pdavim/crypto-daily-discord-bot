@@ -1,4 +1,5 @@
 export async function fetchWithRetry(fn, { retries = 3, baseDelay = 500 } = {}) {
+    console.log(`Fetching with retry, max attempts: ${retries + 1}, function: ${fn || 'anonymous'}`);
     let attempt = 0;
     while (true) {
         try {

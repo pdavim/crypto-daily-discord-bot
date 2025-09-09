@@ -56,6 +56,7 @@ function sortByRank(a, b) {
 }
 
 export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
+    console.log(`Fetching news for ${symbol}`);
     if (!config.serpapiApiKey || !symbol) {
         return { items: [], summary: "" };
     }
@@ -94,7 +95,7 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
                     filtered.map(i => `- ${i.title} (${i.source})`).join("\n");
                 const messages = [
                     { role: "system", content: "You are a concise financial news assistant." },
-                    { role: "user", content: prompt }
+                    { role: "user", content: [{ type: "text", text: prompt }] }
                 ];
                 summary = await callOpenRouter(messages);
             } catch {

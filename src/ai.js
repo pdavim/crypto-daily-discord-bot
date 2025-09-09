@@ -13,12 +13,16 @@ const openrouter = CFG.openrouterApiKey
 
 // OpenRouter chat completion
 export async function callOpenRouter(messages) {
+    console.log("Calling OpenRouter...");
     if (!openrouter) {
         throw new Error("OpenRouter API key missing");
     }
+    if (!CFG.openrouterModel) {
+        throw new Error("OpenRouter model missing");
+    }
     try {
         const response = await openrouter.chat.completions.create({
-            model: CFG.openrouterModel || "openrouter/sonoma-dusk-alpha",
+            model: CFG.openrouterModel,
             messages,
         });
         return response.choices[0].message.content;
@@ -46,6 +50,7 @@ function fallbackVerdict({ ma20, ma50, rsi14 }) {
 }
 
 async function getMacroContext() {
+    console.log("Fetching macro context...");
     try {
         const { summary } = await getAssetNews({ symbol: "crypto market" });
         const web = await searchWeb("crypto market");
@@ -57,6 +62,7 @@ async function getMacroContext() {
 
 // Gather metrics for several assets and use OpenRouter for a brief analysis
 export async function runAgent() {
+    console.log("Running AI agent for asset analysis...");
     const reports = [];
     const macro = await getMacroContext();
 
@@ -96,14 +102,14 @@ export async function runAgent() {
                 `News: ${newsSummary}\n` +
                 `Web: ${webSnips.join(' | ')}\n` +
                 `Macro: ${macro}\n` +
-                `Give a verdict (📈 bullish, 📉 bearish, 🔁 neutral) with 1-2 line justification.`;
+                `Give a verdict (📈 bullish, 📉 bearish, 🔁 neutral) with 1-2 line detailed justification.`;
 
             let verdict = "";
             if (openrouter) {
                 try {
                     const messages = [
                         { role: "system", content: "You are a crypto trading assistant." },
-                        { role: "user", content: prompt }
+                        { role: "user", content: [{ type: "text", text: prompt }] }
                     ];
                     verdict = await callOpenRouter(messages);
                 } catch {

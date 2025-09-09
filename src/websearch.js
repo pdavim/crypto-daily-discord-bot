@@ -18,6 +18,7 @@ function stripHtml(html) {
 }
 
 async function fetchOfficialBlog(asset) {
+    console.log(`Fetching official blog for ${asset}`);
     const url = BLOG_SOURCES[asset];
     if (!url) return null;
     try {
@@ -36,6 +37,7 @@ async function fetchOfficialBlog(asset) {
 }
 
 export async function searchWeb(asset) {
+    console.log(`Fetching web results for ${asset}`);
     WEB_SNIPPETS.length = 0;
     if (!config.serpapiApiKey || !asset) {
         return WEB_SNIPPETS;
@@ -48,6 +50,7 @@ export async function searchWeb(asset) {
             num: 5,
         };
         const { data } = await fetchWithRetry(() => axios.get("https://serpapi.com/search", { params }));
+        console.log("Web search data:", data);
         const results = data.organic_results || [];
         results.slice(0, 5).forEach(r => {
             if (r.snippet) {
