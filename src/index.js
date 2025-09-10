@@ -90,7 +90,8 @@ async function runOnceForAsset(asset) {
                     sarSeries: undefined, trendSeries: undefined, heuristicSeries: undefined,
                     vwapSeries: undefined, ema9: undefined, ema21: undefined, stochasticK: undefined, stochasticD: undefined, willrSeries: undefined, cciSeries: undefined, obvSeries: undefined
                 });
-                const hasSignals = alerts.some(a => !a.startsWith("Preço") && !a.startsWith("Var24h"));
+                const hasSignals = alerts.some(a =>
+                    !a.startsWith('💰 Preço') && !a.startsWith('📊 Var24h'));
                 if (hasSignals) {
                     const mention = "@here";
                     const alertMsg = [`**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`, ...alerts.map(a => `• ${a}`)].join("\n");
