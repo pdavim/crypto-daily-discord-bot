@@ -16,7 +16,8 @@ export function buildAlerts({
     const prevPrice = closes?.at(-2);
     const high20 = Math.max(...highs?.slice(-20));
     const low20 = Math.min(...lows?.slice(-20));
-    const avgVol = volumes?.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    const last20Vol = volumes?.slice(-20);
+    const avgVol = last20Vol?.length === 20 ? last20Vol.reduce((a, b) => a + b, 0) / 20 : undefined;
     const lastVol = volumes?.at(-1);
     const atr = atrSeries?.at(-1);
     const prevAtr = atrSeries?.at(-2);
