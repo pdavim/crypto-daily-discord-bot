@@ -20,10 +20,13 @@ export const CFG = {
     analysisFrequency: process.env.ANALYSIS_FREQUENCY || 'hourly',
     openrouterApiKey: process.env.OPENROUTER_API_KEY,
     openrouterModel: process.env.OPENROUTER_MODEL || 'openrouter/sonoma-dusk-alpha',
+    enableCharts: process.env.ENABLE_CHARTS === undefined || process.env.ENABLE_CHARTS === 'true',
+    enableAlerts: process.env.ENABLE_ALERTS === undefined || process.env.ENABLE_ALERTS === 'true',
+    enableAnalysis: process.env.ENABLE_ANALYSIS === undefined || process.env.ENABLE_ANALYSIS === 'true',
+    enableReports: process.env.ENABLE_REPORTS === undefined || process.env.ENABLE_REPORTS === 'true',
 };
 
 export const config = {
     newsApiKey: process.env.NEWS_API_KEY,
     serpapiApiKey: process.env.SERPAPI_API_KEY,
 };
-

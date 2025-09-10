@@ -137,8 +137,6 @@ export function volumeDivergence(closes, volumes, period = 20) {
 }
 
 
-// ... (mantém SMA, RSI, MACD, Bollinger que já tens)
-
 export function atr14(ohlc) {
     const tr = [];
     for (let i = 0; i < ohlc.length; i++) {
@@ -210,3 +208,30 @@ export function semaforo(score) {
     if (score >= 33) return "🟡";
     return "🔴";
 }
+
+
+// indicators list:
+// - SMA (20,50,200)
+// - RSI (14)
+// - MACD (12,26,9)
+// - Bollinger Bands (20,2) + width + squeeze
+// - Parabolic SAR
+// - Volume Divergence
+// - ATR (14)
+// - Trend from MAs
+// - Heuristic Score (0-100) + semaforo
+// - Sparkline of closes
+// - atr14
+// - bollWidth
+// - isBBSqueeze
+// - crossUp
+// - crossDown
+// - sparkline
+// - trendFromMAs
+// - scoreHeuristic
+// - semaforo
+
+// Example usage:
+// const closes = [....]; // array of closing prices
+// const volumes = [....]; // array of volumes
+// const ohlc = [ {o,h,l,c,v}, ... ]; // array of OHLCV objects
