@@ -85,7 +85,7 @@ async function runOnceForAsset(asset) {
                     lastClose: snapshot.kpis.price,
                     var24h: snapshot.kpis.var24h,
                     closes: close, highs: high, lows: low, volumes: vol,
-                    atrSeries: atr.map(x => x.atr),
+                    atrSeries: atr,
                     upperBB: bb.upper, lowerBB: bb.lower,
                     sarSeries: undefined, trendSeries: undefined, heuristicSeries: undefined,
                     vwapSeries: undefined, ema9: undefined, ema21: undefined, stochasticK: undefined, stochasticD: undefined, willrSeries: undefined, cciSeries: undefined, obvSeries: undefined
