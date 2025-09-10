@@ -132,9 +132,12 @@ export async function runAgent() {
             const lowsH = hourly.map(c => c.l);
             const volumesH = hourly.map(c => c.v);
 
-            const ma20 = sma(closesH, 20).at(-1);
-            const ma50 = sma(closesH, 50).at(-1);
-            const ma200 = sma(closesH, 200).at(-1);
+            const ma20Series = sma(closesH, 20);
+            const ma50Series = sma(closesH, 50);
+            const ma200Series = sma(closesH, 200);
+            const ma20 = ma20Series.at(-1);
+            const ma50 = ma50Series.at(-1);
+            const ma200 = ma200Series.at(-1);
             const rsi14 = rsi(closesH, 14).at(-1);
             const macdResult = macd(closesH, 12, 26, 9);
             const macdLine = macdResult.macd.at(-1);
@@ -143,15 +146,16 @@ export async function runAgent() {
             const widthSeries = bollWidth(bb.upper, bb.lower, bb.mid);
             const bollW = widthSeries.at(-1);
             const bbSqueeze = isBBSqueeze(widthSeries);
-            const atrValue = atr14(hourly, 14).at(-1)?.atr;
+            const atrSeries = atr14(hourly);
+            const atrValue = atrSeries.at(-1);
             const sar = parabolicSAR(hourly, 0.02, 0.2).at(-1);
-            const volume = volumeDivergence(hourly, 14).at(-1);
-            const trend = trendFromMAs(closesH, 20, 50).at(-1);
+            const volume = volumeDivergence(closesH, volumesH, 14).at(-1);
+            const trend = trendFromMAs(ma20Series, ma50Series, ma200Series);
             const heuristic = scoreHeuristic(closesH, 14).at(-1);
             const semaf = semaforo(heuristic);
             const spark = sparkline(closesH);
-            const crossUpSignal = crossUp(ma20, ma50);
-            const crossDownSignal = crossDown(ma20, ma50);
+            const crossUpSignal = crossUp(ma20Series, ma50Series);
+            const crossDownSignal = crossDown(ma20Series, ma50Series);
             const lastDaily = daily.at(-1);
             const dailyCloses = daily.map(c => c.c);
             const ret1d = calcReturn(dailyCloses, 1);
@@ -170,7 +174,7 @@ export async function runAgent() {
                 `Parabolic SAR: ${sar?.toFixed(2)}\n` +
                 `Volume Divergence: ${volume?.toFixed(2)}\n` +
                 `ATR: ${atrValue?.toFixed(2)}\n` +
-                `Trend from MAs: ${trend?.toFixed(2)}\n` +
+                `Trend from MAs: ${trend}\n` +
                 `Heuristic Score: ${heuristic?.toFixed(2)} Semaforo: ${semaf}\n` +
                 `Cross Up: ${crossUpSignal} Cross Down: ${crossDownSignal}\n` +
                 `Sparkline: ${spark}\n` +
@@ -204,20 +208,20 @@ export async function runAgent() {
                 rsiSeries: rsi(closesH, 14),
                 macdObj: macdResult,
                 bbWidth: widthSeries,
-                ma20: sma(closesH, 20),
-                ma50: sma(closesH, 50),
-                ma200: sma(closesH, 200),
+                ma20: ma20Series,
+                ma50: ma50Series,
+                ma200: ma200Series,
                 lastClose: closesH.at(-1),
                 var24h: (closesH.at(-1) - closesH.at(-25)) / closesH.at(-25),
                 closes: closesH,
                 highs: highsH,
                 lows: lowsH,
                 volumes: volumesH,
-                atrSeries: atr14(hourly, 14).map(x => x.atr),
+                atrSeries,
                 upperBB: bb.upper,
                 lowerBB: bb.lower,
                 sarSeries: parabolicSAR(hourly, 0.02, 0.2),
-                trendSeries: trendFromMAs(closesH, 20, 50),
+                trendSeries: [trend],
                 heuristicSeries: scoreHeuristic(closesH, 14),
                 vwapSeries: undefined, // Add if you have VWAP calculation
                 ema9: undefined, // Add if you have EMA9 calculation
@@ -239,7 +243,7 @@ export async function runAgent() {
                 `- Parabolic SAR: ${sar?.toFixed(2)}`,
                 `- Volume Divergence: ${volume?.toFixed(2)}`,
                 `- ATR: ${atrValue?.toFixed(2)}`,
-                `- Trend from MAs: ${trend?.toFixed(2)}`,
+                `- Trend from MAs: ${trend}`,
                 `- Heuristic Score: ${heuristic?.toFixed(2)} Semaforo: ${semaf}`,
                 `- Cross Up: ${crossUpSignal} Cross Down: ${crossDownSignal}`,
                 `- Sparkline: ${spark}`,
