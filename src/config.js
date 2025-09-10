@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { ASSETS } from './assets.js';
 export const CFG = {
     webhook: process.env.DISCORD_WEBHOOK_URL,
     webhookAlerts: process.env.DISCORD_WEBHOOK_ALERTS_URL,
@@ -31,3 +32,35 @@ export const config = {
     newsApiKey: process.env.NEWS_API_KEY,
     serpapiApiKey: process.env.SERPAPI_API_KEY,
 };
+
+export function validateConfig() {
+    const missing = [];
+
+    if (!process.env.DISCORD_WEBHOOK_URL) {
+        missing.push('DISCORD_WEBHOOK_URL');
+    }
+
+    for (const { key, binance } of ASSETS) {
+        if (!binance) {
+            missing.push(`BINANCE_SYMBOL_${key}`);
+        }
+    }
+
+    const apiKeys = ['OPENROUTER_API_KEY', 'NEWS_API_KEY', 'SERPAPI_API_KEY'];
+    for (const key of apiKeys) {
+        if (!process.env[key]) {
+            missing.push(key);
+        }
+    }
+
+    if (missing.length > 0) {
+        const message = `Missing required environment variables: ${missing.join(', ')}`;
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error(message);
+        } else {
+            console.warn(message);
+        }
+    }
+}
+
+validateConfig();
