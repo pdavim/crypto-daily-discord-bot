@@ -24,6 +24,7 @@ export const CFG = {
     enableAlerts: process.env.ENABLE_ALERTS === undefined || process.env.ENABLE_ALERTS === 'true',
     enableAnalysis: process.env.ENABLE_ANALYSIS === undefined || process.env.ENABLE_ANALYSIS === 'true',
     enableReports: process.env.ENABLE_REPORTS === undefined || process.env.ENABLE_REPORTS === 'true',
+    debug: process.env.DEBUG === 'true',
 };
 
 export const config = {
