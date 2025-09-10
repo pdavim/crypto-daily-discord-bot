@@ -139,9 +139,10 @@ export async function runAgent() {
             const macdResult = macd(closesH, 12, 26, 9);
             const macdLine = macdResult.macd.at(-1);
             const macdSignal = macdResult.signal.at(-1);
-            const [upperBand, lowerBand] = bollinger(closesH, 20, 2);
-            const bollW = bollWidth(closesH, 20, 2).at(-1);
-            const bbSqueeze = isBBSqueeze(closesH, 20, 2).at(-1);
+            const bb = bollinger(closesH, 20, 2);
+            const widthSeries = bollWidth(bb.upper, bb.lower, bb.mid);
+            const bollW = widthSeries.at(-1);
+            const bbSqueeze = isBBSqueeze(widthSeries);
             const atrValue = atr14(hourly, 14).at(-1)?.atr;
             const sar = parabolicSAR(hourly, 0.02, 0.2).at(-1);
             const volume = volumeDivergence(hourly, 14).at(-1);
@@ -165,7 +166,7 @@ export async function runAgent() {
                 `Returns: 24h ${ret1d.toFixed(2)}% 7d ${ret7d.toFixed(2)}% 30d ${ret30d.toFixed(2)}%\n` +
                 `MA20: ${ma20?.toFixed(2)} MA50: ${ma50?.toFixed(2)} MA200: ${ma200?.toFixed(2)} RSI14: ${rsi14?.toFixed(2)}\n` +
                 `MACD: ${macdLine?.toFixed(2)} Signal: ${macdSignal?.toFixed(2)}\n` +
-                `Bollinger Bands: ${upperBand?.toFixed(2)} / ${lowerBand?.toFixed(2)} Width: ${bollW?.toFixed(2)} Squeeze: ${bbSqueeze}\n` +
+                `Bollinger Bands: ${bb.upper.at(-1)?.toFixed(2)} / ${bb.lower.at(-1)?.toFixed(2)} Width: ${bollW?.toFixed(2)} Squeeze: ${bbSqueeze}\n` +
                 `Parabolic SAR: ${sar?.toFixed(2)}\n` +
                 `Volume Divergence: ${volume?.toFixed(2)}\n` +
                 `ATR: ${atrValue?.toFixed(2)}\n` +
@@ -201,8 +202,8 @@ export async function runAgent() {
             // Prepare indicator series for alerts
             const alerts = buildAlerts({
                 rsiSeries: rsi(closesH, 14),
-                macdObj: macd(closesH, 12, 26, 9),
-                bbWidth: bollWidth(closesH, 20, 2),
+                macdObj: macdResult,
+                bbWidth: widthSeries,
                 ma20: sma(closesH, 20),
                 ma50: sma(closesH, 50),
                 ma200: sma(closesH, 200),
@@ -213,8 +214,8 @@ export async function runAgent() {
                 lows: lowsH,
                 volumes: volumesH,
                 atrSeries: atr14(hourly, 14).map(x => x.atr),
-                upperBB: bollinger(closesH, 20, 2)[0],
-                lowerBB: bollinger(closesH, 20, 2)[1],
+                upperBB: bb.upper,
+                lowerBB: bb.lower,
                 sarSeries: parabolicSAR(hourly, 0.02, 0.2),
                 trendSeries: trendFromMAs(closesH, 20, 50),
                 heuristicSeries: scoreHeuristic(closesH, 14),
@@ -234,7 +235,7 @@ export async function runAgent() {
                 `- Returns: 24h ${ret1d.toFixed(2)}%, 7d ${ret7d.toFixed(2)}%, 30d ${ret30d.toFixed(2)}%`,
                 `- Technicals: MA20 ${ma20?.toFixed(2)}, MA50 ${ma50?.toFixed(2)}, MA200 ${ma200?.toFixed(2)}, RSI14 ${rsi14?.toFixed(2)}`,
                 `- MACD: ${macdLine?.toFixed(2)} Signal: ${macdSignal?.toFixed(2)}`,
-                `- Bollinger Bands: ${upperBand?.toFixed(2)} / ${lowerBand?.toFixed(2)} Width: ${bollW?.toFixed(2)} Squeeze: ${bbSqueeze}`,
+                `- Bollinger Bands: ${bb.upper.at(-1)?.toFixed(2)} / ${bb.lower.at(-1)?.toFixed(2)} Width: ${bollW?.toFixed(2)} Squeeze: ${bbSqueeze}`,
                 `- Parabolic SAR: ${sar?.toFixed(2)}`,
                 `- Volume Divergence: ${volume?.toFixed(2)}`,
                 `- ATR: ${atrValue?.toFixed(2)}`,
