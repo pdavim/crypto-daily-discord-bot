@@ -10,7 +10,7 @@ export async function fetchOHLCV(symbol, interval) {
     const url = `${BASE}?symbol=${symbol}&interval=${interval}&limit=${CANDLES}`;
     const { data } = await fetchWithRetry(() => axios.get(url));
     if (CFG.debug) {
-        console.log("OHLCV data:");
+        console.log("OHLCV data:", data);
     }
     return data.map(c => ({
         t: new Date(c[0]),
