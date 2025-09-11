@@ -40,21 +40,21 @@ function buildCron(minute) {
 }
 
 async function runOnceForAsset(asset) {
-    const daily = await fetchDailyCloses(asset.binance, 32);
+    const dailyPromise = fetchDailyCloses(asset.binance, 32);
     const snapshots = {};
     const chartPaths = [];
-    for (const tf of TIMEFRAMES) {
+    await Promise.all(TIMEFRAMES.map(async tf => {
         try {
             let candles = await fetchOHLCV(asset.binance, tfToInterval(tf));
             if (tf === "45m") {
                 candles = build45mCandles(candles);
             }
             const min = tf === "45m" ? 40 : 120;
-            if (!candles || candles.length < min) continue;
+            if (!candles || candles.length < min) return;
             const lastCandleTime = candles.at(-1)?.t?.getTime?.();
             const key = `${asset.key}:${tf}`;
             if (lastCandleTime != null && getSignature(key) === lastCandleTime) {
-                continue;
+                return;
             }
             if (lastCandleTime != null) {
                 updateSignature(key, lastCandleTime);
@@ -67,6 +67,7 @@ async function runOnceForAsset(asset) {
             const bb = bollinger(close, 20, 2);
             const atr = atr14(candles);
             const width = bollWidth(bb.upper, bb.lower, bb.mid);
+            const daily = await dailyPromise;
             const snapshot = buildSnapshotForReport({
                 candles, daily, ma20, ma50, ma100, ma200, rsi: r, macdObj: m, bb, atr, volSeries: vol
             });
@@ -104,7 +105,7 @@ async function runOnceForAsset(asset) {
         } catch (e) {
             console.error(`[${asset.key} ${tf}]`, e?.message || e);
         }
-    }
+    }));
     saveStore();
     if (CFG.enableAnalysis && snapshots["4h"]) {
         const summary = buildSummary({ assetKey: asset.key, snapshots });
