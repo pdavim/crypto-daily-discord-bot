@@ -1,10 +1,11 @@
 import axios from "axios";
 import { CFG } from "./config.js";
+import { logger } from "./logger.js";
 
 export async function postAnalysis(assetKey, tf, text) {
     const url = CFG.webhookAnalysis;
     if (!url) {
-        console.warn("DISCORD_WEBHOOK_ANALYSIS_URL not configured—skipping post.");
+        logger.warn({ asset: assetKey, timeframe: tf, fn: 'postAnalysis' }, "DISCORD_WEBHOOK_ANALYSIS_URL not configured—skipping post.");
         return false;
     }
     const attemptSend = async () => {
@@ -15,12 +16,12 @@ export async function postAnalysis(assetKey, tf, text) {
         await attemptSend();
         return true;
     } catch (err) {
-        console.error(`Failed to post analysis for ${assetKey} ${tf}`, err?.message || err);
+        logger.error({ asset: assetKey, timeframe: tf, fn: 'postAnalysis', err }, 'Failed to post analysis');
         try {
             await attemptSend();
             return true;
         } catch (retryErr) {
-            console.error(`Retry failed for ${assetKey} ${tf}`, retryErr?.message || retryErr);
+            logger.error({ asset: assetKey, timeframe: tf, fn: 'postAnalysis', err: retryErr }, 'Retry failed');
             return false;
         }
     }
@@ -36,12 +37,12 @@ export async function sendDiscordAlert(text) {
         await attemptSend();
         return true;
     } catch (err) {
-        console.error("Failed to send alert", err?.message || err);
+        logger.error({ asset: undefined, timeframe: undefined, fn: 'sendDiscordAlert', err }, 'Failed to send alert');
         try {
             await attemptSend();
             return true;
         } catch (retryErr) {
-            console.error("Retry failed for alert", retryErr?.message || retryErr);
+            logger.error({ asset: undefined, timeframe: undefined, fn: 'sendDiscordAlert', err: retryErr }, 'Retry failed for alert');
             return false;
         }
     }

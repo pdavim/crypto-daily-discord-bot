@@ -2,6 +2,7 @@ import axios from "axios";
 import crypto from "crypto";
 import WebSocket from "ws";
 import { logTrade } from "./tradeLog.js";
+import { logger } from "../logger.js";
 
 const BASE = "https://api.binance.com";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
@@ -63,7 +64,7 @@ export function subscribeTicker(symbol, onMessage) {
             const data = JSON.parse(msg);
             onMessage?.(data);
         } catch (e) {
-            console.error("WS parse error", e);
+            logger.error({ asset: symbol, timeframe: undefined, fn: 'subscribeTicker', err: e }, "WS parse error");
         }
     });
     return ws;

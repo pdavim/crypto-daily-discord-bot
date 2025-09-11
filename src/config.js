@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { ASSETS } from './assets.js';
+import { logger } from './logger.js';
 export const CFG = {
     webhook: process.env.DISCORD_WEBHOOK_URL,
     webhookAlerts: process.env.DISCORD_WEBHOOK_ALERTS_URL,
@@ -60,7 +61,7 @@ export function validateConfig() {
         if (process.env.NODE_ENV === 'production') {
             throw new Error(message);
         } else {
-            console.warn(message);
+            logger.warn({ asset: undefined, timeframe: undefined, fn: 'validateConfig' }, message);
         }
     }
 }

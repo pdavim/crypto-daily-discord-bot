@@ -1,5 +1,6 @@
 import axios from "axios";
 import { config } from "../config.js";
+import { logger } from "../logger.js";
 
 export async function searchNews(asset) {
     if (!config.newsApiKey) return [];
@@ -18,7 +19,7 @@ export async function searchNews(asset) {
             description: a.description || "",
         }));
     } catch (error) {
-        console.error("Error fetching news:", error.message);
+        logger.error({ asset, timeframe: undefined, fn: 'searchNews', err: error }, "Error fetching news");
         return [];
     }
 }

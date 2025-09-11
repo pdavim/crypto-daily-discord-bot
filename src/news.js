@@ -2,6 +2,7 @@ import axios from "axios";
 import { config, CFG } from "./config.js";
 import { callOpenRouter } from "./ai.js";
 import { fetchWithRetry } from "./utils.js";
+import { logger } from "./logger.js";
 
 const REPUTABLE_DOMAINS = [
     "coindesk.com",
@@ -72,7 +73,7 @@ async function classifySentiments(items) {
                 return arr.map(n => Math.max(-1, Math.min(1, Number(n) || 0)));
             }
         } catch (err) {
-            console.error("Sentiment classification via OpenRouter failed:", err.message);
+              logger.error({ asset: undefined, timeframe: undefined, fn: 'classifySentiments', err }, "Sentiment classification via OpenRouter failed");
         }
     }
     const positive = ["up", "surge", "rally", "gain", "bull", "rise", "soar", "profit", "positive"];
@@ -87,7 +88,7 @@ async function classifySentiments(items) {
 }
 
 export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
-    console.log(`Fetching news for ${symbol}`);
+    logger.info({ asset: symbol, timeframe: undefined, fn: 'getAssetNews' }, `Fetching news for ${symbol}`);
     if (!config.serpapiApiKey || !symbol) {
         return { items: [], summary: "", avgSentiment: 0 };
     }
@@ -149,7 +150,7 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
 
         return { items: normalized, summary: summary.trim(), avgSentiment };
     } catch (error) {
-        console.error("Error fetching asset news:", error.message);
+          logger.error({ asset: symbol, timeframe: undefined, fn: 'getAssetNews', err: error }, "Error fetching asset news");
         return { items: [], summary: "", avgSentiment: 0 };
     }
 }

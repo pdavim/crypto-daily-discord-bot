@@ -12,6 +12,7 @@ import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
+import { logger } from "./logger.js";
 
 function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
 
@@ -97,7 +98,7 @@ async function runOnceForAsset(asset) {
                 }
             }
         } catch (e) {
-            console.error(`[${asset.key} ${tf}]`, e?.message || e);
+            logger.error({ asset: asset.key, timeframe: tf, fn: 'runOnceForAsset', err: e }, 'Processing error');
         }
     }));
     saveStore();
@@ -105,13 +106,13 @@ async function runOnceForAsset(asset) {
         const summary = buildSummary({ assetKey: asset.key, snapshots });
         const sent = await postAnalysis(asset.key, "4h", summary);
         if (!sent) {
-            console.warn(`[${asset.key}] report upload failed`);
+            logger.warn({ asset: asset.key, timeframe: '4h', fn: 'runOnceForAsset' }, 'report upload failed');
         }
     }
     if (CFG.enableCharts && chartPaths.length > 0) {
         const chartsSent = await postCharts(chartPaths);
         if (!chartsSent) {
-            console.warn(`[${asset.key}] chart upload failed`);
+            logger.warn({ asset: asset.key, timeframe: undefined, fn: 'runOnceForAsset' }, 'chart upload failed');
         }
     }
 }
@@ -149,11 +150,11 @@ async function runDailyAnalysis() {
         if (CFG.enableReports) {
             const sent = await postAnalysis("DAILY", "1d", finalReport);
             if (!sent) {
-                console.warn("[DAILY] report upload failed");
+                logger.warn({ asset: 'DAILY', timeframe: '1d', fn: 'runDailyAnalysis' }, 'report upload failed');
             }
         }
     } catch (e) {
-        console.error("[DAILY]", e?.message || e);
+        logger.error({ asset: 'DAILY', timeframe: '1d', fn: 'runDailyAnalysis', err: e }, 'Error in daily analysis');
     }
 }
 
@@ -177,7 +178,7 @@ if (!ONCE) {
         }
     });
     cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
-    console.log(`⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
+    logger.info({ asset: undefined, timeframe: undefined, fn: 'schedule' }, `⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
     runAll();
     runDailyAnalysis();
 } else {
