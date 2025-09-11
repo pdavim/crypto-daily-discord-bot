@@ -10,6 +10,7 @@ import { renderChartPNG } from "./chart.js";
 import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore } from "./store.js";
+import { fetchEconomicEvents } from "./data/economic.js";
 
 function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
 
@@ -142,8 +143,16 @@ async function runDailyAnalysis() {
             saveStore();
         }
         const report = await runAgent();
+        const events = await fetchEconomicEvents();
+        let finalReport = report;
+        if (events.length > 0) {
+            const fmt = d => new Date(d).toLocaleString("en-US", { timeZone: CFG.tz, hour12: false });
+            const header = "**Upcoming high-impact economic events**";
+            const lines = events.map(e => `- ${fmt(e.date)}: ${e.title} (${e.country})`);
+            finalReport = [header, ...lines, "", report].join("\n");
+        }
         if (CFG.enableReports) {
-            const sent = await postAnalysis("DAILY", "1d", report);
+            const sent = await postAnalysis("DAILY", "1d", finalReport);
             if (!sent) {
                 console.warn("[DAILY] report upload failed");
             }
