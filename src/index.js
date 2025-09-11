@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { CFG } from "./config.js";
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
+import { streamKlines } from "./data/binanceStream.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert } from "./discord.js";
@@ -31,13 +32,6 @@ function build45mCandles(candles15m) {
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-function buildCron(minute) {
-    if (CFG.analysisFrequency === "twice-daily") {
-        return `${minute} 0,12 * * *`;
-    }
-    return `${minute} * * * *`;
-}
 
 async function runOnceForAsset(asset) {
     const dailyPromise = fetchDailyCloses(asset.binance, 32);
@@ -165,12 +159,22 @@ async function runDailyAnalysis() {
 
 const ONCE = process.argv.includes("--once");
 
+const runningAssets = new Set();
+function scheduleRun(asset) {
+    if (runningAssets.has(asset.key)) return;
+    runningAssets.add(asset.key);
+    runOnceForAsset(asset).finally(() => runningAssets.delete(asset.key));
+}
+
 if (!ONCE) {
-    ASSETS.forEach((asset, idx) => {
-        const minute = idx * 2;
-        const pattern = buildCron(minute);
-        cron.schedule(pattern, () => runOnceForAsset(asset), { timezone: CFG.tz });
-        console.log(`⏱️ Scheduled ${asset.key} at '${pattern}' (TZ=${CFG.tz})`);
+    const intervals = Array.from(new Set(TIMEFRAMES.map(tf => tfToInterval(tf))));
+    const pairs = [];
+    ASSETS.forEach(a => intervals.forEach(i => pairs.push({ symbol: a.binance, interval: i })));
+    streamKlines(pairs, (symbol) => {
+        const asset = ASSETS.find(a => a.binance === symbol);
+        if (asset) {
+            scheduleRun(asset);
+        }
     });
     cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
     console.log(`⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
