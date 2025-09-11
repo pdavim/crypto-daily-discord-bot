@@ -39,7 +39,7 @@ const hasTimeAdapter = () => {
 };
 
 // renderização
-export async function renderChartPNG(assetKey, tf, candles, indicators) {
+export async function renderChartPNG(assetKey, tf, candles, indicators = {}, overlays = {}) {
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
     const timeAdapter = hasTimeAdapter();
     const candlestickAvailable = !!Chart.registry.controllers.get("candlestick");
@@ -49,6 +49,15 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
     const labels = !useTime
         ? candles.map(c => new Date(toMs(c.t)).toISOString().slice(0, 16))
         : undefined;
+
+    const {
+        ma20: showMa20 = true,
+        ma50: showMa50 = true,
+        ma200: showMa200 = true,
+        bb: showBB = true,
+        volume: showVolume = false,
+        psar: showPsar = false,
+    } = overlays;
 
     const datasets = [];
     if (useTime) {
@@ -83,7 +92,7 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
     }
 
     // linhas de indicadores (SMA, Bollinger, etc.)
-    if (indicators?.ma20) {
+    if (showMa20 && indicators?.ma20) {
         datasets.push({
             type: "line", label: "SMA20",
             data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.ma20[i]) }) : safe(indicators.ma20[i])),
@@ -91,28 +100,28 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
         });
     }
 
-    if (indicators?.ma50) {
+    if (showMa50 && indicators?.ma50) {
         datasets.push({
             type: "line", label: "SMA50",
             data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.ma50[i]) }) : safe(indicators.ma50[i])),
             borderWidth: 1, pointRadius: 0
         });
     }
-    if (indicators?.ma200) {
+    if (showMa200 && indicators?.ma200) {
         datasets.push({
             type: "line", label: "SMA200",
             data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.ma200[i]) }) : safe(indicators.ma200[i])),
             borderWidth: 1, pointRadius: 0
         });
     }
-    if (indicators?.bbUpper) {
+    if (showBB && indicators?.bbUpper) {
         datasets.push({
             type: "line", label: "BB Upper",
             data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.bbUpper[i]) }) : safe(indicators.bbUpper[i])),
             borderWidth: 1, pointRadius: 0
         });
     }
-    if (indicators?.bbLower) {
+    if (showBB && indicators?.bbLower) {
         datasets.push({
             type: "line", label: "BB Lower",
             data: candles.map((c, i) => useTime ? ({ x: toMs(c.t), y: safe(indicators.bbLower[i]) }) : safe(indicators.bbLower[i])),
@@ -120,14 +129,49 @@ export async function renderChartPNG(assetKey, tf, candles, indicators) {
         });
     }
 
+    if (showVolume) {
+        const volData = candles.map((c, i) =>
+            useTime ? ({ x: toMs(c.t), y: c.v }) : c.v
+        );
+        datasets.push({
+            type: "bar",
+            label: "Volume",
+            data: volData,
+            yAxisID: "y1",
+            ...(useTime ? {} : { parsing: false }),
+        });
+    }
+
+    if (showPsar) {
+        const sarSeries = indicators.sarSeries || indicators.sar || indicators.psar;
+        if (sarSeries) {
+            datasets.push({
+                type: "scatter",
+                label: "Parabolic SAR",
+                data: candles.map((c, i) =>
+                    useTime ? ({ x: toMs(c.t), y: safe(sarSeries[i]) }) : safe(sarSeries[i])
+                ),
+                borderColor: "blue",
+                backgroundColor: "blue",
+                pointRadius: 2,
+            });
+        }
+    }
+
 
     const options = {
         responsive: false,
         ...(useTime ? {} : { parsing: false }),
         plugins: { legend: { display: true } },
-        scales: useTime
-            ? { x: { type: "time", time: { tooltipFormat: "yyyy-LL-dd HH:mm" } }, y: { type: "linear" } }
-            : { x: { type: "category" }, y: { type: "linear" } },
+        scales: (() => {
+            const base = useTime
+                ? { x: { type: "time", time: { tooltipFormat: "yyyy-LL-dd HH:mm" } }, y: { type: "linear" } }
+                : { x: { type: "category" }, y: { type: "linear" } };
+            if (showVolume) {
+                base.y1 = { type: "linear", position: "right", grid: { display: false } };
+            }
+            return base;
+        })(),
     };
 
     const chartType = useTime || candlestickAvailable ? "candlestick" : "line";
