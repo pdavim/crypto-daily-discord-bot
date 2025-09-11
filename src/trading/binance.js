@@ -1,6 +1,7 @@
 import axios from "axios";
 import crypto from "crypto";
 import WebSocket from "ws";
+import { logTrade } from "./tradeLog.js";
 
 const BASE = "https://api.binance.com";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
@@ -30,16 +31,19 @@ export async function getBalances() {
 }
 
 export async function placeMarketOrder(symbol, side, quantity) {
-    return privateRequest("POST", "/api/v3/order", {
+    const data = await privateRequest("POST", "/api/v3/order", {
         symbol,
         side,
         type: "MARKET",
         quantity
     });
+    const price = parseFloat(data?.fills?.[0]?.price);
+    logTrade({ id: data.orderId, symbol, side, quantity, entry: price, type: "MARKET" });
+    return data;
 }
 
 export async function placeLimitOrder(symbol, side, quantity, price) {
-    return privateRequest("POST", "/api/v3/order", {
+    const data = await privateRequest("POST", "/api/v3/order", {
         symbol,
         side,
         type: "LIMIT",
@@ -47,6 +51,8 @@ export async function placeLimitOrder(symbol, side, quantity, price) {
         quantity,
         price
     });
+    logTrade({ id: data.orderId, symbol, side, quantity, entry: price, type: "LIMIT" });
+    return data;
 }
 
 export function subscribeTicker(symbol, onMessage) {

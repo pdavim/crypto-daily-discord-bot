@@ -26,6 +26,8 @@ export const CFG = {
     enableAnalysis: process.env.ENABLE_ANALYSIS === undefined || process.env.ENABLE_ANALYSIS === 'true',
     enableReports: process.env.ENABLE_REPORTS === undefined || process.env.ENABLE_REPORTS === 'true',
     debug: process.env.DEBUG?.toLowerCase() === 'true',
+    accountEquity: parseFloat(process.env.ACCOUNT_EQUITY || '0'),
+    riskPerTrade: parseFloat(process.env.RISK_PER_TRADE || '0.01'),
 };
 
 export const config = {

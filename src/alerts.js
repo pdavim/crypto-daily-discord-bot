@@ -1,7 +1,10 @@
 import { crossUp, crossDown, isBBSqueeze } from "./indicators.js";
+import { atrStopTarget, positionSize } from "./trading/risk.js";
 
 export function buildAlerts({
-    rsiSeries, macdObj, bbWidth, ma20, ma50, ma200, lastClose, var24h, closes, highs, lows, volumes, atrSeries, upperBB, lowerBB, sarSeries, trendSeries, heuristicSeries, vwapSeries, ema9, ema21, stochasticK, stochasticD, willrSeries, cciSeries, obvSeries
+    rsiSeries, macdObj, bbWidth, ma20, ma50, ma200, lastClose, var24h, closes, highs, lows, volumes, atrSeries, upperBB, lowerBB, sarSeries, trendSeries, heuristicSeries, vwapSeries, ema9, ema21, stochasticK, stochasticD, willrSeries, cciSeries, obvSeries,
+    equity,
+    riskPct
 }) {
     const alerts = [];
 
@@ -98,5 +101,12 @@ export function buildAlerts({
     if (price % 1000 < 10) alerts.push("🔵 Price near round number");
     alerts.push(`💰 Preço: ${lastClose?.toFixed(4)}`);
     if (var24h != null) alerts.push(`📊 Var24h: ${var24h > 0 ? '+' : ''}${(var24h * 100).toFixed(2)}%`);
+    if (equity != null && atr != null && price != null && riskPct != null) {
+        const { stop, target } = atrStopTarget(price, atr);
+        const size = positionSize(equity, riskPct, price, stop);
+        if (stop != null && target != null) {
+            alerts.push(`🎯 Stop ${stop.toFixed(4)} / Target ${target.toFixed(4)} / Size ${size.toFixed(4)}`);
+        }
+    }
     return alerts;
 }
