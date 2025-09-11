@@ -88,7 +88,9 @@ async function runOnceForAsset(asset) {
                     atrSeries: atr,
                     upperBB: bb.upper, lowerBB: bb.lower,
                     sarSeries: undefined, trendSeries: undefined, heuristicSeries: undefined,
-                    vwapSeries: undefined, ema9: undefined, ema21: undefined, stochasticK: undefined, stochasticD: undefined, willrSeries: undefined, cciSeries: undefined, obvSeries: undefined
+                    vwapSeries: undefined, ema9: undefined, ema21: undefined, stochasticK: undefined, stochasticD: undefined, willrSeries: undefined, cciSeries: undefined, obvSeries: undefined,
+                    equity: CFG.accountEquity,
+                    riskPct: CFG.riskPerTrade
                 });
                 const hasSignals = alerts.some(a =>
                     !a.startsWith('💰 Preço') && !a.startsWith('📊 Var24h'));
