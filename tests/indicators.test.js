@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sma, rsi, macd, parabolicSAR } from '../src/indicators.js';
+import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth } from '../src/indicators.js';
 
 describe('sma', () => {
   it('calculates simple moving average', () => {
@@ -42,5 +42,39 @@ describe('parabolicSAR', () => {
     const res = parabolicSAR(ohlc);
     const expected = [null, 0, 0, 0.12, 0.3528, 0.724576];
     expect(res).toEqual(expected);
+  });
+});
+
+describe('trendFromMAs', () => {
+  it('detects bullish trend', () => {
+    const t = trendFromMAs([1,2,3,5], [1,2,3,4], [1,2,3,3]);
+    expect(t).toBe('Alta');
+  });
+
+  it('detects bearish trend', () => {
+    const t = trendFromMAs([5,4,3,2], [6,5,4,3], [7,6,5,4]);
+    expect(t).toBe('Baixa');
+  });
+
+  it('detects neutral trend', () => {
+    const t = trendFromMAs([1,2,2], [1,2,3], [3,2,1]);
+    expect(t).toBe('Neutro');
+  });
+});
+
+describe('bollWidth', () => {
+  it('calculates relative width of bollinger bands', () => {
+    const upper = [12,14,16];
+    const lower = [8,10,12];
+    const mid = [10,12,14];
+    const res = bollWidth(upper, lower, mid);
+    expect(res[0]).toBeCloseTo(0.4, 5);
+    expect(res[1]).toBeCloseTo(0.3333333333, 5);
+    expect(res[2]).toBeCloseTo(0.2857142857, 5);
+  });
+
+  it('returns null when values missing', () => {
+    const res = bollWidth([null, 5], [1,2], [1,0]);
+    expect(res).toEqual([null, null]);
   });
 });
