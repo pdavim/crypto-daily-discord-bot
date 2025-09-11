@@ -40,8 +40,8 @@ export function validateConfig() {
         missing.push('DISCORD_WEBHOOK_URL');
     }
 
-    for (const { key, binance } of ASSETS) {
-        if (!binance) {
+    for (const { key } of ASSETS) {
+        if (!process.env[`BINANCE_SYMBOL_${key}`]) {
             missing.push(`BINANCE_SYMBOL_${key}`);
         }
     }
