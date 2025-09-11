@@ -1,6 +1,7 @@
 import axios from "axios";
 import { config } from "./config.js";
 import { fetchWithRetry } from "./utils.js";
+import { logger } from "./logger.js";
 
 export const WEB_SNIPPETS = [];
 
@@ -18,7 +19,7 @@ function stripHtml(html) {
 }
 
 async function fetchOfficialBlog(asset) {
-    console.log(`Fetching official blog for ${asset}`);
+    logger.info({ asset, timeframe: undefined, fn: 'fetchOfficialBlog' }, `Fetching official blog for ${asset}`);
     const url = BLOG_SOURCES[asset];
     if (!url) return null;
     try {
@@ -31,13 +32,13 @@ async function fetchOfficialBlog(asset) {
         if (err.code === "ENOTFOUND" || err.code === "EAI_AGAIN") {
             return null;
         }
-        console.error(`Error fetching official blog for ${asset}:`, err.message);
+        logger.error({ asset, timeframe: undefined, fn: 'fetchOfficialBlog', err }, `Error fetching official blog for ${asset}`);
     }
     return null;
 }
 
 export async function searchWeb(asset) {
-    console.log(`Fetching web results for ${asset}`);
+    logger.info({ asset, timeframe: undefined, fn: 'searchWeb' }, `Fetching web results for ${asset}`);
     WEB_SNIPPETS.length = 0;
     if (!config.serpapiApiKey || !asset) {
         return WEB_SNIPPETS;
@@ -50,7 +51,7 @@ export async function searchWeb(asset) {
             num: 5,
         };
         const { data } = await fetchWithRetry(() => axios.get("https://serpapi.com/search", { params }));
-        console.log("Web search data:", data);
+        logger.info({ asset, timeframe: undefined, fn: 'searchWeb', data }, "Web search data");
         const results = data.organic_results || [];
         results.slice(0, 5).forEach(r => {
             if (r.snippet) {
@@ -58,14 +59,14 @@ export async function searchWeb(asset) {
             }
         });
     } catch (err) {
-        console.error("Error fetching web results:", err.message);
+        logger.error({ asset, timeframe: undefined, fn: 'searchWeb', err }, "Error fetching web results");
     }
     let official = null;
     try {
         official = await fetchOfficialBlog(asset);
     } catch (err) {
         if (err.code !== "ENOTFOUND" && err.code !== "EAI_AGAIN") {
-            console.error(`Error fetching official blog for ${asset}:`, err.message);
+            logger.error({ asset, timeframe: undefined, fn: 'searchWeb', err }, `Error fetching official blog for ${asset}`);
         }
     }
     if (official) {

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { fetchWithRetry } from "../utils.js";
+import { logger } from "../logger.js";
 
 const BASE = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
 
@@ -20,7 +21,7 @@ export async function fetchEconomicEvents() {
                 impact: e.impact
             }));
     } catch (err) {
-        console.error("Error fetching economic events:", err.message);
+        logger.error({ asset: undefined, timeframe: undefined, fn: 'fetchEconomicEvents', err }, "Error fetching economic events");
         return [];
     }
 }

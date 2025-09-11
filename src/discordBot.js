@@ -1,16 +1,17 @@
 import { Client, GatewayIntentBits } from 'discord.js';
 import { CFG } from './config.js';
+import { logger } from './logger.js';
 
 let clientPromise;
 function getClient() {
     if (!CFG.botToken || !CFG.channelChartsId) {
-        console.warn('Missing bot token or channel ID; skipping Discord chart upload');
+        logger.warn({ asset: undefined, timeframe: undefined, fn: 'getClient' }, 'Missing bot token or channel ID; skipping Discord chart upload');
         return null;
     }
     if (!clientPromise) {
         const client = new Client({ intents: [GatewayIntentBits.Guilds] });
         clientPromise = client.login(CFG.botToken).then(() => client);
-        client.on('error', e => console.error('Discord client error', e));
+        client.on('error', e => logger.error({ asset: undefined, timeframe: undefined, fn: 'getClient', err: e }, 'Discord client error'));
     }
     return clientPromise;
 }
@@ -24,7 +25,7 @@ export async function postCharts(files) {
         await channel.send({ files });
         return true;
     } catch (e) {
-        console.error('Failed to post charts to Discord', e);
+        logger.error({ asset: undefined, timeframe: undefined, fn: 'postCharts', err: e }, 'Failed to post charts to Discord');
         return false;
     }
 }

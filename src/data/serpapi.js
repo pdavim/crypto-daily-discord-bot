@@ -1,5 +1,6 @@
 import { getJson } from "serpapi";
 import { config } from "../config.js";
+import { logger } from "../logger.js";
 
 const apiKey = config.serpapiApiKey;
 if (!apiKey) {
@@ -35,7 +36,7 @@ export const fetchTrending = async (crypto_trending_prompt) => {
         data_type: "TIMESERIES",
         include_low_search_volume: "true",
     }, (json) => {
-        console.log(json);
+        logger.info({ asset: undefined, timeframe: undefined, fn: 'fetchTrending', data: json });
     });
 
     return res;
