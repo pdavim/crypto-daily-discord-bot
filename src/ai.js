@@ -195,8 +195,9 @@ export async function runAgent() {
                         { role: "user", content: [{ type: "text", text: prompt }] }
                     ];
                     verdict = await callOpenRouter(messages);
-                } catch {
-                    verdict = "";
+                } catch (error) {
+                    console.error(`OpenRouter call failed for ${key}:`, error);
+                    verdict = fallbackVerdict({ ma20, ma50, rsi14 });
                 }
             }
             if (!verdict) {
