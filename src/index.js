@@ -13,6 +13,7 @@ import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
 import { logger } from "./logger.js";
+import pLimit from "./limit.js";
 
 function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
 
@@ -32,7 +33,6 @@ function build45mCandles(candles15m) {
     return out;
 }
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function runOnceForAsset(asset) {
     const dailyPromise = fetchDailyCloses(asset.binance, 32);
@@ -118,12 +118,10 @@ async function runOnceForAsset(asset) {
 }
 
 async function runAll() {
-    for (let i = 0; i < ASSETS.length; i++) {
-        await runOnceForAsset(ASSETS[i]);
-        if (i < ASSETS.length - 1) {
-            await sleep(1000);
-        }
-    }
+    const limit = pLimit(3);
+    await Promise.all(
+        ASSETS.map(asset => limit(() => runOnceForAsset(asset)))
+    );
 }
 
 async function runDailyAnalysis() {
