@@ -55,10 +55,41 @@ function sortByRank(a, b) {
     return bw - aw;
 }
 
+async function classifySentiments(items) {
+    const titles = items.map(i => i.title);
+    if (!titles.length) return [];
+    if (CFG.openrouterApiKey) {
+        try {
+            const prompt = `Classify the sentiment of each headline as -1 for negative, 0 for neutral, and 1 for positive. Return a JSON array of numbers in the same order.\n` +
+                titles.map(t => `- ${t}`).join("\n");
+            const messages = [
+                { role: "system", content: "You are a sentiment analysis assistant." },
+                { role: "user", content: [{ type: "text", text: prompt }] }
+            ];
+            const resp = await callOpenRouter(messages);
+            const arr = JSON.parse(resp);
+            if (Array.isArray(arr)) {
+                return arr.map(n => Math.max(-1, Math.min(1, Number(n) || 0)));
+            }
+        } catch (err) {
+            console.error("Sentiment classification via OpenRouter failed:", err.message);
+        }
+    }
+    const positive = ["up", "surge", "rally", "gain", "bull", "rise", "soar", "profit", "positive"];
+    const negative = ["down", "drop", "fall", "crash", "bear", "decline", "plunge", "loss", "negative"];
+    return titles.map(t => {
+        const lc = t.toLowerCase();
+        let score = 0;
+        for (const w of positive) if (lc.includes(w)) score++;
+        for (const w of negative) if (lc.includes(w)) score--;
+        return score > 0 ? 1 : score < 0 ? -1 : 0;
+    });
+}
+
 export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
     console.log(`Fetching news for ${symbol}`);
     if (!config.serpapiApiKey || !symbol) {
-        return { items: [], summary: "" };
+        return { items: [], summary: "", avgSentiment: 0 };
     }
     try {
         const params = {
@@ -88,6 +119,10 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
         filtered.sort(sortByRank);
         filtered = dedupeByTrigram(filtered).slice(0, limit);
 
+        const sentiments = await classifySentiments(filtered);
+        const avgSentiment = sentiments.length ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length : 0;
+        filtered = filtered.map((i, idx) => ({ ...i, sentiment: sentiments[idx] ?? 0 }));
+
         let summary = "";
         if (CFG.openrouterApiKey) {
             try {
@@ -112,9 +147,9 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
             publishedAt: i.publishedAt.toISOString(),
         }));
 
-        return { items: normalized, summary: summary.trim() };
+        return { items: normalized, summary: summary.trim(), avgSentiment };
     } catch (error) {
         console.error("Error fetching asset news:", error.message);
-        return { items: [], summary: "" };
+        return { items: [], summary: "", avgSentiment: 0 };
     }
 }
