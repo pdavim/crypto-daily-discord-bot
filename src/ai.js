@@ -165,6 +165,22 @@ export async function runAgent() {
             const { summary: newsSummary } = await getAssetNews({ symbol: key });
             const webSnips = await searchWeb(key);
 
+            const baseReport = [
+                `**${key}**`,
+                `- Price: ${lastDaily.c} (O:${lastDaily.o} H:${lastDaily.h} L:${lastDaily.l} V:${lastDaily.v})`,
+                `- Returns: 24h ${ret1d.toFixed(2)}%, 7d ${ret7d.toFixed(2)}%, 30d ${ret30d.toFixed(2)}%`,
+                `- Technicals: MA20 ${ma20?.toFixed(2)}, MA50 ${ma50?.toFixed(2)}, MA200 ${ma200?.toFixed(2)}, RSI14 ${rsi14?.toFixed(2)}`,
+                `- MACD: ${macdLine?.toFixed(2)} Signal: ${macdSignal?.toFixed(2)}`,
+                `- Bollinger Bands: ${bb.upper.at(-1)?.toFixed(2)} / ${bb.lower.at(-1)?.toFixed(2)} Width: ${bollW?.toFixed(2)} Squeeze: ${bbSqueeze}`,
+                `- Parabolic SAR: ${sar?.toFixed(2)}`,
+                `- Volume Divergence: ${volume?.toFixed(2)}`,
+                `- ATR: ${atrValue?.toFixed(2)}`,
+                `- Trend from MAs: ${trend}`,
+                `- Heuristic Score: ${heuristic?.toFixed(2)} Semaforo: ${semaf}`,
+                `- Cross Up: ${crossUpSignal} Cross Down: ${crossDownSignal}`,
+                `- Sparkline: ${spark}`
+            ];
+
             const prompt = `Asset: ${key}\n` +
                 `OHLCV: O:${lastDaily.o} H:${lastDaily.h} L:${lastDaily.l} C:${lastDaily.c} V:${lastDaily.v}\n` +
                 `Returns: 24h ${ret1d.toFixed(2)}% 7d ${ret7d.toFixed(2)}% 30d ${ret30d.toFixed(2)}%\n` +
@@ -196,8 +212,16 @@ export async function runAgent() {
                     ];
                     verdict = await callOpenRouter(messages);
                 } catch (error) {
-                    console.error(`OpenRouter call failed for ${key}:`, error);
-                    verdict = fallbackVerdict({ ma20, ma50, rsi14 });
+                    console.error(`OpenRouter call failed for ${key}:`, error.message);
+                    const partial = [
+                        ...baseReport,
+                        `- News: ${newsSummary || 'n/a'}`,
+                        `- Web: ${webSnips.slice(0, 2).join(' | ') || 'n/a'}`,
+                        `- Macro: ${macro || 'n/a'}`,
+                        `- Verdict: ${fallbackVerdict({ ma20, ma50, rsi14 })}`,
+                    ].join("\n");
+                    reports.push(partial);
+                    continue;
                 }
             }
             if (!verdict) {
@@ -235,19 +259,7 @@ export async function runAgent() {
             });
 
             const report = [
-                `**${key}**`,
-                `- Price: ${lastDaily.c} (O:${lastDaily.o} H:${lastDaily.h} L:${lastDaily.l} V:${lastDaily.v})`,
-                `- Returns: 24h ${ret1d.toFixed(2)}%, 7d ${ret7d.toFixed(2)}%, 30d ${ret30d.toFixed(2)}%`,
-                `- Technicals: MA20 ${ma20?.toFixed(2)}, MA50 ${ma50?.toFixed(2)}, MA200 ${ma200?.toFixed(2)}, RSI14 ${rsi14?.toFixed(2)}`,
-                `- MACD: ${macdLine?.toFixed(2)} Signal: ${macdSignal?.toFixed(2)}`,
-                `- Bollinger Bands: ${bb.upper.at(-1)?.toFixed(2)} / ${bb.lower.at(-1)?.toFixed(2)} Width: ${bollW?.toFixed(2)} Squeeze: ${bbSqueeze}`,
-                `- Parabolic SAR: ${sar?.toFixed(2)}`,
-                `- Volume Divergence: ${volume?.toFixed(2)}`,
-                `- ATR: ${atrValue?.toFixed(2)}`,
-                `- Trend from MAs: ${trend}`,
-                `- Heuristic Score: ${heuristic?.toFixed(2)} Semaforo: ${semaf}`,
-                `- Cross Up: ${crossUpSignal} Cross Down: ${crossDownSignal}`,
-                `- Sparkline: ${spark}`,
+                ...baseReport,
                 `**Alert Status:**`,
                 ...alerts,
                 `- News: ${newsSummary || 'n/a'}`,
