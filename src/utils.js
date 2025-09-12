@@ -19,3 +19,11 @@ export async function fetchWithRetry(fn, { retries = 3, baseDelay = 500 } = {}) 
         }
     }
 }
+
+export function roundThreshold(price) {
+    if (price == null || isNaN(price)) return 1;
+    if (price >= 1000) return 1000;
+    if (price >= 100) return 100;
+    if (price >= 10) return 10;
+    return 1;
+}

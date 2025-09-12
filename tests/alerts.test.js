@@ -22,4 +22,42 @@ describe('buildAlerts', () => {
     expect(alerts).toContain('📈 Golden cross 20/50');
     expect(alerts).toContain('💰 Preço: 100.0000');
   });
+  
+  it('detects round numbers for cheap assets', () => {
+    const lastClose = 1.005;
+    const data = {
+      rsiSeries: [50, 50],
+      macdObj: { macd: [0, 0], signal: [0, 0], hist: [0, 0] },
+      bbWidth: [0.1],
+      ma20: [1, 1],
+      ma50: [1, 1],
+      ma200: [1, 1],
+      lastClose,
+      closes: Array(20).fill(lastClose).concat(lastClose),
+      highs: Array(20).fill(lastClose + 1),
+      lows: Array(20).fill(lastClose - 1),
+      volumes: Array(20).fill(1000)
+    };
+    const alerts = buildAlerts(data);
+    expect(alerts).toContain('🔵 Price near round number');
+  });
+
+  it('detects round numbers for expensive assets', () => {
+    const lastClose = 1002;
+    const data = {
+      rsiSeries: [50, 50],
+      macdObj: { macd: [0, 0], signal: [0, 0], hist: [0, 0] },
+      bbWidth: [0.1],
+      ma20: [1, 1],
+      ma50: [1, 1],
+      ma200: [1, 1],
+      lastClose,
+      closes: Array(20).fill(lastClose).concat(lastClose),
+      highs: Array(20).fill(lastClose + 10),
+      lows: Array(20).fill(lastClose - 10),
+      volumes: Array(20).fill(1000)
+    };
+    const alerts = buildAlerts(data);
+    expect(alerts).toContain('🔵 Price near round number');
+  });
 });

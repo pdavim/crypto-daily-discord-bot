@@ -1,5 +1,6 @@
 import { crossUp, crossDown, isBBSqueeze } from "./indicators.js";
 import { atrStopTarget, positionSize } from "./trading/risk.js";
+import { roundThreshold } from "./utils.js";
 
 export function buildAlerts({
     rsiSeries, macdObj, bbWidth, ma20, ma50, ma200, lastClose, var24h, closes, highs, lows, volumes, atrSeries, upperBB, lowerBB, sarSeries, trendSeries, heuristicSeries, vwapSeries, ema9, ema21, stochasticK, stochasticD, willrSeries, cciSeries, obvSeries,
@@ -98,7 +99,8 @@ export function buildAlerts({
     if (cci != null && cci < -100) alerts.push("📈 CCI oversold");
     if (obv != null && prevObv != null && obv > prevObv * 1.05) alerts.push("📈 OBV bullish divergence");
     if (obv != null && prevObv != null && obv < prevObv * 0.95) alerts.push("📉 OBV bearish divergence");
-    if (price % 1000 < 10) alerts.push("🔵 Price near round number");
+    const threshold = roundThreshold(price);
+    if (price % threshold < threshold / 100) alerts.push("🔵 Price near round number");
     alerts.push(`💰 Preço: ${lastClose?.toFixed(4)}`);
     if (var24h != null) alerts.push(`📊 Var24h: ${var24h > 0 ? '+' : ''}${(var24h * 100).toFixed(2)}%`);
     if (equity != null && atr != null && price != null && riskPct != null) {
