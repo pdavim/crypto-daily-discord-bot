@@ -6,7 +6,7 @@ import { streamKlines } from "./data/binanceStream.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, stochastic, williamsR, cci, obv } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert } from "./discord.js";
-import { postCharts } from "./discordBot.js";
+import { postCharts, initBot } from "./discordBot.js";
 import { renderChartPNG } from "./chart.js";
 import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
@@ -15,6 +15,8 @@ import { fetchEconomicEvents } from "./data/economic.js";
 import { logger } from "./logger.js";
 import pLimit from "./limit.js";
 import { buildHash, shouldSend } from "./alertCache.js";
+
+initBot();
 
 function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
 
