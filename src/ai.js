@@ -160,8 +160,13 @@ export async function runAgent() {
             const cciSeries = cci(highsH, lowsH, closesH, 20);
             const obvSeries = obv(closesH, volumesH);
             const trend = trendFromMAs(ma20Series, ma50Series, ma200Series);
-            const heuristicSeries = scoreHeuristic(closesH, 14);
-            const heuristic = heuristicSeries.at(-1);
+            const trendLabel = trend > 0 ? "Alta" : trend < 0 ? "Baixa" : "Neutro";
+            const heuristic = scoreHeuristic({
+                rsi: rsi14,
+                macdHist: macdResult.hist.at(-1),
+                width: bollW,
+                trend
+            });
             const semaf = semaforo(heuristic);
             const spark = sparkline(closesH);
             const crossUpSignal = crossUp(ma20Series, ma50Series);
@@ -185,7 +190,7 @@ export async function runAgent() {
                 `- Parabolic SAR: ${sar?.toFixed(2)}`,
                 `- Volume Divergence: ${volume?.toFixed(2)}`,
                 `- ATR: ${atrValue?.toFixed(2)}`,
-                `- Trend from MAs: ${trend}`,
+                `- Trend from MAs: ${trendLabel}`,
                 `- Heuristic Score: ${heuristic?.toFixed(2)} Semaforo: ${semaf}`,
                 `- Cross Up: ${crossUpSignal} Cross Down: ${crossDownSignal}`,
                 `- Sparkline: ${spark}`
@@ -257,7 +262,7 @@ export async function runAgent() {
                 lowerBB: bb.lower,
                 sarSeries,
                 trendSeries: [trend],
-                heuristicSeries,
+                heuristicSeries: [heuristic],
                 vwapSeries,
                 ema9,
                 ema21,

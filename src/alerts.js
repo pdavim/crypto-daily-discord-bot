@@ -80,8 +80,8 @@ export function buildAlerts({
     if (price < lower) alerts.push("📉 BB breakout below");
     if (prevSar < price && sar > price) alerts.push("📉 Parabolic SAR flip bearish");
     if (prevSar > price && sar < price) alerts.push("📈 Parabolic SAR flip bullish");
-    if (trend != null && trend > 0.7) alerts.push("📈 Strong uptrend");
-    if (trend != null && trend < -0.7) alerts.push("📉 Strong downtrend");
+    if (trend === 1) alerts.push("📈 Strong uptrend");
+    if (trend === -1) alerts.push("📉 Strong downtrend");
     if (heuristic != null && heuristic > 80) alerts.push("🌟 Heuristic score very high");
     if (heuristic != null && heuristic < 20) alerts.push("⚠️ Heuristic score very low");
     if (vwap != null && price > vwap && prevPrice <= prevVwap) alerts.push("📈 Price crossed above VWAP");

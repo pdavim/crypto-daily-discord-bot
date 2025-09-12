@@ -269,10 +269,10 @@ export function sparkline(values, points = 20) {
 
 export function trendFromMAs(ma20, ma50, ma200) {
     const m20 = ma20.at(-1), m50 = ma50.at(-1), m200 = ma200?.at(-1);
-    if (m20 == null || m50 == null) return "Neutro";
-    if (m20 > m50 && (m200 == null || m50 > m200)) return "Alta";
-    if (m20 < m50 && (m200 == null || m50 < m200)) return "Baixa";
-    return "Neutro";
+    if (m20 == null || m50 == null) return 0;
+    if (m20 > m50 && (m200 == null || m50 > m200)) return 1;
+    if (m20 < m50 && (m200 == null || m50 < m200)) return -1;
+    return 0;
 }
 
 export function scoreHeuristic({ rsi, macdHist, width, trend }) {
@@ -280,7 +280,7 @@ export function scoreHeuristic({ rsi, macdHist, width, trend }) {
     if (rsi != null) { if (rsi > 70) s -= 10; else if (rsi < 30) s += 10; }
     if (macdHist != null) { if (macdHist > 0) s += 5; else s -= 5; }
     if (width != null) { if (width < 0.1) s += 3; } // squeeze pode anteceder movimento
-    if (trend === "Alta") s += 7; else if (trend === "Baixa") s -= 7;
+    if (trend != null) { if (trend > 0) s += 7; else if (trend < 0) s -= 7; }
     return Math.max(0, Math.min(100, Math.round(s)));
 }
 

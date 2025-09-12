@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth, ema, vwap, stochastic, williamsR, cci, obv } from '../src/indicators.js';
+import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth, ema, vwap, stochastic, williamsR, cci, obv, scoreHeuristic } from '../src/indicators.js';
 
 describe('sma', () => {
   it('calculates simple moving average', () => {
@@ -48,17 +48,25 @@ describe('parabolicSAR', () => {
 describe('trendFromMAs', () => {
   it('detects bullish trend', () => {
     const t = trendFromMAs([1,2,3,5], [1,2,3,4], [1,2,3,3]);
-    expect(t).toBe('Alta');
+    expect(t).toBe(1);
   });
 
   it('detects bearish trend', () => {
     const t = trendFromMAs([5,4,3,2], [6,5,4,3], [7,6,5,4]);
-    expect(t).toBe('Baixa');
+    expect(t).toBe(-1);
   });
 
   it('detects neutral trend', () => {
     const t = trendFromMAs([1,2,2], [1,2,3], [3,2,1]);
-    expect(t).toBe('Neutro');
+    expect(t).toBe(0);
+  });
+});
+
+describe('scoreHeuristic', () => {
+  it('adjusts score based on trend', () => {
+    expect(scoreHeuristic({ trend: 1 })).toBe(57);
+    expect(scoreHeuristic({ trend: -1 })).toBe(43);
+    expect(scoreHeuristic({ trend: 0 })).toBe(50);
   });
 });
 
