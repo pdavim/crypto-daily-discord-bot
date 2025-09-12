@@ -81,7 +81,11 @@ export function buildSummary({ assetKey, snapshots }) {
     };
     const trendOf = tf => {
         const v = s[tf]?.kpis?.trend;
-        return v == null ? '??' : `${dirEmoji(v)} ${v}`;
+        if (v == null) return '??';
+        const label = typeof v === 'string'
+            ? v
+            : v > 0 ? 'Alta' : v < 0 ? 'Baixa' : 'Neutro';
+        return `${dirEmoji(v)} ${label}`;
     };
 
     const lines = [
