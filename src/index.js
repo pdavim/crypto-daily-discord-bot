@@ -3,7 +3,7 @@ import { CFG } from "./config.js";
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { streamKlines } from "./data/binanceStream.js";
-import { sma, rsi, macd, bollinger, atr14, bollWidth } from "./indicators.js";
+import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, stochastic, williamsR, cci, obv } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert } from "./discord.js";
 import { postCharts } from "./discordBot.js";
@@ -62,6 +62,13 @@ async function runOnceForAsset(asset) {
             const bb = bollinger(close, 20, 2);
             const atr = atr14(candles);
             const width = bollWidth(bb.upper, bb.lower, bb.mid);
+            const vwapSeries = vwap(high, low, close, vol);
+            const ema9 = ema(close, 9);
+            const ema21 = ema(close, 21);
+            const { k: stochasticK, d: stochasticD } = stochastic(high, low, close, 14, 3);
+            const willrSeries = williamsR(high, low, close, 14);
+            const cciSeries = cci(high, low, close, 20);
+            const obvSeries = obv(close, vol);
             const daily = await dailyPromise;
             const snapshot = buildSnapshotForReport({
                 candles, daily, ma20, ma50, ma100, ma200, rsi: r, macdObj: m, bb, atr, volSeries: vol
@@ -84,8 +91,9 @@ async function runOnceForAsset(asset) {
                     closes: close, highs: high, lows: low, volumes: vol,
                     atrSeries: atr,
                     upperBB: bb.upper, lowerBB: bb.lower,
-                    sarSeries: undefined, trendSeries: undefined, heuristicSeries: undefined,
-                    vwapSeries: undefined, ema9: undefined, ema21: undefined, stochasticK: undefined, stochasticD: undefined, willrSeries: undefined, cciSeries: undefined, obvSeries: undefined,
+                    vwapSeries, ema9, ema21,
+                    stochasticK, stochasticD,
+                    willrSeries, cciSeries, obvSeries,
                     equity: CFG.accountEquity,
                     riskPct: CFG.riskPerTrade
                 });

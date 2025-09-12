@@ -136,6 +136,87 @@ export function volumeDivergence(closes, volumes, period = 20) {
     return out;
 }
 
+export function vwap(highs, lows, closes, volumes) {
+    const out = Array(closes.length).fill(null);
+    let cumPV = 0, cumVol = 0;
+    for (let i = 0; i < closes.length; i++) {
+        const tp = (highs[i] + lows[i] + closes[i]) / 3;
+        const v = volumes[i];
+        cumPV += tp * v;
+        cumVol += v;
+        out[i] = cumVol ? cumPV / cumVol : null;
+    }
+    return out;
+}
+
+export function ema(arr, period) {
+    const k = 2 / (period + 1);
+    const out = [];
+    arr.forEach((val, i) => {
+        if (i === 0) out.push(val);
+        else out.push(val * k + out[i - 1] * (1 - k));
+    });
+    return out;
+}
+
+export function stochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
+    const k = Array(closes.length).fill(null);
+    for (let i = 0; i < closes.length; i++) {
+        if (i >= kPeriod - 1) {
+            const hh = Math.max(...highs.slice(i - kPeriod + 1, i + 1));
+            const ll = Math.min(...lows.slice(i - kPeriod + 1, i + 1));
+            k[i] = hh === ll ? 0 : ((closes[i] - ll) / (hh - ll)) * 100;
+        }
+    }
+    const d = Array(closes.length).fill(null);
+    for (let i = 0; i < closes.length; i++) {
+        if (i >= kPeriod - 1 + dPeriod - 1) {
+            const slice = k.slice(i - dPeriod + 1, i + 1);
+            if (slice.every(v => v != null)) {
+                d[i] = slice.reduce((a, b) => a + b, 0) / dPeriod;
+            }
+        }
+    }
+    return { k, d };
+}
+
+export function williamsR(highs, lows, closes, period = 14) {
+    const out = Array(closes.length).fill(null);
+    for (let i = 0; i < closes.length; i++) {
+        if (i >= period - 1) {
+            const hh = Math.max(...highs.slice(i - period + 1, i + 1));
+            const ll = Math.min(...lows.slice(i - period + 1, i + 1));
+            out[i] = hh === ll ? 0 : ((hh - closes[i]) / (hh - ll)) * -100;
+        }
+    }
+    return out;
+}
+
+export function cci(highs, lows, closes, period = 20) {
+    const tp = highs.map((h, i) => (h + lows[i] + closes[i]) / 3);
+    const smaTp = sma(tp, period);
+    const out = Array(closes.length).fill(null);
+    for (let i = 0; i < closes.length; i++) {
+        if (i >= period - 1) {
+            const slice = tp.slice(i - period + 1, i + 1);
+            const mean = smaTp[i];
+            const md = slice.reduce((sum, v) => sum + Math.abs(v - mean), 0) / period;
+            out[i] = md === 0 ? 0 : (tp[i] - mean) / (0.015 * md);
+        }
+    }
+    return out;
+}
+
+export function obv(closes, volumes) {
+    const out = [];
+    for (let i = 0; i < closes.length; i++) {
+        if (i === 0) { out.push(0); continue; }
+        if (closes[i] > closes[i - 1]) out.push(out[i - 1] + volumes[i]);
+        else if (closes[i] < closes[i - 1]) out.push(out[i - 1] - volumes[i]);
+        else out.push(out[i - 1]);
+    }
+    return out;
+}
 
 export function atr14(ohlc) {
     const tr = [];

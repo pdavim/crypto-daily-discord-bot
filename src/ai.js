@@ -51,7 +51,7 @@ import { ASSETS } from "./assets.js";
 import { fetchOHLCV } from "./data/binance.js";
 import { getAssetNews } from "./news.js";
 import { searchWeb } from "./websearch.js";
-import { sma, rsi, macd, atr14, bollinger, bollWidth, crossUp, crossDown, parabolicSAR, semaforo, isBBSqueeze, sparkline, volumeDivergence, trendFromMAs, scoreHeuristic } from "./indicators.js";
+import { sma, rsi, macd, atr14, bollinger, bollWidth, crossUp, crossDown, parabolicSAR, semaforo, isBBSqueeze, sparkline, volumeDivergence, trendFromMAs, scoreHeuristic, vwap, ema, stochastic, williamsR, cci, obv } from "./indicators.js";
 import { buildAlerts } from "./alerts.js";
 import { logger } from "./logger.js";
 
@@ -149,10 +149,19 @@ export async function runAgent() {
             const bbSqueeze = isBBSqueeze(widthSeries);
             const atrSeries = atr14(hourly);
             const atrValue = atrSeries.at(-1);
-            const sar = parabolicSAR(hourly, 0.02, 0.2).at(-1);
+            const sarSeries = parabolicSAR(hourly, 0.02, 0.2);
+            const sar = sarSeries.at(-1);
             const volume = volumeDivergence(closesH, volumesH, 14).at(-1);
+            const vwapSeries = vwap(highsH, lowsH, closesH, volumesH);
+            const ema9 = ema(closesH, 9);
+            const ema21 = ema(closesH, 21);
+            const { k: stochasticK, d: stochasticD } = stochastic(highsH, lowsH, closesH, 14, 3);
+            const willrSeries = williamsR(highsH, lowsH, closesH, 14);
+            const cciSeries = cci(highsH, lowsH, closesH, 20);
+            const obvSeries = obv(closesH, volumesH);
             const trend = trendFromMAs(ma20Series, ma50Series, ma200Series);
-            const heuristic = scoreHeuristic(closesH, 14).at(-1);
+            const heuristicSeries = scoreHeuristic(closesH, 14);
+            const heuristic = heuristicSeries.at(-1);
             const semaf = semaforo(heuristic);
             const spark = sparkline(closesH);
             const crossUpSignal = crossUp(ma20Series, ma50Series);
@@ -246,17 +255,17 @@ export async function runAgent() {
                 atrSeries,
                 upperBB: bb.upper,
                 lowerBB: bb.lower,
-                sarSeries: parabolicSAR(hourly, 0.02, 0.2),
+                sarSeries,
                 trendSeries: [trend],
-                heuristicSeries: scoreHeuristic(closesH, 14),
-                vwapSeries: undefined, // Add if you have VWAP calculation
-                ema9: undefined, // Add if you have EMA9 calculation
-                ema21: undefined, // Add if you have EMA21 calculation
-                stochasticK: undefined, // Add if you have Stochastic K calculation
-                stochasticD: undefined, // Add if you have Stochastic D calculation
-                willrSeries: undefined, // Add if you have Williams %R calculation
-                cciSeries: undefined, // Add if you have CCI calculation
-                obvSeries: undefined // Add if you have OBV calculation
+                heuristicSeries,
+                vwapSeries,
+                ema9,
+                ema21,
+                stochasticK,
+                stochasticD,
+                willrSeries,
+                cciSeries,
+                obvSeries
             });
 
             const report = [
