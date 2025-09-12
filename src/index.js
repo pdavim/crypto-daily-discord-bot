@@ -171,6 +171,47 @@ async function runDailyAnalysis() {
     }
 }
 
+async function runWeeklyAnalysis() {
+    try {
+        const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 8);
+        const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
+        const key = "WEEKLY:1w";
+        const weekMs = 7 * 24 * 60 * 60 * 1000;
+        const weekSig = lastTime != null ? Math.floor(lastTime / weekMs) : null;
+        if (weekSig != null && getSignature(key) === weekSig) {
+            return;
+        }
+        if (weekSig != null) {
+            updateSignature(key, weekSig);
+            saveStore();
+        }
+        const report = await runAgent();
+        const lines = ["**Weekly performance (7d)**"];
+        for (const asset of ASSETS) {
+            try {
+                const candles = await fetchDailyCloses(asset.binance, 8);
+                const last = candles.at(-1);
+                const prev = candles.at(-8);
+                const pct = (last?.c != null && prev?.c != null)
+                    ? ((last.c / prev.c - 1) * 100).toFixed(2)
+                    : null;
+                lines.push(`- ${asset.key}: ${pct != null ? pct + '%': 'n/a'}`);
+            } catch (err) {
+                lines.push(`- ${asset.key}: error`);
+            }
+        }
+        const finalReport = [lines.join("\n"), report].join("\n\n");
+        if (CFG.enableReports) {
+            const sent = await postAnalysis("WEEKLY", "1w", finalReport);
+            if (!sent) {
+                logger.warn({ asset: 'WEEKLY', timeframe: '1w', fn: 'runWeeklyAnalysis' }, 'report upload failed');
+            }
+        }
+    } catch (e) {
+        logger.error({ asset: 'WEEKLY', timeframe: '1w', fn: 'runWeeklyAnalysis', err: e }, 'Error in weekly analysis');
+    }
+}
+
 const ONCE = process.argv.includes("--once");
 
 const runningAssets = new Set();
@@ -192,9 +233,13 @@ if (!ONCE) {
     });
     cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
     logger.info({ asset: undefined, timeframe: undefined, fn: 'schedule' }, `⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
+    cron.schedule('0 18 * * 0', runWeeklyAnalysis, { timezone: CFG.tz });
+    logger.info({ asset: undefined, timeframe: undefined, fn: 'schedule' }, `⏱️ Scheduled weekly at 18h Sunday (TZ=${CFG.tz})`);
     runAll();
     runDailyAnalysis();
+    runWeeklyAnalysis();
 } else {
     runAll();
     runDailyAnalysis();
+    runWeeklyAnalysis();
 }
