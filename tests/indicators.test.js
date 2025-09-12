@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth } from '../src/indicators.js';
+import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth, ema, vwap, stochastic, williamsR, cci, obv } from '../src/indicators.js';
 
 describe('sma', () => {
   it('calculates simple moving average', () => {
@@ -76,5 +76,66 @@ describe('bollWidth', () => {
   it('returns null when values missing', () => {
     const res = bollWidth([null, 5], [1,2], [1,0]);
     expect(res).toEqual([null, null]);
+  });
+});
+
+describe('ema', () => {
+  it('calculates exponential moving average', () => {
+    const res = ema([1,2,3,4,5], 3);
+    const expected = [1,1.5,2.25,3.125,4.0625];
+    expected.forEach((v,i) => expect(res[i]).toBeCloseTo(v, 5));
+  });
+});
+
+describe('vwap', () => {
+  it('calculates volume weighted average price', () => {
+    const highs = [2,4,6];
+    const lows = [0,2,4];
+    const closes = [1,3,5];
+    const vols = [10,20,30];
+    const res = vwap(highs, lows, closes, vols);
+    expect(res[0]).toBeCloseTo(1,5);
+    expect(res[1]).toBeCloseTo(70/30,5);
+    expect(res[2]).toBeCloseTo(220/60,5);
+  });
+});
+
+describe('stochastic', () => {
+  it('calculates stochastic oscillator', () => {
+    const highs = [5,6,7,8,9];
+    const lows = [1,2,3,4,5];
+    const closes = [4,5,6,7,8];
+    const { k, d } = stochastic(highs, lows, closes, 3, 3);
+    expect(k[4]).toBeCloseTo(83.3333, 3);
+    expect(d[4]).toBeCloseTo(83.3333, 3);
+  });
+});
+
+describe('williamsR', () => {
+  it('calculates Williams %R', () => {
+    const highs = [5,6,7,8,9];
+    const lows = [1,2,3,4,5];
+    const closes = [4,5,6,7,8];
+    const res = williamsR(highs, lows, closes, 3);
+    expect(res[4]).toBeCloseTo(-16.6667, 3);
+  });
+});
+
+describe('cci', () => {
+  it('calculates Commodity Channel Index', () => {
+    const highs = [1,2,3,4,5];
+    const lows = [0,1,2,3,4];
+    const closes = [0.5,1.5,2.5,3.5,4.5];
+    const res = cci(highs, lows, closes, 3);
+    expect(res[4]).toBeCloseTo(100, 3);
+  });
+});
+
+describe('obv', () => {
+  it('calculates On-Balance Volume', () => {
+    const closes = [1,2,1,2,3];
+    const vols = [10,10,10,10,10];
+    const res = obv(closes, vols);
+    expect(res).toEqual([0,10,0,10,20]);
   });
 });
