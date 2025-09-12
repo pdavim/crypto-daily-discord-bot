@@ -2,18 +2,38 @@
 
 This project posts crypto analysis, charts and alerts to Discord.
 
+## Setup
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Copy `.env.example` to `.env` and fill in the values for your environment.
+
+## Running
+
+- Start scheduled jobs:
+
+  ```bash
+  npm start
+  ```
+
+- Run a single cycle for testing:
+
+  ```bash
+  npm run once
+  ```
+
 ## Environment Variables
 
-Copy `.env.example` to `.env` and provide values for the variables below before running the bot:
+The `.env.example` file documents each available variable with a purpose and example value.
 
-- `DISCORD_WEBHOOK_URL` – default channel webhook
-- `DISCORD_WEBHOOK_ALERTS_URL` – alert channel webhook
-- `DISCORD_WEBHOOK_REPORTS_URL` – reports channel webhook
-- `DISCORD_WEBHOOK_ANALYSIS_URL` – analysis channel webhook
-- `DISCORD_WEBHOOK_BTC`, `DISCORD_WEBHOOK_ETH` – asset specific webhooks
-- `OPENROUTER_API_KEY` – OpenRouter access key
-- `NEWS_API_KEY` – NewsAPI key
-- `SERPAPI_API_KEY` – SerpAPI key
-- `ALERT_DEDUP_MINUTES` – minutes to suppress duplicate alerts
+## Technical Articles
+
+- [Getting started with Discord webhooks](https://support.discord.com/hc/en-us/articles/228383668)
+- [Scheduling cron jobs in Node.js](https://blog.logrocket.com/how-to-use-node-cron/)
+- [Binance spot API trading guide](https://binance-docs.github.io/apidocs/spot/en/)
 
 The bot logs a warning and skips work when required webhooks are missing so deployments fail fast.
