@@ -14,6 +14,7 @@ import { getSignature, updateSignature, saveStore } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
 import { logger } from "./logger.js";
 import pLimit from "./limit.js";
+import { buildHash, shouldSend } from "./alertCache.js";
 
 function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
 
@@ -102,7 +103,11 @@ async function runOnceForAsset(asset) {
                 if (hasSignals) {
                     const mention = "@here";
                     const alertMsg = [`**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`, ...alerts.map(a => `• ${a}`)].join("\n");
-                    await sendDiscordAlert(alertMsg);
+                    const hash = buildHash(alertMsg);
+                    const windowMs = CFG.alertDedupMinutes * 60 * 1000;
+                    if (shouldSend(hash, windowMs)) {
+                        await sendDiscordAlert(alertMsg);
+                    }
                 }
             }
         } catch (e) {
