@@ -29,6 +29,7 @@ export const CFG = {
     debug: process.env.DEBUG?.toLowerCase() === 'true',
     accountEquity: parseFloat(process.env.ACCOUNT_EQUITY || '0'),
     riskPerTrade: parseFloat(process.env.RISK_PER_TRADE || '0.01'),
+    alertDedupMinutes: parseFloat(process.env.ALERT_DEDUP_MINUTES || '60'),
 };
 
 export const config = {

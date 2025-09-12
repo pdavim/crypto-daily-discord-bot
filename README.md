@@ -14,5 +14,6 @@ Copy `.env.example` to `.env` and provide values for the variables below before 
 - `OPENROUTER_API_KEY` – OpenRouter access key
 - `NEWS_API_KEY` – NewsAPI key
 - `SERPAPI_API_KEY` – SerpAPI key
+- `ALERT_DEDUP_MINUTES` – minutes to suppress duplicate alerts
 
 The bot logs a warning and skips work when required webhooks are missing so deployments fail fast.
