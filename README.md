@@ -12,6 +12,12 @@ This project posts crypto analysis, charts and alerts to Discord.
 
 2. Copy `.env.example` to `.env` and fill in the values for your environment.
 
+3. Create the `logs/` directory used for rotating log files:
+
+   ```bash
+   mkdir logs
+   ```
+
 ## Running
 
 - Start scheduled jobs:
