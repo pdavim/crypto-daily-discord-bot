@@ -1,12 +1,16 @@
 import { crossUp, crossDown, isBBSqueeze } from "./indicators.js";
 import { atrStopTarget, positionSize } from "./trading/risk.js";
 import { roundThreshold } from "./utils.js";
+import { performance } from 'node:perf_hooks';
+import { logger } from './logger.js';
+import { recordPerf } from './perf.js';
 
 export function buildAlerts({
     rsiSeries, macdObj, bbWidth, ma20, ma50, ma200, lastClose, var24h, closes, highs, lows, volumes, atrSeries, upperBB, lowerBB, sarSeries, trendSeries, heuristicSeries, vwapSeries, ema9, ema21, stochasticK, stochasticD, willrSeries, cciSeries, obvSeries,
     equity,
     riskPct
 }) {
+    const start = performance.now();
     const alerts = [];
 
     const rsi = rsiSeries?.at(-1);
@@ -110,5 +114,8 @@ export function buildAlerts({
             alerts.push(`🎯 Stop ${stop.toFixed(4)} / Target ${target.toFixed(4)} / Size ${size.toFixed(4)}`);
         }
     }
+    const ms = performance.now() - start;
+    logger.debug({ fn: 'buildAlerts', ms }, 'duration');
+    recordPerf('buildAlerts', ms);
     return alerts;
 }
