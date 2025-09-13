@@ -12,7 +12,7 @@ import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
-import { logger } from "./logger.js";
+import { logger, withContext, createContext } from "./logger.js";
 import pLimit from "./limit.js";
 import { buildHash, shouldSend } from "./alertCache.js";
 
@@ -42,6 +42,7 @@ async function runOnceForAsset(asset) {
     const snapshots = {};
     const chartPaths = [];
     await Promise.all(TIMEFRAMES.map(async tf => {
+        const log = withContext(logger, createContext({ asset: asset.key, timeframe: tf }));
         try {
             let candles = await fetchOHLCV(asset.binance, tfToInterval(tf));
             if (tf === "45m") {
@@ -113,7 +114,7 @@ async function runOnceForAsset(asset) {
                 }
             }
         } catch (e) {
-            logger.error({ asset: asset.key, timeframe: tf, fn: 'runOnceForAsset', err: e }, 'Processing error');
+            log.error({ fn: 'runOnceForAsset', err: e }, 'Processing error');
         }
     }));
     saveStore();
@@ -121,13 +122,15 @@ async function runOnceForAsset(asset) {
         const summary = buildSummary({ assetKey: asset.key, snapshots });
         const sent = await postAnalysis(asset.key, "4h", summary);
         if (!sent) {
-            logger.warn({ asset: asset.key, timeframe: '4h', fn: 'runOnceForAsset' }, 'report upload failed');
+            const log = withContext(logger, createContext({ asset: asset.key, timeframe: '4h' }));
+            log.warn({ fn: 'runOnceForAsset' }, 'report upload failed');
         }
     }
     if (CFG.enableCharts && chartPaths.length > 0) {
         const chartsSent = await postCharts(chartPaths);
         if (!chartsSent) {
-            logger.warn({ asset: asset.key, timeframe: undefined, fn: 'runOnceForAsset' }, 'chart upload failed');
+            const log = withContext(logger, createContext({ asset: asset.key }));
+            log.warn({ fn: 'runOnceForAsset' }, 'chart upload failed');
         }
     }
 }
@@ -140,6 +143,7 @@ async function runAll() {
 }
 
 async function runDailyAnalysis() {
+    const log = withContext(logger, createContext({ asset: 'DAILY', timeframe: '1d' }));
     try {
         const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 2);
         const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
@@ -163,15 +167,16 @@ async function runDailyAnalysis() {
         if (CFG.enableReports) {
             const sent = await postAnalysis("DAILY", "1d", finalReport);
             if (!sent) {
-                logger.warn({ asset: 'DAILY', timeframe: '1d', fn: 'runDailyAnalysis' }, 'report upload failed');
+                log.warn({ fn: 'runDailyAnalysis' }, 'report upload failed');
             }
         }
     } catch (e) {
-        logger.error({ asset: 'DAILY', timeframe: '1d', fn: 'runDailyAnalysis', err: e }, 'Error in daily analysis');
+        log.error({ fn: 'runDailyAnalysis', err: e }, 'Error in daily analysis');
     }
 }
 
 async function runWeeklyAnalysis() {
+    const log = withContext(logger, createContext({ asset: 'WEEKLY', timeframe: '1w' }));
     try {
         const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 8);
         const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
@@ -204,11 +209,11 @@ async function runWeeklyAnalysis() {
         if (CFG.enableReports) {
             const sent = await postAnalysis("WEEKLY", "1w", finalReport);
             if (!sent) {
-                logger.warn({ asset: 'WEEKLY', timeframe: '1w', fn: 'runWeeklyAnalysis' }, 'report upload failed');
+                log.warn({ fn: 'runWeeklyAnalysis' }, 'report upload failed');
             }
         }
     } catch (e) {
-        logger.error({ asset: 'WEEKLY', timeframe: '1w', fn: 'runWeeklyAnalysis', err: e }, 'Error in weekly analysis');
+        log.error({ fn: 'runWeeklyAnalysis', err: e }, 'Error in weekly analysis');
     }
 }
 
@@ -231,10 +236,11 @@ if (!ONCE) {
             scheduleRun(asset);
         }
     });
+    const scheduleLog = withContext(logger, createContext());
     cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
-    logger.info({ asset: undefined, timeframe: undefined, fn: 'schedule' }, `⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
+    scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
     cron.schedule('0 18 * * 0', runWeeklyAnalysis, { timezone: CFG.tz });
-    logger.info({ asset: undefined, timeframe: undefined, fn: 'schedule' }, `⏱️ Scheduled weekly at 18h Sunday (TZ=${CFG.tz})`);
+    scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled weekly at 18h Sunday (TZ=${CFG.tz})`);
     runAll();
     runDailyAnalysis();
     runWeeklyAnalysis();

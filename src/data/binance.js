@@ -2,7 +2,7 @@ import axios from "axios";
 import { LRUCache } from "lru-cache";
 import { fetchWithRetry } from "../utils.js";
 import { CFG } from "../config.js";
-import { logger } from "../logger.js";
+import { logger, withContext, createContext } from "../logger.js";
 
 const BASE = "https://api.binance.com/api/v3/klines";
 const CANDLES = 200; // solicitamos pelo menos 200 barras
@@ -28,14 +28,15 @@ export async function fetchOHLCV(symbol, interval) {
     if (cached) {
         return cached;
     }
-    logger.info({ asset: symbol, timeframe: interval, fn: 'fetchOHLCV' }, `Fetching OHLCV for ${symbol} ${interval}`);
+    const log = withContext(logger, createContext({ asset: symbol, timeframe: interval }));
+    log.info({ fn: 'fetchOHLCV' }, `Fetching OHLCV for ${symbol} ${interval}`);
     const url = `${BASE}?symbol=${symbol}&interval=${interval}&limit=${CANDLES}`;
     const { data } = await fetchWithRetry(async () => {
         await rateLimit();
         return axios.get(url);
     });
     if (CFG.debug) {
-        logger.info({ asset: symbol, timeframe: interval, fn: 'fetchOHLCV', data }, "OHLCV data");
+        log.info({ fn: 'fetchOHLCV', data }, "OHLCV data");
     }
     const result = data.map(c => ({
         t: new Date(c[0]),
@@ -52,14 +53,15 @@ export async function fetchDailyCloses(symbol, days = 32) {
     if (cached) {
         return cached;
     }
-    logger.info({ asset: symbol, timeframe: '1d', fn: 'fetchDailyCloses' }, `Fetching daily closes for ${symbol} last ${days} days`);
+    const log = withContext(logger, createContext({ asset: symbol, timeframe: '1d' }));
+    log.info({ fn: 'fetchDailyCloses' }, `Fetching daily closes for ${symbol} last ${days} days`);
     const url = `${BASE}?symbol=${symbol}&interval=1d&limit=${days}`;
     const { data } = await fetchWithRetry(async () => {
         await rateLimit();
         return axios.get(url);
     });
     if (CFG.debug) {
-        logger.info({ asset: symbol, timeframe: '1d', fn: 'fetchDailyCloses', data }, "Daily closes data");
+        log.info({ fn: 'fetchDailyCloses', data }, "Daily closes data");
     }
     const result = data.map(c => ({ t: new Date(c[0]), c: +c[4], v: +c[5] }));
     cache.set(cacheKey, result);

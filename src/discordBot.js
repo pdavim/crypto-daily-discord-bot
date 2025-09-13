@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, ApplicationCommandOptionType } from 'discord.js';
 import { CFG } from './config.js';
-import { logger } from './logger.js';
+import { logger, withContext, createContext } from './logger.js';
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from './assets.js';
 import { fetchOHLCV } from './data/binance.js';
 import { renderChartPNG } from './chart.js';
@@ -42,7 +42,8 @@ async function handleInteraction(interaction) {
             const chartPath = await renderChartPNG(asset.key, tf, candles);
             await interaction.editReply({ files: [chartPath] });
         } catch (e) {
-            logger.error({ asset: assetKey, timeframe: tf, fn: 'handleInteraction', err: e }, 'Failed to render chart');
+            const log = withContext(logger, createContext({ asset: assetKey, timeframe: tf }));
+            log.error({ fn: 'handleInteraction', err: e }, 'Failed to render chart');
             await interaction.editReply('Erro ao gerar gráfico');
         }
     } else if (interaction.commandName === 'watch') {
@@ -66,8 +67,9 @@ async function handleInteraction(interaction) {
 }
 
 function getClient() {
+    const log = withContext(logger, createContext());
     if (!CFG.botToken) {
-        logger.warn({ asset: undefined, timeframe: undefined, fn: 'getClient' }, 'Missing bot token; skipping Discord bot');
+        log.warn({ fn: 'getClient' }, 'Missing bot token; skipping Discord bot');
         return null;
     }
     if (!clientPromise) {
@@ -133,15 +135,16 @@ function getClient() {
             client.on('interactionCreate', handleInteraction);
             return client;
         });
-        client.on('error', e => logger.error({ asset: undefined, timeframe: undefined, fn: 'getClient', err: e }, 'Discord client error'));
+        client.on('error', e => withContext(logger, createContext()).error({ fn: 'getClient', err: e }, 'Discord client error'));
     }
     return clientPromise;
 }
 
 export async function postCharts(files) {
     if (!Array.isArray(files)) files = [files];
+    const log = withContext(logger, createContext());
     if (!CFG.channelChartsId) {
-        logger.warn({ asset: undefined, timeframe: undefined, fn: 'postCharts' }, 'Missing channel ID; cannot post charts');
+        log.warn({ fn: 'postCharts' }, 'Missing channel ID; cannot post charts');
         return false;
     }
     const client = await getClient();
@@ -151,7 +154,7 @@ export async function postCharts(files) {
         await channel.send({ files });
         return true;
     } catch (e) {
-        logger.error({ asset: undefined, timeframe: undefined, fn: 'postCharts', err: e }, 'Failed to post charts to Discord');
+        log.error({ fn: 'postCharts', err: e }, 'Failed to post charts to Discord');
         return false;
     }
 }

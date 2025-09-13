@@ -1,7 +1,7 @@
 import axios from "axios";
 import { config } from "./config.js";
 import { fetchWithRetry } from "./utils.js";
-import { logger } from "./logger.js";
+import { logger, withContext, createContext } from "./logger.js";
 
 export const WEB_SNIPPETS = [];
 
@@ -19,7 +19,8 @@ function stripHtml(html) {
 }
 
 async function fetchOfficialBlog(asset) {
-    logger.info({ asset, timeframe: undefined, fn: 'fetchOfficialBlog' }, `Fetching official blog for ${asset}`);
+    const log = withContext(logger, createContext({ asset }));
+    log.info({ fn: 'fetchOfficialBlog' }, `Fetching official blog for ${asset}`);
     const url = BLOG_SOURCES[asset];
     if (!url) return null;
     try {
@@ -32,13 +33,14 @@ async function fetchOfficialBlog(asset) {
         if (err.code === "ENOTFOUND" || err.code === "EAI_AGAIN") {
             return null;
         }
-        logger.error({ asset, timeframe: undefined, fn: 'fetchOfficialBlog', err }, `Error fetching official blog for ${asset}`);
+        log.error({ fn: 'fetchOfficialBlog', err }, `Error fetching official blog for ${asset}`);
     }
     return null;
 }
 
 export async function searchWeb(asset) {
-    logger.info({ asset, timeframe: undefined, fn: 'searchWeb' }, `Fetching web results for ${asset}`);
+    const log = withContext(logger, createContext({ asset }));
+    log.info({ fn: 'searchWeb' }, `Fetching web results for ${asset}`);
     WEB_SNIPPETS.length = 0;
     if (!config.serpapiApiKey || !asset) {
         return WEB_SNIPPETS;
@@ -51,7 +53,7 @@ export async function searchWeb(asset) {
             num: 5,
         };
         const { data } = await fetchWithRetry(() => axios.get("https://serpapi.com/search", { params }));
-        logger.info({ asset, timeframe: undefined, fn: 'searchWeb', data }, "Web search data");
+        log.info({ fn: 'searchWeb', data }, "Web search data");
         const results = data.organic_results || [];
         results.slice(0, 5).forEach(r => {
             if (r.snippet) {
@@ -59,14 +61,14 @@ export async function searchWeb(asset) {
             }
         });
     } catch (err) {
-        logger.error({ asset, timeframe: undefined, fn: 'searchWeb', err }, "Error fetching web results");
+        log.error({ fn: 'searchWeb', err }, "Error fetching web results");
     }
     let official = null;
     try {
         official = await fetchOfficialBlog(asset);
     } catch (err) {
         if (err.code !== "ENOTFOUND" && err.code !== "EAI_AGAIN") {
-            logger.error({ asset, timeframe: undefined, fn: 'searchWeb', err }, `Error fetching official blog for ${asset}`);
+            log.error({ fn: 'searchWeb', err }, `Error fetching official blog for ${asset}`);
         }
     }
     if (official) {
