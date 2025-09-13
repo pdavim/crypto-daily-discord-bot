@@ -3,6 +3,7 @@ import { CFG } from "./config.js";
 import { logger, withContext, createContext } from "./logger.js";
 import { fetchWithRetry } from "./utils.js";
 import { alertCounter, alertHistogram } from "./metrics.js";
+import { notifyOps } from "./monitor.js";
 
 export async function postAnalysis(assetKey, tf, text) {
     const url = CFG.webhookAnalysis;
@@ -17,6 +18,7 @@ export async function postAnalysis(assetKey, tf, text) {
         return true;
     } catch (err) {
         log.error({ fn: 'postAnalysis', err }, 'Failed to post analysis after retries');
+        await notifyOps(`Failed to post analysis for ${assetKey} ${tf}: ${err.message || err}`);
         return false;
     }
 }
@@ -34,6 +36,7 @@ export async function sendDiscordAlert(text) {
     } catch (err) {
         end();
         log.error({ fn: 'sendDiscordAlert', err }, 'Failed to send alert after retries');
+        await notifyOps(`Failed to send alert: ${err.message || err}`);
         return false;
     }
 }
