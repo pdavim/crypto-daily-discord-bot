@@ -18,6 +18,7 @@ import pLimit, { calcConcurrency } from "./limit.js";
 import { buildHash, shouldSend } from "./alertCache.js";
 import { register } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
+import { reportWeeklyPerf } from "./perf.js";
 
 initBot();
 
@@ -254,6 +255,7 @@ async function runWeeklyAnalysis() {
                 log.warn({ fn: 'runWeeklyAnalysis' }, 'report upload failed');
             }
         }
+        reportWeeklyPerf();
     } catch (e) {
         log.error({ fn: 'runWeeklyAnalysis', err: e }, 'Error in weekly analysis');
         await notifyOps(`Error in weekly analysis: ${e.message || e}`);

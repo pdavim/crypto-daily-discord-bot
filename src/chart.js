@@ -3,6 +3,8 @@ import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "node:fs";
 import "chartjs-adapter-luxon";
 import { logger, withContext, createContext } from "./logger.js";
+import { performance } from 'node:perf_hooks';
+import { recordPerf } from './perf.js';
 import {
     CandlestickController,
     CandlestickElement,
@@ -41,6 +43,7 @@ const hasTimeAdapter = () => {
 
 // renderização
 export async function renderChartPNG(assetKey, tf, candles, indicators = {}, overlays = {}) {
+    const start = performance.now();
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
     const timeAdapter = hasTimeAdapter();
     const candlestickAvailable = !!Chart.registry.controllers.get("candlestick");
@@ -185,5 +188,8 @@ export async function renderChartPNG(assetKey, tf, candles, indicators = {}, ove
     const buffer = await canvas.renderToBuffer(cfg);
     const outPath = `charts/${assetKey}_${tf}.png`;
     fs.writeFileSync(outPath, buffer);
+    const ms = performance.now() - start;
+    log.debug({ fn: 'renderChartPNG', ms }, 'duration');
+    recordPerf('renderChartPNG', ms);
     return outPath;
 }

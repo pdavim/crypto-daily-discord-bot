@@ -3,6 +3,8 @@ import { LRUCache } from "lru-cache";
 import { fetchWithRetry } from "../utils.js";
 import { CFG } from "../config.js";
 import { logger, withContext, createContext } from "../logger.js";
+import { performance } from 'node:perf_hooks';
+import { recordPerf } from '../perf.js';
 
 const BASE = "https://api.binance.com/api/v3/klines";
 const CANDLES = 200; // solicitamos pelo menos 200 barras
@@ -23,12 +25,16 @@ async function rateLimit() {
 }
 
 export async function fetchOHLCV(symbol, interval) {
+    const start = performance.now();
+    const log = withContext(logger, createContext({ asset: symbol, timeframe: interval }));
     const cacheKey = `ohlcv:${symbol}:${interval}`;
     const cached = cache.get(cacheKey);
     if (cached) {
+        const ms = performance.now() - start;
+        log.debug({ fn: 'fetchOHLCV', ms }, 'duration');
+        recordPerf('fetchOHLCV', ms);
         return cached;
     }
-    const log = withContext(logger, createContext({ asset: symbol, timeframe: interval }));
     log.info({ fn: 'fetchOHLCV' }, `Fetching OHLCV for ${symbol} ${interval}`);
     const url = `${BASE}?symbol=${symbol}&interval=${interval}&limit=${CANDLES}`;
     const { data } = await fetchWithRetry(async () => {
@@ -44,6 +50,9 @@ export async function fetchOHLCV(symbol, interval) {
         v: +c[5]
     }));
     cache.set(cacheKey, result);
+    const ms = performance.now() - start;
+    log.debug({ fn: 'fetchOHLCV', ms }, 'duration');
+    recordPerf('fetchOHLCV', ms);
     return result;
 }
 
