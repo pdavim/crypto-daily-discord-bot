@@ -1,10 +1,11 @@
 import axios from "axios";
 import { fetchWithRetry } from "../utils.js";
-import { logger } from "../logger.js";
+import { logger, withContext, createContext } from "../logger.js";
 
 const BASE = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
 
 export async function fetchEconomicEvents() {
+    const log = withContext(logger, createContext());
     try {
         const { data } = await fetchWithRetry(() => axios.get(BASE));
         const now = new Date();
@@ -21,7 +22,7 @@ export async function fetchEconomicEvents() {
                 impact: e.impact
             }));
     } catch (err) {
-        logger.error({ asset: undefined, timeframe: undefined, fn: 'fetchEconomicEvents', err }, "Error fetching economic events");
+        log.error({ fn: 'fetchEconomicEvents', err }, "Error fetching economic events");
         return [];
     }
 }

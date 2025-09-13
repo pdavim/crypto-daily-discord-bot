@@ -2,7 +2,7 @@ import axios from "axios";
 import { config, CFG } from "./config.js";
 import { callOpenRouter } from "./ai.js";
 import { fetchWithRetry } from "./utils.js";
-import { logger } from "./logger.js";
+import { logger, withContext, createContext } from "./logger.js";
 
 const REPUTABLE_DOMAINS = [
     "coindesk.com",
@@ -60,6 +60,7 @@ async function classifySentiments(items) {
     const titles = items.map(i => i.title);
     if (!titles.length) return [];
     if (CFG.openrouterApiKey) {
+        const log = withContext(logger, createContext());
         try {
             const prompt = `Classify the sentiment of each headline as -1 for negative, 0 for neutral, and 1 for positive. Return a JSON array of numbers in the same order.\n` +
                 titles.map(t => `- ${t}`).join("\n");
@@ -73,7 +74,7 @@ async function classifySentiments(items) {
                 return arr.map(n => Math.max(-1, Math.min(1, Number(n) || 0)));
             }
         } catch (err) {
-              logger.error({ asset: undefined, timeframe: undefined, fn: 'classifySentiments', err }, "Sentiment classification via OpenRouter failed");
+              log.error({ fn: 'classifySentiments', err }, "Sentiment classification via OpenRouter failed");
         }
     }
     const positive = ["up", "surge", "rally", "gain", "bull", "rise", "soar", "profit", "positive"];
@@ -88,7 +89,8 @@ async function classifySentiments(items) {
 }
 
 export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
-    logger.info({ asset: symbol, timeframe: undefined, fn: 'getAssetNews' }, `Fetching news for ${symbol}`);
+    const log = withContext(logger, createContext({ asset: symbol }));
+    log.info({ fn: 'getAssetNews' }, `Fetching news for ${symbol}`);
     if (!config.serpapiApiKey || !symbol) {
         return { items: [], summary: "", avgSentiment: 0 };
     }
@@ -150,7 +152,7 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
 
         return { items: normalized, summary: summary.trim(), avgSentiment };
     } catch (error) {
-          logger.error({ asset: symbol, timeframe: undefined, fn: 'getAssetNews', err: error }, "Error fetching asset news");
+          log.error({ fn: 'getAssetNews', err: error }, "Error fetching asset news");
         return { items: [], summary: "", avgSentiment: 0 };
     }
 }

@@ -1,9 +1,10 @@
 import axios from "axios";
 import { config } from "../config.js";
-import { logger } from "../logger.js";
+import { logger, withContext, createContext } from "../logger.js";
 
 export async function searchNews(asset) {
     if (!config.newsApiKey) return [];
+    const log = withContext(logger, createContext({ asset }));
     try {
         const resp = await axios.get("https://newsapi.org/v2/everything", {
             params: {
@@ -19,7 +20,7 @@ export async function searchNews(asset) {
             description: a.description || "",
         }));
     } catch (error) {
-        logger.error({ asset, timeframe: undefined, fn: 'searchNews', err: error }, "Error fetching news");
+        log.error({ fn: 'searchNews', err: error }, "Error fetching news");
         return [];
     }
 }

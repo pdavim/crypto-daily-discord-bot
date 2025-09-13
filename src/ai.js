@@ -53,7 +53,7 @@ import { getAssetNews } from "./news.js";
 import { searchWeb } from "./websearch.js";
 import { sma, rsi, macd, atr14, bollinger, bollWidth, crossUp, crossDown, parabolicSAR, semaforo, isBBSqueeze, sparkline, volumeDivergence, trendFromMAs, scoreHeuristic, vwap, ema, stochastic, williamsR, cci, obv } from "./indicators.js";
 import { buildAlerts } from "./alerts.js";
-import { logger } from "./logger.js";
+import { logger, withContext, createContext } from "./logger.js";
 
 const openrouter = CFG.openrouterApiKey
     ? new OpenAi({ baseURL: 'https://openrouter.ai/api/v1', apiKey: CFG.openrouterApiKey })
@@ -61,7 +61,8 @@ const openrouter = CFG.openrouterApiKey
 
 // OpenRouter chat completion
 export async function callOpenRouter(messages) {
-    logger.info({ asset: undefined, timeframe: undefined, fn: 'callOpenRouter' }, "Calling OpenRouter...");
+    const log = withContext(logger, createContext());
+    log.info({ fn: 'callOpenRouter' }, "Calling OpenRouter...");
     if (!openrouter) {
         throw new Error("OpenRouter API key missing");
     }
@@ -75,7 +76,7 @@ export async function callOpenRouter(messages) {
         });
         return response.choices[0].message.content;
     } catch (error) {
-        logger.error({ asset: undefined, timeframe: undefined, fn: 'callOpenRouter', err: error }, "Error calling OpenRouter");
+        log.error({ fn: 'callOpenRouter', err: error }, "Error calling OpenRouter");
         throw error;
     }
 }
@@ -98,7 +99,8 @@ function fallbackVerdict({ ma20, ma50, rsi14 }) {
 }
 
 async function getMacroContext() {
-    logger.info({ asset: undefined, timeframe: undefined, fn: 'getMacroContext' }, "Fetching macro context...");
+    const log = withContext(logger, createContext());
+    log.info({ fn: 'getMacroContext' }, "Fetching macro context...");
     try {
         const { summary } = await getAssetNews({ symbol: "crypto market" });
         const web = await searchWeb("crypto market");
@@ -110,7 +112,8 @@ async function getMacroContext() {
 
 // Gather metrics for several assets and use OpenRouter for a brief analysis
 export async function runAgent() {
-    logger.info({ asset: undefined, timeframe: undefined, fn: 'runAgent' }, "Running AI agent for asset analysis...");
+    const log = withContext(logger, createContext());
+    log.info({ fn: 'runAgent' }, "Running AI agent for asset analysis...");
     const reports = [];
     const macro = await getMacroContext();
 
@@ -227,7 +230,8 @@ export async function runAgent() {
                     ];
                     verdict = await callOpenRouter(messages);
                 } catch (error) {
-                    logger.error({ asset: key, timeframe: '1h', fn: 'runAgent', err: error }, `OpenRouter call failed for ${key}`);
+                    const logAsset = withContext(logger, createContext({ asset: key, timeframe: '1h' }));
+                    logAsset.error({ fn: 'runAgent', err: error }, `OpenRouter call failed for ${key}`);
                     const partial = [
                         ...baseReport,
                         `- News: ${newsSummary || 'n/a'}`,

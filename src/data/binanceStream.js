@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { CFG } from '../config.js';
-import { logger } from '../logger.js';
+import { logger, withContext, createContext } from '../logger.js';
 
 const BASE_URL = 'wss://stream.binance.com:9443/stream?streams=';
 
@@ -29,17 +29,17 @@ export function streamKlines(pairs, onCandleClose) {
             }
         } catch (e) {
             if (CFG.debug) {
-                logger.error({ asset: undefined, timeframe: undefined, fn: 'streamKlines', err: e }, '[BinanceWS] parse error');
+                withContext(logger, createContext()).error({ fn: 'streamKlines', err: e }, '[BinanceWS] parse error');
             }
         }
     });
 
     ws.on('error', err => {
-        logger.error({ asset: undefined, timeframe: undefined, fn: 'streamKlines', err }, '[BinanceWS] error');
+        withContext(logger, createContext()).error({ fn: 'streamKlines', err }, '[BinanceWS] error');
     });
 
     ws.on('close', () => {
-        logger.warn({ asset: undefined, timeframe: undefined, fn: 'streamKlines' }, '[BinanceWS] connection closed');
+        withContext(logger, createContext()).warn({ fn: 'streamKlines' }, '[BinanceWS] connection closed');
     });
 
     return ws;
