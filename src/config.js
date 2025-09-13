@@ -30,6 +30,7 @@ export const CFG = {
     accountEquity: parseFloat(process.env.ACCOUNT_EQUITY || '0'),
     riskPerTrade: parseFloat(process.env.RISK_PER_TRADE || '0.01'),
     alertDedupMinutes: parseFloat(process.env.ALERT_DEDUP_MINUTES || '60'),
+    maxConcurrency: process.env.MAX_CONCURRENCY ? parseInt(process.env.MAX_CONCURRENCY, 10) : undefined,
 };
 
 export const config = {

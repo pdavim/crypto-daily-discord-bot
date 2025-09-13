@@ -14,7 +14,7 @@ import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
 import { logger, withContext, createContext } from "./logger.js";
-import pLimit from "./limit.js";
+import pLimit, { calcConcurrency } from "./limit.js";
 import { buildHash, shouldSend } from "./alertCache.js";
 import { register } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
@@ -154,7 +154,7 @@ async function runOnceForAsset(asset) {
 }
 
 async function runAll() {
-    const limit = pLimit(3);
+    const limit = pLimit(calcConcurrency());
     await Promise.all(
         ASSETS.map(asset => limit(() => runOnceForAsset(asset)))
     );

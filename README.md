@@ -36,6 +36,10 @@ This project posts crypto analysis, charts and alerts to Discord.
 
 The `.env.example` file documents each available variable with a purpose and example value.
 
+Key variables:
+
+- `MAX_CONCURRENCY` – optional limit for parallel analyses (defaults to the number of CPU cores).
+
 ## Technical Articles
 
 - [Getting started with Discord webhooks](https://support.discord.com/hc/en-us/articles/228383668)
