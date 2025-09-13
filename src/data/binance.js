@@ -10,10 +10,11 @@ const BASE = "https://api.binance.com/api/v3/klines";
 const CANDLES = 200; // solicitamos pelo menos 200 barras
 const RATE_LIMIT_MS = 200;
 let lastCall = 0;
-const CACHE_TTL_MS = 10 * 60 * 1000; // ~10 minutes
-
 // Cache for OHLCV and daily close requests
-const cache = new LRUCache({ max: 500, ttl: CACHE_TTL_MS });
+const cache = new LRUCache({
+    max: 500,
+    ttl: CFG.binanceCacheTTL * 60 * 1000,
+});
 
 async function rateLimit() {
     const now = Date.now();

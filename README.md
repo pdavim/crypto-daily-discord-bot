@@ -39,6 +39,7 @@ The `.env.example` file documents each available variable with a purpose and exa
 Key variables:
 
 - `MAX_CONCURRENCY` – optional limit for parallel analyses (defaults to the number of CPU cores).
+- `BINANCE_CACHE_TTL_MINUTES` – cache duration for Binance price data in minutes (defaults to 10 minutes).
 
 ## Technical Articles
 
