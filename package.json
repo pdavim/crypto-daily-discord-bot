@@ -23,6 +23,7 @@
     "node-cron": "^3.0.3",
     "openai": "^5.19.1",
     "pino": "^8.21.0",
+    "pino-rotating-file-stream": "^0.0.2",
     "puppeteer": "^24.19.0",
     "ws": "^8.18.3"
   },

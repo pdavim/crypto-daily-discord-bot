@@ -1,6 +1,7 @@
 node_modules/
 dist/
 charts/
+logs/
 .env
 .DS_Store
 .vscode/
