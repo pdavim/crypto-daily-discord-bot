@@ -1,16 +1,22 @@
 import { logger, withContext, createContext } from './logger.js';
+import { fetchWithRetryCounter, fetchWithRetryHistogram } from './metrics.js';
 
 export async function fetchWithRetry(fn, { retries = 3, baseDelay = 500 } = {}) {
     const log = withContext(logger, createContext());
+    fetchWithRetryCounter.inc();
+    const end = fetchWithRetryHistogram.startTimer();
     log.info({ fn: 'fetchWithRetry' }, `Fetching with retry, max attempts: ${retries + 1}, function: ${fn || 'anonymous'}`);
     let attempt = 0;
     while (true) {
         try {
-            return await fn();
+            const result = await fn();
+            end();
+            return result;
         } catch (err) {
             attempt++;
             if (attempt > retries) {
                 log.error({ fn: 'fetchWithRetry', err }, `[FATAL] ${err.message || err}`);
+                end();
                 throw err;
             }
             const delay = baseDelay * (2 ** (attempt - 1));

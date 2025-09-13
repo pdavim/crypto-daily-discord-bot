@@ -2,6 +2,7 @@ import axios from "axios";
 import { CFG } from "./config.js";
 import { logger, withContext, createContext } from "./logger.js";
 import { fetchWithRetry } from "./utils.js";
+import { alertCounter, alertHistogram } from "./metrics.js";
 
 export async function postAnalysis(assetKey, tf, text) {
     const url = CFG.webhookAnalysis;
@@ -23,11 +24,15 @@ export async function postAnalysis(assetKey, tf, text) {
 export async function sendDiscordAlert(text) {
     const url = CFG.webhookAlerts ?? CFG.webhook;
     const log = withContext(logger, createContext());
+    alertCounter.inc();
+    const end = alertHistogram.startTimer();
 
     try {
         await fetchWithRetry(() => axios.post(url, { content: text }), { retries: 2 });
+        end();
         return true;
     } catch (err) {
+        end();
         log.error({ fn: 'sendDiscordAlert', err }, 'Failed to send alert after retries');
         return false;
     }

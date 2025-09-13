@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import http from "http";
 import { CFG } from "./config.js";
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
@@ -15,8 +16,23 @@ import { fetchEconomicEvents } from "./data/economic.js";
 import { logger, withContext, createContext } from "./logger.js";
 import pLimit from "./limit.js";
 import { buildHash, shouldSend } from "./alertCache.js";
+import { register } from "./metrics.js";
 
 initBot();
+
+const METRICS_PORT = process.env.METRICS_PORT || 3001;
+http.createServer(async (req, res) => {
+    if (req.method === 'GET' && req.url === '/metrics') {
+        res.setHeader('Content-Type', register.contentType);
+        res.end(await register.metrics());
+    } else {
+        res.statusCode = 404;
+        res.end('Not found');
+    }
+}).listen(METRICS_PORT, () => {
+    const log = withContext(logger, createContext());
+    log.info({ fn: 'metrics' }, `Metrics server listening on port ${METRICS_PORT}`);
+});
 
 function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
 
