@@ -58,25 +58,48 @@ async function runOnceForAsset(asset) {
     const dailyPromise = fetchDailyCloses(asset.binance, 32);
     const snapshots = {};
     const chartPaths = [];
-    await Promise.all(TIMEFRAMES.map(async tf => {
+
+    // fetch unique intervals in parallel
+    const intervalPromises = {};
+    for (const tf of TIMEFRAMES) {
+        const interval = tfToInterval(tf);
+        if (!intervalPromises[interval]) {
+            intervalPromises[interval] = fetchOHLCV(asset.binance, interval);
+        }
+    }
+    const intervalKeys = Object.keys(intervalPromises);
+    const intervalResults = await Promise.all(Object.values(intervalPromises));
+    const candlesByInterval = {};
+    intervalKeys.forEach((k, i) => { candlesByInterval[k] = intervalResults[i]; });
+
+    // process each timeframe sequentially to reuse indicator results
+    let candles45m;
+    for (const tf of TIMEFRAMES) {
         const log = withContext(logger, createContext({ asset: asset.key, timeframe: tf }));
         try {
-            let candles = await fetchOHLCV(asset.binance, tfToInterval(tf));
+            const interval = tfToInterval(tf);
+            let candles = candlesByInterval[interval];
             if (tf === "45m") {
-                candles = build45mCandles(candles);
+                if (!candles45m) {
+                    candles45m = build45mCandles(candles);
+                }
+                candles = candles45m;
             }
             const min = tf === "45m" ? 40 : 120;
-            if (!candles || candles.length < min) return;
+            if (!candles || candles.length < min) continue;
             const lastCandleTime = candles.at(-1)?.t?.getTime?.();
             const key = `${asset.key}:${tf}`;
             if (lastCandleTime != null && getSignature(key) === lastCandleTime) {
-                return;
+                continue;
             }
             if (lastCandleTime != null) {
                 updateSignature(key, lastCandleTime);
             }
-            const close = candles.map(c => c.c), vol = candles.map(c => c.v), high = candles.map(c => c.h), low = candles.map(c => c.l);
-            // Calculate indicators once
+            const close = candles.map(c => c.c);
+            const vol = candles.map(c => c.v);
+            const high = candles.map(c => c.h);
+            const low = candles.map(c => c.l);
+            // Calculate indicators once per timeframe
             const ma20 = sma(close, 20), ma50 = sma(close, 50), ma100 = sma(close, 100), ma200 = sma(close, 200);
             const r = rsi(close, 14);
             const m = macd(close, 12, 26, 9);
@@ -134,7 +157,7 @@ async function runOnceForAsset(asset) {
             log.error({ fn: 'runOnceForAsset', err: e }, 'Processing error');
             await notifyOps(`Processing error for ${asset.key} ${tf}: ${e.message || e}`);
         }
-    }));
+    }
     saveStore();
     if (CFG.enableAnalysis && snapshots["4h"]) {
         const summary = buildSummary({ assetKey: asset.key, snapshots });
