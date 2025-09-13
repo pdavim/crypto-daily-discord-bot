@@ -17,6 +17,7 @@ import { logger, withContext, createContext } from "./logger.js";
 import pLimit from "./limit.js";
 import { buildHash, shouldSend } from "./alertCache.js";
 import { register } from "./metrics.js";
+import { notifyOps } from "./monitor.js";
 
 initBot();
 
@@ -131,6 +132,7 @@ async function runOnceForAsset(asset) {
             }
         } catch (e) {
             log.error({ fn: 'runOnceForAsset', err: e }, 'Processing error');
+            await notifyOps(`Processing error for ${asset.key} ${tf}: ${e.message || e}`);
         }
     }));
     saveStore();
@@ -188,6 +190,7 @@ async function runDailyAnalysis() {
         }
     } catch (e) {
         log.error({ fn: 'runDailyAnalysis', err: e }, 'Error in daily analysis');
+        await notifyOps(`Error in daily analysis: ${e.message || e}`);
     }
 }
 
@@ -230,6 +233,7 @@ async function runWeeklyAnalysis() {
         }
     } catch (e) {
         log.error({ fn: 'runWeeklyAnalysis', err: e }, 'Error in weekly analysis');
+        await notifyOps(`Error in weekly analysis: ${e.message || e}`);
     }
 }
 
