@@ -25,7 +25,7 @@ function build45mCandles(candles15m) {
     return out;
 }
 
-async function handleInteraction(interaction) {
+export async function handleInteraction(interaction) {
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName === 'chart') {
         const assetKey = interaction.options.getString('ativo', true).toUpperCase();
