@@ -1,14 +1,17 @@
 import pino from 'pino';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 const logsDir = 'logs';
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
+const transportTarget = fileURLToPath(new URL('./logger-transport.cjs', import.meta.url));
+
 const transport = process.env.NODE_ENV === 'test' ? undefined : {
-  target: 'pino-rotating-file-stream',
+  target: transportTarget,
   options: {
     path: logsDir,
     filename: 'app-%DATE%.log',
