@@ -1,7 +1,7 @@
 import axios from "axios";
 import { config } from "./config.js";
 import { fetchWithRetry } from "./utils.js";
-import { logger, withContext, createContext } from "./logger.js";
+import { logger, withContext } from "./logger.js";
 
 export const WEB_SNIPPETS = [];
 
@@ -19,7 +19,7 @@ function stripHtml(html) {
 }
 
 async function fetchOfficialBlog(asset) {
-    const log = withContext(logger, createContext({ asset }));
+    const log = withContext(logger, { asset });
     log.info({ fn: 'fetchOfficialBlog' }, `Fetching official blog for ${asset}`);
     const url = BLOG_SOURCES[asset];
     if (!url) return null;
@@ -39,7 +39,7 @@ async function fetchOfficialBlog(asset) {
 }
 
 export async function searchWeb(asset) {
-    const log = withContext(logger, createContext({ asset }));
+    const log = withContext(logger, { asset });
     log.info({ fn: 'searchWeb' }, `Fetching web results for ${asset}`);
     WEB_SNIPPETS.length = 0;
     if (!config.serpapiApiKey || !asset) {

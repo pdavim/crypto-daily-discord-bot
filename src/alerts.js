@@ -2,7 +2,7 @@ import { crossUp, crossDown, isBBSqueeze } from "./indicators.js";
 import { atrStopTarget, positionSize } from "./trading/risk.js";
 import { roundThreshold } from "./utils.js";
 import { performance } from 'node:perf_hooks';
-import { logger } from './logger.js';
+import { logger, withContext } from './logger.js';
 import { recordPerf } from './perf.js';
 
 export function buildAlerts({
@@ -115,7 +115,8 @@ export function buildAlerts({
         }
     }
     const ms = performance.now() - start;
-    logger.debug({ fn: 'buildAlerts', ms }, 'duration');
+    const log = withContext(logger);
+    log.debug({ fn: 'buildAlerts', ms }, 'duration');
     recordPerf('buildAlerts', ms);
     return alerts;
 }

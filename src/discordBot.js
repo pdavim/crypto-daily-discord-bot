@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, ApplicationCommandOptionType } from 'discord.js';
 import { CFG } from './config.js';
-import { logger, withContext, createContext } from './logger.js';
+import { logger, withContext } from './logger.js';
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from './assets.js';
 import { fetchOHLCV } from './data/binance.js';
 import { renderChartPNG } from './chart.js';
@@ -42,7 +42,7 @@ export async function handleInteraction(interaction) {
             const chartPath = await renderChartPNG(asset.key, tf, candles);
             await interaction.editReply({ files: [chartPath] });
         } catch (e) {
-            const log = withContext(logger, createContext({ asset: assetKey, timeframe: tf }));
+            const log = withContext(logger, { asset: assetKey, timeframe: tf });
             log.error({ fn: 'handleInteraction', err: e }, 'Failed to render chart');
             await interaction.editReply('Erro ao gerar gráfico');
         }
@@ -67,7 +67,7 @@ export async function handleInteraction(interaction) {
 }
 
 function getClient() {
-    const log = withContext(logger, createContext());
+    const log = withContext(logger);
     if (!CFG.botToken) {
         log.warn({ fn: 'getClient' }, 'Missing bot token; skipping Discord bot');
         return null;
@@ -135,14 +135,14 @@ function getClient() {
             client.on('interactionCreate', handleInteraction);
             return client;
         });
-        client.on('error', e => withContext(logger, createContext()).error({ fn: 'getClient', err: e }, 'Discord client error'));
+        client.on('error', e => withContext(logger).error({ fn: 'getClient', err: e }, 'Discord client error'));
     }
     return clientPromise;
 }
 
 export async function postCharts(files) {
     if (!Array.isArray(files)) files = [files];
-    const log = withContext(logger, createContext());
+    const log = withContext(logger);
     if (!CFG.channelChartsId) {
         log.warn({ fn: 'postCharts' }, 'Missing channel ID; cannot post charts');
         return false;

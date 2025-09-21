@@ -24,11 +24,18 @@ export const logger = pino({
 });
 
 export function createContext(ctx = {}) {
-  return { requestId: randomUUID(), ...ctx };
+  const { asset, timeframe, ...rest } = ctx;
+  return {
+    requestId: randomUUID(),
+    ...(asset !== undefined ? { asset } : {}),
+    ...(timeframe !== undefined ? { timeframe } : {}),
+    ...rest,
+  };
 }
 
 export function withContext(baseLogger, ctx = {}) {
-  return baseLogger.child(ctx);
+  const context = ctx?.requestId ? ctx : createContext(ctx);
+  return baseLogger.child(context);
 }
 
 export default logger;

@@ -1,6 +1,6 @@
 import { getJson } from "serpapi";
 import { config } from "../config.js";
-import { logger, withContext, createContext } from "../logger.js";
+import { logger, withContext } from "../logger.js";
 
 const apiKey = config.serpapiApiKey;
 if (!apiKey) {
@@ -29,7 +29,7 @@ export const searchWeb = async (crypto_search_prompt) => {
 };
 
 export const fetchTrending = async (crypto_trending_prompt) => {
-    const log = withContext(logger, createContext());
+    const log = withContext(logger);
     const res = await getJson({
         api_key: apiKey,
         engine: "google_trends",

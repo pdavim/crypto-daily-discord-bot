@@ -2,7 +2,7 @@ import axios from "axios";
 import { LRUCache } from "lru-cache";
 import { fetchWithRetry } from "../utils.js";
 import { CFG } from "../config.js";
-import { logger, withContext, createContext } from "../logger.js";
+import { logger, withContext } from "../logger.js";
 import { performance } from 'node:perf_hooks';
 import { recordPerf } from '../perf.js';
 
@@ -27,7 +27,7 @@ async function rateLimit() {
 
 export async function fetchOHLCV(symbol, interval) {
     const start = performance.now();
-    const log = withContext(logger, createContext({ asset: symbol, timeframe: interval }));
+    const log = withContext(logger, { asset: symbol, timeframe: interval });
     const cacheKey = `ohlcv:${symbol}:${interval}`;
     const cached = cache.get(cacheKey);
     if (cached) {
@@ -63,7 +63,7 @@ export async function fetchDailyCloses(symbol, days = 32) {
     if (cached) {
         return cached;
     }
-    const log = withContext(logger, createContext({ asset: symbol, timeframe: '1d' }));
+    const log = withContext(logger, { asset: symbol, timeframe: '1d' });
     log.info({ fn: 'fetchDailyCloses' }, `Fetching daily closes for ${symbol} last ${days} days`);
     const url = `${BASE}?symbol=${symbol}&interval=1d&limit=${days}`;
     const { data } = await fetchWithRetry(async () => {

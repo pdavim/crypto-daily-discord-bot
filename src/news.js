@@ -2,7 +2,7 @@ import axios from "axios";
 import { config, CFG } from "./config.js";
 import { callOpenRouter } from "./ai.js";
 import { fetchWithRetry } from "./utils.js";
-import { logger, withContext, createContext } from "./logger.js";
+import { logger, withContext } from "./logger.js";
 
 const REPUTABLE_DOMAINS = [
     "coindesk.com",
@@ -60,7 +60,7 @@ async function classifySentiments(items) {
     const titles = items.map(i => i.title);
     if (!titles.length) return [];
     if (CFG.openrouterApiKey) {
-        const log = withContext(logger, createContext());
+        const log = withContext(logger);
         try {
             const prompt = `Classify the sentiment of each headline as -1 for negative, 0 for neutral, and 1 for positive. Return a JSON array of numbers in the same order.\n` +
                 titles.map(t => `- ${t}`).join("\n");
@@ -89,7 +89,7 @@ async function classifySentiments(items) {
 }
 
 export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
-    const log = withContext(logger, createContext({ asset: symbol }));
+    const log = withContext(logger, { asset: symbol });
     log.info({ fn: 'getAssetNews' }, `Fetching news for ${symbol}`);
     if (!config.serpapiApiKey || !symbol) {
         return { items: [], summary: "", avgSentiment: 0 };

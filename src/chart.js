@@ -2,7 +2,7 @@
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "node:fs";
 import "chartjs-adapter-luxon";
-import { logger, withContext, createContext } from "./logger.js";
+import { logger, withContext } from "./logger.js";
 import { performance } from 'node:perf_hooks';
 import { recordPerf } from './perf.js';
 import {
@@ -47,7 +47,7 @@ export async function renderChartPNG(assetKey, tf, candles, indicators = {}, ove
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });
     const timeAdapter = hasTimeAdapter();
     const candlestickAvailable = !!Chart.registry.controllers.get("candlestick");
-    const log = withContext(logger, createContext({ asset: assetKey, timeframe: tf }));
+    const log = withContext(logger, { asset: assetKey, timeframe: tf });
     log.info({ fn: 'renderChartPNG', candlestickAvailable }, "candlestick");
     log.info({ fn: 'renderChartPNG', timeAdapter }, "time adapter");
     const useTime = timeAdapter;
