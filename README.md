@@ -12,7 +12,7 @@ This project posts crypto analysis, charts and alerts to Discord.
 
 2. Copy `.env.example` to `.env` and fill in the values for your environment.
 
-3. Create the `logs/` directory used for rotating log files:
+3. Create the `logs/` directory used for rotating log files. The bot writes daily files as `logs/app-YYYY-MM-DD.log` and automatically prunes entries older than seven days:
 
    ```bash
    mkdir logs
