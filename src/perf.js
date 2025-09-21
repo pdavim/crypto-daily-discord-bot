@@ -1,4 +1,4 @@
-import { logger } from './logger.js';
+import { logger, withContext } from './logger.js';
 
 const stats = {
   fetchOHLCV: [],
@@ -18,6 +18,7 @@ export function reportWeeklyPerf() {
     averages[name] = avg;
     stats[name] = [];
   }
-  logger.info({ fn: 'weeklyPerf', averages }, 'Weekly performance averages (ms)');
+  const log = withContext(logger);
+  log.info({ fn: 'weeklyPerf', averages }, 'Weekly performance averages (ms)');
   return averages;
 }

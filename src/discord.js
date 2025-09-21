@@ -1,13 +1,13 @@
 import axios from "axios";
 import { CFG } from "./config.js";
-import { logger, withContext, createContext } from "./logger.js";
+import { logger, withContext } from "./logger.js";
 import { fetchWithRetry } from "./utils.js";
 import { alertCounter, alertHistogram } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
 
 export async function postAnalysis(assetKey, tf, text) {
     const url = CFG.webhookAnalysis;
-    const log = withContext(logger, createContext({ asset: assetKey, timeframe: tf }));
+    const log = withContext(logger, { asset: assetKey, timeframe: tf });
     if (!url) {
         log.warn({ fn: 'postAnalysis' }, "DISCORD_WEBHOOK_ANALYSIS_URL not configured—skipping post.");
         return false;
@@ -25,7 +25,7 @@ export async function postAnalysis(assetKey, tf, text) {
 
 export async function sendDiscordAlert(text) {
     const url = CFG.webhookAlerts ?? CFG.webhook;
-    const log = withContext(logger, createContext());
+    const log = withContext(logger);
     alertCounter.inc();
     const end = alertHistogram.startTimer();
 

@@ -1,8 +1,8 @@
-import { logger, withContext, createContext } from './logger.js';
+import { logger, withContext } from './logger.js';
 import { fetchWithRetryCounter, fetchWithRetryHistogram } from './metrics.js';
 
 export async function fetchWithRetry(fn, { retries = 3, baseDelay = 500 } = {}) {
-    const log = withContext(logger, createContext());
+    const log = withContext(logger);
     fetchWithRetryCounter.inc();
     const end = fetchWithRetryHistogram.startTimer();
     log.info({ fn: 'fetchWithRetry' }, `Fetching with retry, max attempts: ${retries + 1}, function: ${fn || 'anonymous'}`);

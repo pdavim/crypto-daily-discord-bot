@@ -1,11 +1,11 @@
 import axios from "axios";
 import { fetchWithRetry } from "../utils.js";
-import { logger, withContext, createContext } from "../logger.js";
+import { logger, withContext } from "../logger.js";
 
 const BASE = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
 
 export async function fetchEconomicEvents() {
-    const log = withContext(logger, createContext());
+    const log = withContext(logger);
     try {
         const { data } = await fetchWithRetry(() => axios.get(BASE));
         const now = new Date();
