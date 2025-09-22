@@ -39,6 +39,40 @@ const toStringList = (value) => {
         : [];
 };
 
+const buildDiscordRateLimit = () => {
+    const fallback = {
+        default: {
+            capacity: 5,
+            refillAmount: 1,
+            refillIntervalMs: 1000,
+        },
+        webhooks: {},
+    };
+
+    const raw = process.env.DISCORD_RATE_LIMIT;
+    if (!raw) {
+        return fallback;
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        const defaultLimit = typeof parsed.default === 'object' && parsed.default !== null
+            ? { ...fallback.default, ...parsed.default }
+            : fallback.default;
+        const webhooks = typeof parsed.webhooks === 'object' && parsed.webhooks !== null
+            ? parsed.webhooks
+            : fallback.webhooks;
+
+        return {
+            default: defaultLimit,
+            webhooks,
+        };
+    } catch (err) {
+        logger.warn({ fn: 'buildDiscordRateLimit', raw, err }, 'Failed to parse DISCORD_RATE_LIMIT; using defaults.');
+        return fallback;
+    }
+};
+
 const buildAlertModuleConfig = () => {
     const enabledList = toStringList(process.env.ALERTS_ENABLED);
     const disabledList = toStringList(process.env.ALERTS_DISABLED);
@@ -155,7 +189,8 @@ export const CFG = {
         heuristicHigh: 80,
         heuristicLow: 20,
         obvDelta: 0.05
-    }
+    },
+    discordRateLimit: buildDiscordRateLimit()
 };
 
 export const config = {
