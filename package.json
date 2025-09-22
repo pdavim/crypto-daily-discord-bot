@@ -8,7 +8,7 @@
     "once": "node src/index.js --once",
     "test:chart": "node tests/render-chart.js",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage --hook-timeout=20000"
   },
   "dependencies": {
     "@jvddavid/pino-rotating-file": "^1.0.7",
@@ -30,6 +30,7 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
     "vitest": "^3.2.4"
   }
 }
