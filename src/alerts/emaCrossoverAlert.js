@@ -1,4 +1,4 @@
-import { ALERT_LEVELS, createAlert } from './shared.js';
+import { ALERT_LEVELS, ALERT_CATEGORIES, createAlert } from './shared.js';
 
 export default function emaCrossoverAlert({ ema9, ema21 }) {
     const alerts = [];
@@ -9,10 +9,10 @@ export default function emaCrossoverAlert({ ema9, ema21 }) {
 
     if (ema9Val != null && ema21Val != null && prevEma9 != null && prevEma21 != null) {
         if (prevEma9 < prevEma21 && ema9Val > ema21Val) {
-            alerts.push(createAlert("📈 EMA 9/21 bullish crossover", ALERT_LEVELS.HIGH));
+            alerts.push(createAlert("📈 EMA 9/21 bullish crossover", ALERT_LEVELS.HIGH, ALERT_CATEGORIES.TREND));
         }
         if (prevEma9 > prevEma21 && ema9Val < ema21Val) {
-            alerts.push(createAlert("📉 EMA 9/21 bearish crossover", ALERT_LEVELS.HIGH));
+            alerts.push(createAlert("📉 EMA 9/21 bearish crossover", ALERT_LEVELS.HIGH, ALERT_CATEGORIES.TREND));
         }
     }
 
