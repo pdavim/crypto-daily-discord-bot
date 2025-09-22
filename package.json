@@ -7,7 +7,8 @@
     "start": "node src/index.js",
     "once": "node src/index.js --once",
     "test:chart": "node tests/render-chart.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@jvddavid/pino-rotating-file": "^1.0.7",
