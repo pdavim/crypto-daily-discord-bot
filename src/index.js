@@ -115,6 +115,7 @@ async function runOnceForAsset(asset) {
                 const macdObj = macd(close, 12, 26, 9);
                 const bb = bollinger(close, 20, 2);
                 const kc = keltnerChannel(close, high, low, 20, 2);
+                const adxSeries = adx(high, low, close, 14);
                 const atrSeries = atr14(candles);
                 const bbWidth = bollWidth(bb.upper, bb.lower, bb.mid);
                 const vwapSeries = vwap(high, low, close, vol);
@@ -133,6 +134,7 @@ async function runOnceForAsset(asset) {
                     macdObj,
                     bb,
                     kc,
+                    adxSeries,
                     atrSeries,
                     bbWidth,
                     vwapSeries,
@@ -159,7 +161,9 @@ async function runOnceForAsset(asset) {
                 rsi: indicators.rsiSeries,
                 macdObj: indicators.macdObj,
                 bb: indicators.bb,
+                kc: indicators.kc,
                 atr: indicators.atrSeries,
+                adx: indicators.adxSeries,
                 volSeries: vol
             });
             snapshots[tf] = snapshot;
@@ -194,6 +198,7 @@ async function runOnceForAsset(asset) {
                     lowerBB: indicators.bb.lower,
                     upperKC: indicators.kc.upper,
                     lowerKC: indicators.kc.lower,
+                    adxSeries: indicators.adxSeries,
                     vwapSeries: indicators.vwapSeries,
                     ema9: indicators.ema9Series,
                     ema21: indicators.ema21Series,

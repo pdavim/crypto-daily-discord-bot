@@ -16,13 +16,15 @@ describe('buildAlerts', () => {
       lows: Array(21).fill(80),
       volumes: Array(21).fill(1000),
       upperKC: Array(21).fill(99),
-      lowerKC: Array(21).fill(80)
+      lowerKC: Array(21).fill(80),
+      adxSeries: [30]
     };
     const alerts = buildAlerts(data);
     expect(alerts).toContain('📉 RSI>70 (sobrecompra)');
     expect(alerts).toContain('📈 MACD flip ↑');
     expect(alerts).toContain('📈 Golden cross 20/50');
     expect(alerts).toContain('📈 KC breakout above');
+    expect(alerts).toContain('💪 ADX>25 (tendência forte)');
     expect(alerts).toContain('💰 Preço: 100.0000');
   });
 
