@@ -1,5 +1,5 @@
 import { crossUp, crossDown } from '../indicators.js';
-import { ALERT_LEVELS, createAlert } from './shared.js';
+import { ALERT_LEVELS, ALERT_CATEGORIES, createAlert } from './shared.js';
 
 export default function macdAlert({ macdObj }) {
     const alerts = [];
@@ -11,20 +11,20 @@ export default function macdAlert({ macdObj }) {
 
     if (macd != null && macdSignal != null && prevMacd != null && prevSignal != null) {
         if (prevMacd < prevSignal && macd > macdSignal) {
-            alerts.push(createAlert("📈 MACD bullish crossover", ALERT_LEVELS.HIGH));
+            alerts.push(createAlert("📈 MACD bullish crossover", ALERT_LEVELS.HIGH, ALERT_CATEGORIES.MOMENTUM));
         }
         if (prevMacd > prevSignal && macd < macdSignal) {
-            alerts.push(createAlert("📉 MACD bearish crossover", ALERT_LEVELS.HIGH));
+            alerts.push(createAlert("📉 MACD bearish crossover", ALERT_LEVELS.HIGH, ALERT_CATEGORIES.MOMENTUM));
         }
     }
 
     if (macdHist && macdHist.length >= 2) {
         const zeros = Array(macdHist.length).fill(0);
         if (crossUp(macdHist, zeros)) {
-            alerts.push(createAlert("📈 MACD flip ↑", ALERT_LEVELS.MEDIUM));
+            alerts.push(createAlert("📈 MACD flip ↑", ALERT_LEVELS.MEDIUM, ALERT_CATEGORIES.MOMENTUM));
         }
         if (crossDown(macdHist, zeros)) {
-            alerts.push(createAlert("📉 MACD flip ↓", ALERT_LEVELS.MEDIUM));
+            alerts.push(createAlert("📉 MACD flip ↓", ALERT_LEVELS.MEDIUM, ALERT_CATEGORIES.MOMENTUM));
         }
     }
 

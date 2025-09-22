@@ -1,4 +1,4 @@
-import { ALERT_LEVELS, createAlert } from './shared.js';
+import { ALERT_LEVELS, ALERT_CATEGORIES, createAlert } from './shared.js';
 
 export default function vwapAlert({ vwapSeries, closes, lastClose }) {
     const alerts = [];
@@ -9,10 +9,10 @@ export default function vwapAlert({ vwapSeries, closes, lastClose }) {
 
     if (vwap != null && price != null && prevPrice != null && prevVwap != null) {
         if (price > vwap && prevPrice <= prevVwap) {
-            alerts.push(createAlert("📈 Price crossed above VWAP", ALERT_LEVELS.MEDIUM));
+            alerts.push(createAlert("📈 Price crossed above VWAP", ALERT_LEVELS.MEDIUM, ALERT_CATEGORIES.MOMENTUM));
         }
         if (price < vwap && prevPrice >= prevVwap) {
-            alerts.push(createAlert("📉 Price crossed below VWAP", ALERT_LEVELS.MEDIUM));
+            alerts.push(createAlert("📉 Price crossed below VWAP", ALERT_LEVELS.MEDIUM, ALERT_CATEGORIES.MOMENTUM));
         }
     }
 

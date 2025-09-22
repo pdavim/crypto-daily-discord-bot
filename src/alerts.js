@@ -3,7 +3,7 @@ import { logger, withContext } from './logger.js';
 import { recordPerf } from './perf.js';
 import { CFG } from './config.js';
 import { DEFAULT_ALERT_MODULES } from './alerts/registry.js';
-import { ALERT_LEVELS } from './alerts/shared.js';
+import { ALERT_LEVELS, ALERT_CATEGORIES, ALERT_CATEGORY_LABELS } from './alerts/shared.js';
 
 const LEVEL_ORDER = {
     [ALERT_LEVELS.HIGH]: 0,
@@ -53,10 +53,13 @@ function normalizeAlerts(result) {
         .filter(Boolean)
         .map(alert => {
             if (alert && typeof alert === 'object' && 'msg' in alert && 'level' in alert) {
-                return alert;
+                return {
+                    ...alert,
+                    category: alert.category ?? ALERT_CATEGORIES.INFO
+                };
             }
             if (typeof alert === 'string') {
-                return { msg: alert, level: ALERT_LEVELS.MEDIUM };
+                return { msg: alert, level: ALERT_LEVELS.MEDIUM, category: ALERT_CATEGORIES.INFO };
             }
             return null;
         })
@@ -99,9 +102,16 @@ export async function buildAlerts(context) {
     return alerts;
 }
 
-export function formatAlertMessage({ msg, level }) {
+export function formatAlertMessage({ msg, level, category }, count = 1) {
     const { emoji, label } = LEVEL_STYLES[level] ?? LEVEL_STYLES[ALERT_LEVELS.MEDIUM];
-    return `${emoji} **${label}:** ${msg}`;
+    const categoryLabel = category ? ALERT_CATEGORY_LABELS[category] : null;
+    const segments = [`${emoji} **${label}:**`];
+    if (categoryLabel) {
+        segments.push(`_${categoryLabel}_ —`);
+    }
+    segments.push(msg);
+    const suffix = count > 1 ? ` x${count}` : '';
+    return `${segments.join(' ')}${suffix}`;
 }
 
 export { ALERT_LEVELS };

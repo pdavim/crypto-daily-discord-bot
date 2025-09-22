@@ -211,13 +211,26 @@ async function runOnceForAsset(asset) {
                     equity: CFG.accountEquity,
                     riskPct: CFG.riskPerTrade
                 });
-                const hasSignals = alerts.some(a =>
+                const consolidated = [];
+                const dedupMap = new Map();
+                for (const alert of alerts) {
+                    const key = [alert.level, alert.category, alert.msg].join('|');
+                    const entry = dedupMap.get(key);
+                    if (entry) {
+                        entry.count += 1;
+                    } else {
+                        const withCount = { ...alert, count: 1 };
+                        dedupMap.set(key, withCount);
+                        consolidated.push(withCount);
+                    }
+                }
+                const hasSignals = consolidated.some(a =>
                     !a.msg.startsWith('💰 Preço') && !a.msg.startsWith('📊 Var24h'));
                 if (hasSignals) {
                     const mention = "@here";
                     const alertMsg = [
                         `**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`,
-                        ...alerts.map(alert => `• ${formatAlertMessage(alert)}`)
+                        ...consolidated.map(alert => `• ${formatAlertMessage(alert, alert.count)}`)
                     ].join("\n");
                     const hash = buildHash(alertMsg);
                     const windowMs = CFG.alertDedupMinutes * 60 * 1000;
