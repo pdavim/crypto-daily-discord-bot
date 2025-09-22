@@ -1,3 +1,5 @@
+import { ALERT_LEVELS, createAlert } from './shared.js';
+
 export default function highLowAlert({ highs, lows, lastClose }) {
     const alerts = [];
     const price = lastClose;
@@ -7,10 +9,10 @@ export default function highLowAlert({ highs, lows, lastClose }) {
     const minLow = low20 && low20.length ? Math.min(...low20) : undefined;
 
     if (price != null && maxHigh != null && price >= maxHigh) {
-        alerts.push("🚀 New 20-period high");
+        alerts.push(createAlert("🚀 New 20-period high", ALERT_LEVELS.HIGH));
     }
     if (price != null && minLow != null && price <= minLow) {
-        alerts.push("⚠️ New 20-period low");
+        alerts.push(createAlert("⚠️ New 20-period low", ALERT_LEVELS.HIGH));
     }
 
     return alerts;

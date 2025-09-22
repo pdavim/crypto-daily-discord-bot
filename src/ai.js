@@ -52,7 +52,7 @@ import { fetchOHLCV } from "./data/binance.js";
 import { getAssetNews } from "./news.js";
 import { searchWeb } from "./websearch.js";
 import { sma, rsi, macd, atr14, bollinger, bollWidth, crossUp, crossDown, parabolicSAR, semaforo, isBBSqueeze, sparkline, volumeDivergence, trendFromMAs, scoreHeuristic, vwap, ema, stochastic, williamsR, cci, obv } from "./indicators.js";
-import { buildAlerts } from "./alerts.js";
+import { buildAlerts, formatAlertMessage } from "./alerts.js";
 import { logger, withContext } from "./logger.js";
 
 const openrouter = CFG.openrouterApiKey
@@ -280,7 +280,7 @@ export async function runAgent() {
             const report = [
                 ...baseReport,
                 `**Alert Status:**`,
-                ...alerts,
+                ...alerts.map(alert => `- ${formatAlertMessage(alert)}`),
                 `- News: ${newsSummary || 'n/a'}`,
                 `- Web: ${webSnips.slice(0, 2).join(' | ') || 'n/a'}`,
                 `- Macro: ${macro || 'n/a'}`,

@@ -1,3 +1,5 @@
+import { ALERT_LEVELS, createAlert } from './shared.js';
+
 export default function maPriceAlert({ ma20, ma50, ma200, lastClose, closes }) {
     const alerts = [];
     const price = lastClose;
@@ -8,26 +10,26 @@ export default function maPriceAlert({ ma20, ma50, ma200, lastClose, closes }) {
 
     if (price != null && prevPrice != null && ma20Val != null) {
         if (price > ma20Val && prevPrice <= ma20Val) {
-            alerts.push("📈 Price crossed above MA20");
+            alerts.push(createAlert("📈 Price crossed above MA20", ALERT_LEVELS.MEDIUM));
         }
         if (price < ma20Val && prevPrice >= ma20Val) {
-            alerts.push("📉 Price crossed below MA20");
+            alerts.push(createAlert("📉 Price crossed below MA20", ALERT_LEVELS.MEDIUM));
         }
     }
     if (price != null && prevPrice != null && ma50Val != null) {
         if (price > ma50Val && prevPrice <= ma50Val) {
-            alerts.push("📈 Price crossed above MA50");
+            alerts.push(createAlert("📈 Price crossed above MA50", ALERT_LEVELS.MEDIUM));
         }
         if (price < ma50Val && prevPrice >= ma50Val) {
-            alerts.push("📉 Price crossed below MA50");
+            alerts.push(createAlert("📉 Price crossed below MA50", ALERT_LEVELS.MEDIUM));
         }
     }
     if (price != null && prevPrice != null && ma200Val != null) {
         if (price > ma200Val && prevPrice <= ma200Val) {
-            alerts.push("📈 Price crossed above MA200");
+            alerts.push(createAlert("📈 Price crossed above MA200", ALERT_LEVELS.HIGH));
         }
         if (price < ma200Val && prevPrice >= ma200Val) {
-            alerts.push("📉 Price crossed below MA200");
+            alerts.push(createAlert("📉 Price crossed below MA200", ALERT_LEVELS.HIGH));
         }
     }
 

@@ -1,4 +1,5 @@
 import { isBBSqueeze } from '../indicators.js';
+import { ALERT_LEVELS, createAlert } from './shared.js';
 
 export default function bollingerAlert({ bbWidth, lastClose, upperBB, lowerBB, upperKC, lowerKC }) {
     const alerts = [];
@@ -9,19 +10,19 @@ export default function bollingerAlert({ bbWidth, lastClose, upperBB, lowerBB, u
     const lowerKeltner = lowerKC?.at(-1);
 
     if (Array.isArray(bbWidth) && bbWidth.length > 0 && isBBSqueeze(bbWidth)) {
-        alerts.push("🧨 BB squeeze (compressão)");
+        alerts.push(createAlert("🧨 BB squeeze (compressão)", ALERT_LEVELS.MEDIUM));
     }
     if (price != null && upper != null && price > upper) {
-        alerts.push("📈 BB breakout above");
+        alerts.push(createAlert("📈 BB breakout above", ALERT_LEVELS.HIGH));
     }
     if (price != null && lower != null && price < lower) {
-        alerts.push("📉 BB breakout below");
+        alerts.push(createAlert("📉 BB breakout below", ALERT_LEVELS.HIGH));
     }
     if (price != null && upperKeltner != null && price > upperKeltner) {
-        alerts.push("📈 KC breakout above");
+        alerts.push(createAlert("📈 KC breakout above", ALERT_LEVELS.HIGH));
     }
     if (price != null && lowerKeltner != null && price < lowerKeltner) {
-        alerts.push("📉 KC breakout below");
+        alerts.push(createAlert("📉 KC breakout below", ALERT_LEVELS.HIGH));
     }
 
     return alerts;

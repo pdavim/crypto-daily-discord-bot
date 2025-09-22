@@ -1,3 +1,5 @@
+import { ALERT_LEVELS, createAlert } from './shared.js';
+
 export default function sarAlert({ sarSeries, lastClose }) {
     const alerts = [];
     const price = lastClose;
@@ -6,10 +8,10 @@ export default function sarAlert({ sarSeries, lastClose }) {
 
     if (price != null && sar != null && prevSar != null) {
         if (prevSar < price && sar > price) {
-            alerts.push("📉 Parabolic SAR flip bearish");
+            alerts.push(createAlert("📉 Parabolic SAR flip bearish", ALERT_LEVELS.HIGH));
         }
         if (prevSar > price && sar < price) {
-            alerts.push("📈 Parabolic SAR flip bullish");
+            alerts.push(createAlert("📈 Parabolic SAR flip bullish", ALERT_LEVELS.HIGH));
         }
     }
 

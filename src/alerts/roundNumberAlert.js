@@ -1,4 +1,5 @@
 import { roundThreshold } from '../utils.js';
+import { ALERT_LEVELS, createAlert } from './shared.js';
 
 export default function roundNumberAlert({ lastClose }) {
     const alerts = [];
@@ -6,7 +7,7 @@ export default function roundNumberAlert({ lastClose }) {
     if (price != null) {
         const threshold = roundThreshold(price);
         if (threshold && price % threshold < threshold / 100) {
-            alerts.push("🔵 Price near round number");
+            alerts.push(createAlert("🔵 Price near round number", ALERT_LEVELS.LOW));
         }
     }
     return alerts;
