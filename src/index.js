@@ -4,7 +4,7 @@ import { CFG } from "./config.js";
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { streamKlines } from "./data/binanceStream.js";
-import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, adx, stochastic, williamsR, cci, obv } from "./indicators.js";
+import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, adx, stochastic, williamsR, cci, obv, keltnerChannel } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";
@@ -114,6 +114,7 @@ async function runOnceForAsset(asset) {
                 const rsiSeries = rsi(close, 14);
                 const macdObj = macd(close, 12, 26, 9);
                 const bb = bollinger(close, 20, 2);
+                const kc = keltnerChannel(close, high, low, 20, 2);
                 const atrSeries = atr14(candles);
                 const bbWidth = bollWidth(bb.upper, bb.lower, bb.mid);
                 const vwapSeries = vwap(high, low, close, vol);
@@ -131,6 +132,7 @@ async function runOnceForAsset(asset) {
                     rsiSeries,
                     macdObj,
                     bb,
+                    kc,
                     atrSeries,
                     bbWidth,
                     vwapSeries,
@@ -190,6 +192,8 @@ async function runOnceForAsset(asset) {
                     atrSeries: indicators.atrSeries,
                     upperBB: indicators.bb.upper,
                     lowerBB: indicators.bb.lower,
+                    upperKC: indicators.kc.upper,
+                    lowerKC: indicators.kc.lower,
                     vwapSeries: indicators.vwapSeries,
                     ema9: indicators.ema9Series,
                     ema21: indicators.ema21Series,

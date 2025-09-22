@@ -6,7 +6,7 @@ import { logger, withContext } from './logger.js';
 import { recordPerf } from './perf.js';
 
 export function buildAlerts({
-    rsiSeries, macdObj, bbWidth, ma20, ma50, ma200, lastClose, var24h, closes, highs, lows, volumes, atrSeries, upperBB, lowerBB, sarSeries, trendSeries, heuristicSeries, vwapSeries, ema9, ema21, stochasticK, stochasticD, willrSeries, cciSeries, obvSeries,
+    rsiSeries, macdObj, bbWidth, ma20, ma50, ma200, lastClose, var24h, closes, highs, lows, volumes, atrSeries, upperBB, lowerBB, upperKC, lowerKC, sarSeries, trendSeries, heuristicSeries, vwapSeries, ema9, ema21, stochasticK, stochasticD, willrSeries, cciSeries, obvSeries,
     equity,
     riskPct
 }) {
@@ -31,6 +31,8 @@ export function buildAlerts({
     const prevAtr = atrSeries?.at(-2);
     const upper = upperBB?.at(-1);
     const lower = lowerBB?.at(-1);
+    const upperKeltner = upperKC?.at(-1);
+    const lowerKeltner = lowerKC?.at(-1);
     const prevSar = sarSeries?.at(-2);
     const sar = sarSeries?.at(-1);
     const trend = trendSeries?.at(-1);
@@ -83,6 +85,8 @@ export function buildAlerts({
     if (atr > 1.5 * prevAtr) alerts.push("⚡ ATR spike (volatility)");
     if (price > upper) alerts.push("📈 BB breakout above");
     if (price < lower) alerts.push("📉 BB breakout below");
+    if (price > upperKeltner) alerts.push("📈 KC breakout above");
+    if (price < lowerKeltner) alerts.push("📉 KC breakout below");
     if (prevSar < price && sar > price) alerts.push("📉 Parabolic SAR flip bearish");
     if (prevSar > price && sar < price) alerts.push("📈 Parabolic SAR flip bullish");
     if (trend === 1) alerts.push("📈 Strong uptrend");
