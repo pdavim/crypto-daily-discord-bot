@@ -234,7 +234,7 @@ async function runOnceForAsset(asset) {
                     ].join("\n");
                     const hash = buildHash(alertMsg);
                     const windowMs = CFG.alertDedupMinutes * 60 * 1000;
-                    if (shouldSend(hash, windowMs)) {
+                    if (shouldSend({ asset: asset.key, tf, hash }, windowMs)) {
                         await sendDiscordAlert(alertMsg);
                     }
                 }
