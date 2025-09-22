@@ -1,5 +1,7 @@
 # Crypto Daily Discord Bot
 
+[![Test Status](https://github.com/OWNER/crypto-daily-discord-bot/actions/workflows/test.yml/badge.svg)](https://github.com/OWNER/crypto-daily-discord-bot/actions/workflows/test.yml)
+
 This project posts crypto analysis, charts and alerts to Discord.
 
 ## Setup
