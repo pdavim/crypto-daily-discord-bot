@@ -11,9 +11,10 @@ const CANDLES = 200; // solicitamos pelo menos 200 barras
 const RATE_LIMIT_MS = 200;
 let lastCall = 0;
 // Cache for OHLCV and daily close requests
+const CACHE_TTL_MS = CFG.binanceCacheTTL * 60 * 1000;
 const cache = new LRUCache({
     max: 500,
-    ttl: CFG.binanceCacheTTL * 60 * 1000,
+    ttl: CACHE_TTL_MS,
 });
 
 async function rateLimit() {
