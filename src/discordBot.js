@@ -27,6 +27,7 @@ function formatUptime(ms) {
 }
 
 let clientPromise;
+let analysisCommandHandler;
 function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
 
 function build45mCandles(candles15m) {
@@ -89,6 +90,31 @@ export async function handleInteraction(interaction) {
         const uptimeText = formatUptime(Date.now() - startTime);
         const content = `⏱️ Uptime: ${uptimeText}\n👀 Watchlist: ${watchlistText}`;
         await interaction.reply({ content, ephemeral: true });
+    } else if (interaction.commandName === 'analysis') {
+        const assetKey = interaction.options.getString('ativo', true).toUpperCase();
+        const tf = interaction.options.getString('tf', true);
+        const asset = ASSETS.find(a => a.key === assetKey);
+        if (!asset || !TIMEFRAMES.includes(tf)) {
+            await interaction.reply({ content: 'Ativo ou timeframe não suportado', ephemeral: true });
+            return;
+        }
+        await interaction.deferReply({ ephemeral: true });
+        const log = withContext(logger, { asset: assetKey, timeframe: tf });
+        if (!analysisCommandHandler) {
+            await interaction.editReply('Comando de análise indisponível no momento.');
+            return;
+        }
+        try {
+            const summary = await analysisCommandHandler({ asset, timeframe: tf });
+            if (summary) {
+                await interaction.editReply(summary);
+            } else {
+                await interaction.editReply('Não foi possível gerar o resumo para este ativo.');
+            }
+        } catch (err) {
+            log.error({ fn: 'handleInteraction', err }, 'Failed to run manual analysis');
+            await interaction.editReply('Erro ao executar análise. Tente novamente mais tarde.');
+        }
     }
 }
 
@@ -159,6 +185,26 @@ function getClient() {
                 {
                     name: 'status',
                     description: 'Show watchlist and uptime'
+                },
+                {
+                    name: 'analysis',
+                    description: 'Executa análise resumida para um ativo',
+                    options: [
+                        {
+                            name: 'ativo',
+                            description: 'Ativo',
+                            type: ApplicationCommandOptionType.String,
+                            required: true,
+                            choices: ASSETS.map(a => ({ name: a.key, value: a.key }))
+                        },
+                        {
+                            name: 'tf',
+                            description: 'Timeframe',
+                            type: ApplicationCommandOptionType.String,
+                            required: true,
+                            choices: TIMEFRAMES.map(t => ({ name: t, value: t }))
+                        }
+                    ]
                 }
             ];
             await client.application.commands.set(commands);
@@ -189,7 +235,8 @@ export async function postCharts(files) {
     }
 }
 
-export function initBot() {
+export function initBot(options = {}) {
+    analysisCommandHandler = options.onAnalysis ?? analysisCommandHandler;
     return getClient();
 }
 
