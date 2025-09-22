@@ -309,14 +309,25 @@ async function runWeeklyAnalysis() {
                 lines.push(`- ${asset.key}: error`);
             }
         }
-        const finalReport = [lines.join("\n"), report].join("\n\n");
+        const perfSummary = reportWeeklyPerf();
+        const perfEntries = Object.entries(perfSummary)
+            .filter(([, { count }]) => count > 0)
+            .map(([name, { avg, count }]) => {
+                const ms = avg.toFixed(2);
+                return `- ${name}: ${ms} ms (n=${count})`;
+            });
+        const sections = [lines.join("\n")];
+        if (perfEntries.length) {
+            sections.push(["**Weekly runtime averages (ms)**", ...perfEntries].join("\n"));
+        }
+        sections.push(report);
+        const finalReport = sections.join("\n\n");
         if (CFG.enableReports) {
             const sent = await postAnalysis("WEEKLY", "1w", finalReport);
             if (!sent) {
                 log.warn({ fn: 'runWeeklyAnalysis' }, 'report upload failed');
             }
         }
-        reportWeeklyPerf();
     } catch (e) {
         log.error({ fn: 'runWeeklyAnalysis', err: e }, 'Error in weekly analysis');
         await notifyOps(`Error in weekly analysis: ${e.message || e}`);

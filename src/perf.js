@@ -12,13 +12,14 @@ export function recordPerf(name, ms) {
 }
 
 export function reportWeeklyPerf() {
-  const averages = {};
+  const summary = {};
   for (const [name, arr] of Object.entries(stats)) {
-    const avg = arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-    averages[name] = avg;
+    const count = arr.length;
+    const avg = count ? arr.reduce((a, b) => a + b, 0) / count : 0;
+    summary[name] = { avg, count };
     stats[name] = [];
   }
   const log = withContext(logger);
-  log.info({ fn: 'weeklyPerf', averages }, 'Weekly performance averages (ms)');
-  return averages;
+  log.debug({ fn: 'weeklyPerf', summary }, 'Weekly performance averages (ms)');
+  return summary;
 }
