@@ -60,38 +60,43 @@ async function runOnceForAsset(asset) {
     const snapshots = {};
     const chartPaths = [];
 
-    // fetch unique intervals in parallel
-    const intervalPromises = {};
+    const intervalPromises = new Map();
     for (const tf of TIMEFRAMES) {
         const interval = tfToInterval(tf);
-        if (!intervalPromises[interval]) {
-            intervalPromises[interval] = fetchOHLCV(asset.binance, interval);
+        if (!intervalPromises.has(interval)) {
+            intervalPromises.set(interval, fetchOHLCV(asset.binance, interval));
         }
     }
-    const intervalKeys = Object.keys(intervalPromises);
-    const intervalResults = await Promise.all(Object.values(intervalPromises));
-    const candlesByInterval = {};
-    intervalKeys.forEach((k, i) => { candlesByInterval[k] = intervalResults[i]; });
+    const intervalKeys = [...intervalPromises.keys()];
+    const intervalResults = await Promise.all(intervalKeys.map(k => intervalPromises.get(k)));
+    const candlesByInterval = new Map(intervalKeys.map((k, i) => [k, intervalResults[i]]));
 
-    // process each timeframe sequentially to reuse indicator results
-    let candles45m;
-    for (const tf of TIMEFRAMES) {
+    let cached45mCandles;
+    const indicatorCache = new Map();
+
+    const timeframeTasks = TIMEFRAMES.map(async tf => {
         const log = withContext(logger, { asset: asset.key, timeframe: tf });
         try {
-            const interval = tfToInterval(tf);
-            let candles = candlesByInterval[interval];
+            let candles;
             if (tf === "45m") {
-                if (!candles45m) {
-                    candles45m = build45mCandles(candles);
+                if (!cached45mCandles) {
+                    const base = candlesByInterval.get(tfToInterval("15m"));
+                    if (!base) {
+                        return;
+                    }
+                    cached45mCandles = build45mCandles(base);
                 }
-                candles = candles45m;
+                candles = cached45mCandles;
+            } else {
+                const interval = tfToInterval(tf);
+                candles = candlesByInterval.get(interval);
             }
             const min = tf === "45m" ? 40 : 120;
-            if (!candles || candles.length < min) continue;
+            if (!candles || candles.length < min) return;
             const lastCandleTime = candles.at(-1)?.t?.getTime?.();
             const key = `${asset.key}:${tf}`;
             if (lastCandleTime != null && getSignature(key) === lastCandleTime) {
-                continue;
+                return;
             }
             if (lastCandleTime != null) {
                 updateSignature(key, lastCandleTime);
@@ -100,45 +105,99 @@ async function runOnceForAsset(asset) {
             const vol = candles.map(c => c.v);
             const high = candles.map(c => c.h);
             const low = candles.map(c => c.l);
-            // Calculate indicators once per timeframe
-            const ma20 = sma(close, 20), ma50 = sma(close, 50), ma100 = sma(close, 100), ma200 = sma(close, 200);
-            const r = rsi(close, 14);
-            const m = macd(close, 12, 26, 9);
-            const bb = bollinger(close, 20, 2);
-            const atr = atr14(candles);
-            const width = bollWidth(bb.upper, bb.lower, bb.mid);
-            const vwapSeries = vwap(high, low, close, vol);
-            const ema9 = ema(close, 9);
-            const ema21 = ema(close, 21);
-            const { k: stochasticK, d: stochasticD } = stochastic(high, low, close, 14, 3);
-            const willrSeries = williamsR(high, low, close, 14);
-            const cciSeries = cci(high, low, close, 20);
-            const obvSeries = obv(close, vol);
+
+            const indicators = indicatorCache.get(tf) ?? (() => {
+                const ma20 = sma(close, 20);
+                const ma50 = sma(close, 50);
+                const ma100 = sma(close, 100);
+                const ma200 = sma(close, 200);
+                const rsiSeries = rsi(close, 14);
+                const macdObj = macd(close, 12, 26, 9);
+                const bb = bollinger(close, 20, 2);
+                const atrSeries = atr14(candles);
+                const bbWidth = bollWidth(bb.upper, bb.lower, bb.mid);
+                const vwapSeries = vwap(high, low, close, vol);
+                const ema9Series = ema(close, 9);
+                const ema21Series = ema(close, 21);
+                const { k: stochasticK, d: stochasticD } = stochastic(high, low, close, 14, 3);
+                const willrSeries = williamsR(high, low, close, 14);
+                const cciSeries = cci(high, low, close, 20);
+                const obvSeries = obv(close, vol);
+                const computed = {
+                    ma20,
+                    ma50,
+                    ma100,
+                    ma200,
+                    rsiSeries,
+                    macdObj,
+                    bb,
+                    atrSeries,
+                    bbWidth,
+                    vwapSeries,
+                    ema9Series,
+                    ema21Series,
+                    stochasticK,
+                    stochasticD,
+                    willrSeries,
+                    cciSeries,
+                    obvSeries
+                };
+                indicatorCache.set(tf, computed);
+                return computed;
+            })();
+
             const daily = await dailyPromise;
             const snapshot = buildSnapshotForReport({
-                candles, daily, ma20, ma50, ma100, ma200, rsi: r, macdObj: m, bb, atr, volSeries: vol
+                candles,
+                daily,
+                ma20: indicators.ma20,
+                ma50: indicators.ma50,
+                ma100: indicators.ma100,
+                ma200: indicators.ma200,
+                rsi: indicators.rsiSeries,
+                macdObj: indicators.macdObj,
+                bb: indicators.bb,
+                atr: indicators.atrSeries,
+                volSeries: vol
             });
             snapshots[tf] = snapshot;
+
             if (CFG.enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
-                    ma20, ma50, ma200,
-                    bbUpper: bb.upper,
-                    bbLower: bb.lower,
+                    ma20: indicators.ma20,
+                    ma50: indicators.ma50,
+                    ma200: indicators.ma200,
+                    bbUpper: indicators.bb.upper,
+                    bbLower: indicators.bb.lower,
                 });
                 chartPaths.push(chartPath);
             }
+
             if (CFG.enableAlerts) {
                 const alerts = buildAlerts({
-                    rsiSeries: r, macdObj: m, bbWidth: width,
-                    ma20, ma50, ma200,
+                    rsiSeries: indicators.rsiSeries,
+                    macdObj: indicators.macdObj,
+                    bbWidth: indicators.bbWidth,
+                    ma20: indicators.ma20,
+                    ma50: indicators.ma50,
+                    ma200: indicators.ma200,
                     lastClose: snapshot.kpis.price,
                     var24h: snapshot.kpis.var24h,
-                    closes: close, highs: high, lows: low, volumes: vol,
-                    atrSeries: atr,
-                    upperBB: bb.upper, lowerBB: bb.lower,
-                    vwapSeries, ema9, ema21,
-                    stochasticK, stochasticD,
-                    willrSeries, cciSeries, obvSeries,
+                    closes: close,
+                    highs: high,
+                    lows: low,
+                    volumes: vol,
+                    atrSeries: indicators.atrSeries,
+                    upperBB: indicators.bb.upper,
+                    lowerBB: indicators.bb.lower,
+                    vwapSeries: indicators.vwapSeries,
+                    ema9: indicators.ema9Series,
+                    ema21: indicators.ema21Series,
+                    stochasticK: indicators.stochasticK,
+                    stochasticD: indicators.stochasticD,
+                    willrSeries: indicators.willrSeries,
+                    cciSeries: indicators.cciSeries,
+                    obvSeries: indicators.obvSeries,
                     equity: CFG.accountEquity,
                     riskPct: CFG.riskPerTrade
                 });
@@ -158,7 +217,9 @@ async function runOnceForAsset(asset) {
             log.error({ fn: 'runOnceForAsset', err: e }, 'Processing error');
             await notifyOps(`Processing error for ${asset.key} ${tf}: ${e.message || e}`);
         }
-    }
+    });
+
+    await Promise.all(timeframeTasks);
     saveStore();
     if (CFG.enableAnalysis && snapshots["4h"]) {
         const summary = buildSummary({ assetKey: asset.key, snapshots });
