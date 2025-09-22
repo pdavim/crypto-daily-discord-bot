@@ -65,6 +65,47 @@ export function bollinger(closes, period = 20, mult = 2) {
     return out;
 }
 
+export function keltnerChannel(closes, highs, lows, period = 20, multiplier = 2) {
+    const len = Math.min(closes?.length ?? 0, highs?.length ?? 0, lows?.length ?? 0);
+    const out = {
+        mid: Array(len).fill(null),
+        upper: Array(len).fill(null),
+        lower: Array(len).fill(null)
+    };
+    if (!len) return out;
+
+    const typical = Array(len);
+    for (let i = 0; i < len; i++) {
+        typical[i] = (highs[i] + lows[i] + closes[i]) / 3;
+    }
+    const midEma = ema(typical, period);
+
+    const tr = Array(len).fill(0);
+    for (let i = 0; i < len; i++) {
+        if (i === 0) {
+            tr[i] = highs[i] - lows[i];
+        } else {
+            const prevClose = closes[i - 1];
+            const range = highs[i] - lows[i];
+            const highClose = Math.abs(highs[i] - prevClose);
+            const lowClose = Math.abs(lows[i] - prevClose);
+            tr[i] = Math.max(range, highClose, lowClose);
+        }
+    }
+    const atrEma = ema(tr, period);
+
+    for (let i = 0; i < len; i++) {
+        if (i < period - 1) continue;
+        const mid = midEma[i];
+        const atr = atrEma[i];
+        out.mid[i] = mid;
+        out.upper[i] = mid + multiplier * atr;
+        out.lower[i] = mid - multiplier * atr;
+    }
+
+    return out;
+}
+
 // Parabolic SAR (passo padrão 0.02, aceleração máx 0.2)
 export function parabolicSAR(ohlc, step = 0.02, max = 0.2) {
     const out = Array(ohlc.length).fill(null);

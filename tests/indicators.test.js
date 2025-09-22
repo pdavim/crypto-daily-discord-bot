@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth, ema, vwap, stochastic, williamsR, cci, obv, scoreHeuristic } from '../src/indicators.js';
+import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth, ema, vwap, stochastic, williamsR, cci, obv, scoreHeuristic, keltnerChannel } from '../src/indicators.js';
 
 describe('sma', () => {
   it('calculates simple moving average', () => {
@@ -84,6 +84,21 @@ describe('bollWidth', () => {
   it('returns null when values missing', () => {
     const res = bollWidth([null, 5], [1,2], [1,0]);
     expect(res).toEqual([null, null]);
+  });
+});
+
+describe('keltnerChannel', () => {
+  it('calculates keltner channel bands after warmup', () => {
+    const closes = [10, 10, 10, 10, 10];
+    const highs = [11, 11, 11, 11, 11];
+    const lows = [9, 9, 9, 9, 9];
+    const res = keltnerChannel(closes, highs, lows, 2, 1);
+    expect(res.mid[0]).toBeNull();
+    for (let i = 1; i < closes.length; i++) {
+      expect(res.mid[i]).toBeCloseTo(10, 5);
+      expect(res.upper[i]).toBeCloseTo(12, 5);
+      expect(res.lower[i]).toBeCloseTo(8, 5);
+    }
   });
 });
 
