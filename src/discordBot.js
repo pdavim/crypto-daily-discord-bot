@@ -8,8 +8,8 @@ import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } 
 
 const startTime = Date.now();
 
-function getWatchlist() {
-    return loadWatchlist();
+function getWatchlist(userId) {
+    return loadWatchlist(userId);
 }
 
 function formatUptime(ms) {
@@ -76,16 +76,21 @@ export async function handleInteraction(interaction) {
             return;
         }
         let msg;
+        const userId = interaction.user?.id;
+        if (!userId) {
+            await interaction.reply({ content: 'Não foi possível identificar o usuário.', ephemeral: true });
+            return;
+        }
         if (sub === 'add') {
-            const added = addAssetToWatch(assetKey);
+            const added = addAssetToWatch(userId, assetKey);
             msg = added ? `Ativo ${assetKey} adicionado à watchlist` : `Ativo ${assetKey} já estava na watchlist`;
         } else {
-            const removed = removeAssetFromWatch(assetKey);
+            const removed = removeAssetFromWatch(userId, assetKey);
             msg = removed ? `Ativo ${assetKey} removido da watchlist` : `Ativo ${assetKey} não estava na watchlist`;
         }
         await interaction.reply({ content: msg, ephemeral: true });
     } else if (interaction.commandName === 'status') {
-        const list = getWatchlist();
+        const list = getWatchlist(interaction.user?.id);
         const watchlistText = list.length ? list.join(', ') : 'Nenhum ativo monitorado';
         const uptimeText = formatUptime(Date.now() - startTime);
         const content = `⏱️ Uptime: ${uptimeText}\n👀 Watchlist: ${watchlistText}`;

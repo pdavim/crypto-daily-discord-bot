@@ -83,12 +83,13 @@ describe('discord bot interactions', () => {
         getSubcommand: () => 'add',
         getString: () => 'BTC',
       },
+      user: { id: 'user-1' },
       reply: vi.fn(),
     };
 
     await handleInteraction(interaction);
 
-    expect(addAssetToWatch).toHaveBeenCalledWith('BTC');
+    expect(addAssetToWatch).toHaveBeenCalledWith('user-1', 'BTC');
     expect(interaction.reply).toHaveBeenCalledWith({
       content: 'Ativo BTC adicionado à watchlist',
       ephemeral: true,
@@ -106,12 +107,13 @@ describe('discord bot interactions', () => {
         getSubcommand: () => 'remove',
         getString: () => 'BTC',
       },
+      user: { id: 'user-1' },
       reply: vi.fn(),
     };
 
     await handleInteraction(interaction);
 
-    expect(removeAssetFromWatch).toHaveBeenCalledWith('BTC');
+    expect(removeAssetFromWatch).toHaveBeenCalledWith('user-1', 'BTC');
     expect(interaction.reply).toHaveBeenCalledWith({
       content: 'Ativo BTC removido da watchlist',
       ephemeral: true,
@@ -125,12 +127,13 @@ describe('discord bot interactions', () => {
     const interaction = {
       isChatInputCommand: () => true,
       commandName: 'status',
+      user: { id: 'user-5' },
       reply: vi.fn(),
     };
 
     await handleInteraction(interaction);
 
-    expect(getWatchlist).toHaveBeenCalled();
+    expect(getWatchlist).toHaveBeenCalledWith('user-5');
     expect(interaction.reply).toHaveBeenCalledWith({
       content: expect.stringContaining('BTC, ETH'),
       ephemeral: true,

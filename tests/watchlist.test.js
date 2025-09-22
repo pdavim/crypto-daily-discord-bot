@@ -17,28 +17,37 @@ beforeEach(() => {
 });
 
 describe('watchlist persistence', () => {
-  it('adds and removes assets', async () => {
+  it('adds and removes assets per user', async () => {
+    const USER_ID = 'user-1';
     let mod = await loadModule();
-    expect(mod.getWatchlist()).toEqual([]);
-    expect(mod.addAssetToWatch('BTC')).toBe(true);
-    expect(mod.getWatchlist()).toEqual(['BTC']);
-    expect(mod.addAssetToWatch('BTC')).toBe(false);
-    expect(mod.getWatchlist()).toEqual(['BTC']);
-    expect(mod.removeAssetFromWatch('BTC')).toBe(true);
-    expect(mod.getWatchlist()).toEqual([]);
-    expect(mod.removeAssetFromWatch('BTC')).toBe(false);
+    expect(mod.getWatchlist(USER_ID)).toEqual([]);
+    expect(mod.addAssetToWatch(USER_ID, 'BTC')).toBe(true);
+    expect(mod.getWatchlist(USER_ID)).toEqual(['BTC']);
+    expect(mod.addAssetToWatch(USER_ID, 'BTC')).toBe(false);
+    expect(mod.getWatchlist(USER_ID)).toEqual(['BTC']);
+    expect(mod.removeAssetFromWatch(USER_ID, 'BTC')).toBe(true);
+    expect(mod.getWatchlist(USER_ID)).toEqual([]);
+    expect(mod.removeAssetFromWatch(USER_ID, 'BTC')).toBe(false);
   });
 
-  it('persists to disk', async () => {
+  it('persists to disk per user', async () => {
+    const USER_ID = 'user-2';
     let mod = await loadModule();
-    mod.addAssetToWatch('ETH');
+    mod.addAssetToWatch(USER_ID, 'ETH');
     vi.resetModules();
     mod = await loadModule();
-    expect(mod.getWatchlist()).toEqual(['ETH']);
-    mod.removeAssetFromWatch('ETH');
+    expect(mod.getWatchlist(USER_ID)).toEqual(['ETH']);
+    mod.removeAssetFromWatch(USER_ID, 'ETH');
     expect(fs.existsSync(file)).toBe(false);
     vi.resetModules();
     mod = await loadModule();
-    expect(mod.getWatchlist()).toEqual([]);
+    expect(mod.getWatchlist(USER_ID)).toEqual([]);
+  });
+
+  it('migrates legacy array data', async () => {
+    fs.writeFileSync(file, JSON.stringify(['BTC', 'ETH']));
+    const mod = await loadModule();
+    expect(mod.getWatchlist()).toEqual(expect.arrayContaining(['BTC', 'ETH']));
+    expect(fs.readFileSync(file, 'utf8')).toContain('__legacy__');
   });
 });

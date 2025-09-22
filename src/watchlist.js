@@ -2,24 +2,58 @@ import fs from 'fs';
 import path from 'path';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
-const WATCH_FILE = process.env.WATCHLIST_FILE ? path.resolve(process.env.WATCHLIST_FILE) : path.join(DATA_DIR, 'watchlist.json');
+const WATCH_FILE = process.env.WATCHLIST_FILE
+  ? path.resolve(process.env.WATCHLIST_FILE)
+  : path.join(DATA_DIR, 'watchlist.json');
 
-let list = [];
+function sanitizeAssets(assets) {
+  if (!Array.isArray(assets)) return [];
+  const seen = new Set();
+  const cleaned = [];
+  for (const asset of assets) {
+    if (typeof asset !== 'string') continue;
+    if (seen.has(asset)) continue;
+    seen.add(asset);
+    cleaned.push(asset);
+  }
+  return cleaned;
+}
+
+let list = {};
+let needsMigration = false;
 try {
   if (fs.existsSync(WATCH_FILE)) {
     const txt = fs.readFileSync(WATCH_FILE, 'utf8');
-    list = JSON.parse(txt || '[]');
+    const parsed = JSON.parse(txt || '{}');
+    if (Array.isArray(parsed)) {
+      const assets = sanitizeAssets(parsed);
+      if (assets.length) {
+        list = { __legacy__: assets };
+        needsMigration = true;
+      }
+    } else if (parsed && typeof parsed === 'object') {
+      const entries = Object.entries(parsed);
+      const result = {};
+      for (const [key, value] of entries) {
+        const assets = sanitizeAssets(value);
+        if (assets.length) {
+          result[key] = assets;
+        }
+      }
+      list = result;
+    }
   } else {
     fs.mkdirSync(path.dirname(WATCH_FILE), { recursive: true });
   }
 } catch (e) {
-  list = [];
+  list = {};
 }
 
 function persist() {
   const dir = path.dirname(WATCH_FILE);
   fs.mkdirSync(dir, { recursive: true });
-  if (!list.length) {
+  const hasAssets = Object.values(list).some(assets => assets.length);
+  if (!hasAssets) {
     if (fs.existsSync(WATCH_FILE)) {
       fs.rmSync(WATCH_FILE);
     }
@@ -28,23 +62,52 @@ function persist() {
   fs.writeFileSync(WATCH_FILE, JSON.stringify(list, null, 2));
 }
 
-export function getWatchlist() {
-  return list.slice();
+if (needsMigration) {
+  try {
+    persist();
+  } catch (e) {
+    // ignore migration persistence errors at startup
+  }
 }
 
-export function addAssetToWatch(asset) {
-  if (!list.includes(asset)) {
-    list.push(asset);
+function ensureUser(userId) {
+  if (!list[userId]) {
+    list[userId] = [];
+  }
+}
+
+export function getWatchlist(userId) {
+  if (userId) {
+    return list[userId] ? list[userId].slice() : [];
+  }
+  const combined = new Set();
+  for (const assets of Object.values(list)) {
+    for (const asset of assets) combined.add(asset);
+  }
+  return Array.from(combined);
+}
+
+export function addAssetToWatch(userId, asset) {
+  if (!userId || typeof asset !== 'string') return false;
+  ensureUser(userId);
+  const assets = list[userId];
+  if (!assets.includes(asset)) {
+    assets.push(asset);
     persist();
     return true;
   }
   return false;
 }
 
-export function removeAssetFromWatch(asset) {
-  const idx = list.indexOf(asset);
+export function removeAssetFromWatch(userId, asset) {
+  if (!userId || !list[userId]) return false;
+  const assets = list[userId];
+  const idx = assets.indexOf(asset);
   if (idx !== -1) {
-    list.splice(idx, 1);
+    assets.splice(idx, 1);
+    if (!assets.length) {
+      delete list[userId];
+    }
     persist();
     return true;
   }
