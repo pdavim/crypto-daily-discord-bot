@@ -4,7 +4,7 @@ export function pct(v) { return v == null ? '—' : `${(v * 100).toFixed(2)}%`; 
 export function num(v, p = 4) { return v == null ? '—' : `${(+v).toFixed(p)}`; }
 export function fmt(n) { return n == null ? '—' : Intl.NumberFormat().format(n); }
 
-export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma200, rsi, macdObj, bb, atr, volSeries }) {
+export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma200, rsi, macdObj, bb, kc, atr, adx, volSeries }) {
     const last = candles.at(-1);
     const closeSeries = candles.map(c => c.c);
     const spark = sparkline(closeSeries, 28);
@@ -34,6 +34,19 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
 
     const rsiNow = rsi.at(-1);
     const macdHist = macdObj.hist.at(-1);
+    const adxNow = adx?.at?.(-1) ?? null;
+    const kcUpper = kc?.upper?.at?.(-1) ?? null;
+    const kcLower = kc?.lower?.at?.(-1) ?? null;
+    const kcMid = kc?.mid?.at?.(-1) ?? null;
+    const price = last?.c ?? null;
+    let kcState = null;
+    if (price != null && kcUpper != null && kcLower != null) {
+        kcState = price > kcUpper
+            ? "Acima"
+            : price < kcLower
+                ? "Abaixo"
+                : "Dentro";
+    }
     const bw = (bb.upper.at(-1) != null && bb.lower.at(-1) != null && bb.mid.at(-1) != null)
         ? (bb.upper.at(-1) - bb.lower.at(-1)) / bb.mid.at(-1)
         : null;
@@ -48,7 +61,8 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
         kpis: {
             price: last.c, var24h, var7d, var30d, var: varTf, rsi: rsiNow, macdHist,
             sma20: ma20.at(-1), sma50: ma50.at(-1), sma100: ma100.at(-1), sma200: ma200?.at(-1),
-            bw, atr14: atr.at(-1), vol: last.v, sar, volDiv, fearGreed: '—', trend, reco, sem, score, spark
+            bw, atr14: atr.at(-1), adx14: adxNow, kcUpper, kcLower, kcMid, kcState,
+            vol: last.v, sar, volDiv, fearGreed: '—', trend, reco, sem, score, spark
         }
     };
 }
@@ -79,6 +93,18 @@ export function buildSummary({ assetKey, snapshots }) {
         const v = s[tf]?.kpis?.[key];
         return v == null ? '??' : v;
     };
+    const adxOf = tf => {
+        const v = s[tf]?.kpis?.adx14;
+        if (v == null) return '??';
+        const emoji = v >= 25 ? '💪' : v >= 20 ? '📈' : '🟡';
+        return `${emoji} ${num(v, 0)}`;
+    };
+    const keltnerStateOf = tf => {
+        const state = s[tf]?.kpis?.kcState;
+        if (state == null) return '??';
+        const emoji = state === 'Acima' ? '📈' : state === 'Abaixo' ? '📉' : '🟡';
+        return `${emoji} ${state}`;
+    };
     const trendOf = tf => {
         const v = s[tf]?.kpis?.trend;
         if (v == null) return '??';
@@ -102,7 +128,11 @@ export function buildSummary({ assetKey, snapshots }) {
         `- **Semáforo 🟡**`,
         `-- 5m - ${rawOf('5m', 'sem')} / 15m - ${rawOf('15m', 'sem')} / 30m - ${rawOf('30m', 'sem')} / 1h - ${rawOf('1h', 'sem')} / 4h - ${rawOf('4h', 'sem')}`,
         `- **Score**`,
-        `-- 5m - ${numOf('5m', 'score', 0)} / 15m - ${numOf('15m', 'score', 0)} / 30m - ${numOf('30m', 'score', 0)} / 1h - ${numOf('1h', 'score', 0)} / 4h - ${numOf('4h', 'score', 0)}`
+        `-- 5m - ${numOf('5m', 'score', 0)} / 15m - ${numOf('15m', 'score', 0)} / 30m - ${numOf('30m', 'score', 0)} / 1h - ${numOf('1h', 'score', 0)} / 4h - ${numOf('4h', 'score', 0)}`,
+        `- **ADX (14)**`,
+        `-- 5m - ${adxOf('5m')} / 15m - ${adxOf('15m')} / 30m - ${adxOf('30m')} / 1h - ${adxOf('1h')} / 4h - ${adxOf('4h')}`,
+        `- **Canal de Keltner**`,
+        `-- 5m - ${keltnerStateOf('5m')} / 15m - ${keltnerStateOf('15m')} / 30m - ${keltnerStateOf('30m')} / 1h - ${keltnerStateOf('1h')} / 4h - ${keltnerStateOf('4h')}`
     ];
 
     lines.push("⚠️ *Esta análise é educativa e não constitui aconselhamento financeiro.*");
