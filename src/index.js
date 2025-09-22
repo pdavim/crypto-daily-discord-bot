@@ -181,7 +181,7 @@ async function runOnceForAsset(asset) {
             }
 
             if (CFG.enableAlerts) {
-                const alerts = buildAlerts({
+                const alerts = await buildAlerts({
                     rsiSeries: indicators.rsiSeries,
                     macdObj: indicators.macdObj,
                     bbWidth: indicators.bbWidth,

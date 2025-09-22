@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildAlerts } from '../src/alerts.js';
 
 describe('buildAlerts', () => {
-  it('generates alerts based on indicator values', () => {
+  it('generates alerts based on indicator values', async () => {
     const data = {
       rsiSeries: [71],
       macdObj: { hist: [-1, 1] },
@@ -19,7 +19,7 @@ describe('buildAlerts', () => {
       lowerKC: Array(21).fill(80),
       adxSeries: [30]
     };
-    const alerts = buildAlerts(data);
+    const alerts = await buildAlerts(data);
     expect(alerts).toContain('📉 RSI>70 (sobrecompra)');
     expect(alerts).toContain('📈 MACD flip ↑');
     expect(alerts).toContain('📈 Golden cross 20/50');
@@ -28,7 +28,7 @@ describe('buildAlerts', () => {
     expect(alerts).toContain('💰 Preço: 100.0000');
   });
 
-  it('detects keltner breakout below', () => {
+  it('detects keltner breakout below', async () => {
     const closes = Array(20).fill(80).concat(70);
     const data = {
       rsiSeries: [50, 45],
@@ -45,11 +45,11 @@ describe('buildAlerts', () => {
       upperKC: Array(21).fill(90),
       lowerKC: Array(21).fill(75)
     };
-    const alerts = buildAlerts(data);
+    const alerts = await buildAlerts(data);
     expect(alerts).toContain('📉 KC breakout below');
   });
 
-  it('detects round numbers for cheap assets', () => {
+  it('detects round numbers for cheap assets', async () => {
     const lastClose = 1.005;
     const data = {
       rsiSeries: [50, 50],
@@ -66,11 +66,11 @@ describe('buildAlerts', () => {
       upperKC: Array(21).fill(lastClose + 1),
       lowerKC: Array(21).fill(lastClose - 1)
     };
-    const alerts = buildAlerts(data);
+    const alerts = await buildAlerts(data);
     expect(alerts).toContain('🔵 Price near round number');
   });
 
-  it('detects round numbers for expensive assets', () => {
+  it('detects round numbers for expensive assets', async () => {
     const lastClose = 1002;
     const data = {
       rsiSeries: [50, 50],
@@ -87,7 +87,7 @@ describe('buildAlerts', () => {
       upperKC: Array(21).fill(lastClose + 10),
       lowerKC: Array(21).fill(lastClose - 10)
     };
-    const alerts = buildAlerts(data);
+    const alerts = await buildAlerts(data);
     expect(alerts).toContain('🔵 Price near round number');
   });
 });

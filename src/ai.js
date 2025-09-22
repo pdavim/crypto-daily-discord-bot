@@ -248,7 +248,7 @@ export async function runAgent() {
             }
 
             // Prepare indicator series for alerts
-            const alerts = buildAlerts({
+            const alerts = await buildAlerts({
                 rsiSeries: rsi(closesH, 14),
                 macdObj: macdResult,
                 bbWidth: widthSeries,

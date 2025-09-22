@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { ASSETS } from './assets.js';
 import { logger, withContext } from './logger.js';
+import { DEFAULT_ALERT_MODULES } from './alerts/registry.js';
 const DEFAULT_BINANCE_CACHE_TTL_MINUTES = 10;
 const parsedBinanceCacheTTL = Number.parseFloat(process.env.BINANCE_CACHE_TTL_MINUTES ?? '');
 const binanceCacheTTL = Number.isFinite(parsedBinanceCacheTTL) && parsedBinanceCacheTTL > 0
@@ -27,6 +28,38 @@ const toNumberList = (value, fallback, expectedLength) => {
         return fallback;
     }
     return parsed.length ? parsed : fallback;
+};
+
+const toStringList = (value) => {
+    return value
+        ? value
+            .split(',')
+            .map(part => part.trim())
+            .filter(Boolean)
+        : [];
+};
+
+const buildAlertModuleConfig = () => {
+    const enabledList = toStringList(process.env.ALERTS_ENABLED);
+    const disabledList = toStringList(process.env.ALERTS_DISABLED);
+    const base = Object.fromEntries(DEFAULT_ALERT_MODULES.map(name => [name, true]));
+
+    if (enabledList.length > 0) {
+        for (const name of DEFAULT_ALERT_MODULES) {
+            base[name] = enabledList.includes(name);
+        }
+        for (const name of enabledList) {
+            if (!(name in base)) {
+                base[name] = true;
+            }
+        }
+    }
+
+    for (const name of disabledList) {
+        base[name] = false;
+    }
+
+    return base;
 };
 
 const buildIndicatorConfig = () => {
@@ -103,6 +136,9 @@ export const CFG = {
     binanceCacheTTL,
     maxConcurrency: process.env.MAX_CONCURRENCY ? parseInt(process.env.MAX_CONCURRENCY, 10) : undefined,
     indicators: buildIndicatorConfig(),
+    alerts: {
+        modules: buildAlertModuleConfig(),
+    },
     alertThresholds: {
         rsiOverbought: 70,
         rsiOversold: 30,
