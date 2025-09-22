@@ -1,6 +1,12 @@
 import 'dotenv/config';
 import { ASSETS } from './assets.js';
 import { logger, withContext } from './logger.js';
+const DEFAULT_BINANCE_CACHE_TTL_MINUTES = 10;
+const parsedBinanceCacheTTL = Number.parseFloat(process.env.BINANCE_CACHE_TTL_MINUTES ?? '');
+const binanceCacheTTL = Number.isFinite(parsedBinanceCacheTTL) && parsedBinanceCacheTTL > 0
+    ? parsedBinanceCacheTTL
+    : DEFAULT_BINANCE_CACHE_TTL_MINUTES;
+
 export const CFG = {
     webhook: process.env.DISCORD_WEBHOOK_URL,
     webhookAlerts: process.env.DISCORD_WEBHOOK_ALERTS_URL,
@@ -30,7 +36,7 @@ export const CFG = {
     accountEquity: parseFloat(process.env.ACCOUNT_EQUITY || '0'),
     riskPerTrade: parseFloat(process.env.RISK_PER_TRADE || '0.01'),
     alertDedupMinutes: parseFloat(process.env.ALERT_DEDUP_MINUTES || '60'),
-    binanceCacheTTL: parseFloat(process.env.BINANCE_CACHE_TTL_MINUTES || '10'),
+    binanceCacheTTL,
     maxConcurrency: process.env.MAX_CONCURRENCY ? parseInt(process.env.MAX_CONCURRENCY, 10) : undefined,
 };
 
