@@ -11,7 +11,7 @@ import { postCharts, initBot } from "./discordBot.js";
 import { renderChartPNG } from "./chart.js";
 import { buildAlerts, formatAlertMessage } from "./alerts.js";
 import { runAgent } from "./ai.js";
-import { getSignature, updateSignature, saveStore } from "./store.js";
+import { getSignature, updateSignature, saveStore, getAlertHash, updateAlertHash, resetAlertHashes } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
 import { logger, withContext } from "./logger.js";
 import pLimit, { calcConcurrency } from "./limit.js";
@@ -271,6 +271,11 @@ async function runAll() {
     );
 }
 
+const DAILY_ALERT_SCOPE = 'daily';
+const DAILY_ALERT_KEY = 'analysis';
+const WEEKLY_ALERT_SCOPE = 'weekly';
+const WEEKLY_ALERT_KEY = 'analysis';
+
 async function runDailyAnalysis() {
     const log = withContext(logger, { asset: 'DAILY', timeframe: '1d' });
     try {
@@ -294,8 +299,16 @@ async function runDailyAnalysis() {
             finalReport = [header, ...lines, "", report].join("\n");
         }
         if (CFG.enableReports) {
+            const hash = buildHash(finalReport);
+            if (getAlertHash(DAILY_ALERT_SCOPE, DAILY_ALERT_KEY) === hash) {
+                log.info({ fn: 'runDailyAnalysis' }, 'Skipping daily analysis post (duplicate hash)');
+                return;
+            }
             const sent = await postAnalysis("DAILY", "1d", finalReport);
-            if (!sent) {
+            if (sent) {
+                updateAlertHash(DAILY_ALERT_SCOPE, DAILY_ALERT_KEY, hash);
+                saveStore();
+            } else {
                 log.warn({ fn: 'runDailyAnalysis' }, 'report upload failed');
             }
         }
@@ -349,8 +362,16 @@ async function runWeeklyAnalysis() {
         sections.push(report);
         const finalReport = sections.join("\n\n");
         if (CFG.enableReports) {
+            const hash = buildHash(finalReport);
+            if (getAlertHash(WEEKLY_ALERT_SCOPE, WEEKLY_ALERT_KEY) === hash) {
+                log.info({ fn: 'runWeeklyAnalysis' }, 'Skipping weekly analysis post (duplicate hash)');
+                return;
+            }
             const sent = await postAnalysis("WEEKLY", "1w", finalReport);
-            if (!sent) {
+            if (sent) {
+                updateAlertHash(WEEKLY_ALERT_SCOPE, WEEKLY_ALERT_KEY, hash);
+                saveStore();
+            } else {
                 log.warn({ fn: 'runWeeklyAnalysis' }, 'report upload failed');
             }
         }
@@ -385,6 +406,13 @@ if (!ONCE) {
     scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
     cron.schedule('0 18 * * 0', runWeeklyAnalysis, { timezone: CFG.tz });
     scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled weekly at 18h Sunday (TZ=${CFG.tz})`);
+    cron.schedule('0 0 * * 0', () => {
+        const log = withContext(logger, { fn: 'resetAlertHashesJob' });
+        resetAlertHashes();
+        saveStore();
+        log.info('Reset stored daily/weekly alert hashes');
+    }, { timezone: CFG.tz });
+    scheduleLog.info({ fn: 'schedule' }, '♻️ Scheduled weekly alert hash reset');
     cron.schedule('0 0 * * *', () => pruneOlderThan(sevenDaysMs), { timezone: CFG.tz });
     scheduleLog.info({ fn: 'schedule' }, '🧹 Scheduled daily alert cache pruning (older than 7 days)');
     runAll();
