@@ -102,7 +102,24 @@ export const CFG = {
     alertDedupMinutes: parseFloat(process.env.ALERT_DEDUP_MINUTES || '60'),
     binanceCacheTTL,
     maxConcurrency: process.env.MAX_CONCURRENCY ? parseInt(process.env.MAX_CONCURRENCY, 10) : undefined,
-    indicators: buildIndicatorConfig()
+    indicators: buildIndicatorConfig(),
+    alertThresholds: {
+        rsiOverbought: 70,
+        rsiOversold: 30,
+        rsiMidpoint: 50,
+        adxStrongTrend: 25,
+        volumeSpike: 2,
+        atrSpike: 1.5,
+        stochasticOverbought: 80,
+        stochasticOversold: 20,
+        williamsROverbought: -20,
+        williamsROversold: -80,
+        cciOverbought: 100,
+        cciOversold: -100,
+        heuristicHigh: 80,
+        heuristicLow: 20,
+        obvDelta: 0.05
+    }
 };
 
 export const config = {
