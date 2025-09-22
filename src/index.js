@@ -4,7 +4,7 @@ import { CFG } from "./config.js";
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
 import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { streamKlines } from "./data/binanceStream.js";
-import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, stochastic, williamsR, cci, obv } from "./indicators.js";
+import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, adx, stochastic, williamsR, cci, obv } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";

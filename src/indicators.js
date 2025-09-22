@@ -159,6 +159,69 @@ export function ema(arr, period) {
     return out;
 }
 
+export function adx(highs, lows, closes, period = 14) {
+    const len = Math.min(highs?.length ?? 0, lows?.length ?? 0, closes?.length ?? 0);
+    if (!len) return [];
+
+    const plusDM = Array(len).fill(0);
+    const minusDM = Array(len).fill(0);
+    const tr = Array(len).fill(0);
+
+    if (len > 0) {
+        tr[0] = highs[0] - lows[0];
+    }
+
+    for (let i = 1; i < len; i++) {
+        const upMove = highs[i] - highs[i - 1];
+        const downMove = lows[i - 1] - lows[i];
+        plusDM[i] = (upMove > downMove && upMove > 0) ? upMove : 0;
+        minusDM[i] = (downMove > upMove && downMove > 0) ? downMove : 0;
+
+        const range = highs[i] - lows[i];
+        const rangeHigh = Math.abs(highs[i] - closes[i - 1]);
+        const rangeLow = Math.abs(lows[i] - closes[i - 1]);
+        tr[i] = Math.max(range, rangeHigh, rangeLow);
+    }
+
+    const wilderRMA = (values, p, seedWithSMA = false) => {
+        const out = Array(values.length).fill(null);
+        let prev = null;
+        const alpha = 1 / p;
+        if (seedWithSMA && values.length >= p) {
+            let seed = 0;
+            for (let i = 0; i < p; i++) seed += values[i] ?? 0;
+            values = values.slice();
+            for (let i = 0; i < p - 1; i++) values[i] = null;
+            values[p - 1] = seed / p;
+        }
+        for (let i = 0; i < values.length; i++) {
+            const v = values[i];
+            if (v == null) continue;
+            prev = prev == null ? v : prev + alpha * (v - prev);
+            out[i] = prev;
+        }
+        return out;
+    };
+
+    const atr = wilderRMA(tr, period, true);
+    const plusRma = wilderRMA(plusDM, period);
+    const minusRma = wilderRMA(minusDM, period);
+
+    const dx = Array(len).fill(null);
+    for (let i = 0; i < len; i++) {
+        const atrVal = atr[i];
+        if (atrVal == null || atrVal === 0) continue;
+        const plusVal = plusRma[i] ?? 0;
+        const minusVal = minusRma[i] ?? 0;
+        const plusDI = (plusVal / atrVal) * 100;
+        const minusDI = (minusVal / atrVal) * 100;
+        const denom = plusDI + minusDI;
+        dx[i] = denom === 0 ? 0 : Math.abs(plusDI - minusDI) / denom * 100;
+    }
+
+    return wilderRMA(dx, period);
+}
+
 export function stochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
     const k = Array(closes.length).fill(null);
     for (let i = 0; i < closes.length; i++) {
