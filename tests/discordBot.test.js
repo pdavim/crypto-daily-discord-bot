@@ -24,10 +24,11 @@ const fetchOHLCV = vi.fn();
 const renderChartPNG = vi.fn();
 const addAssetToWatch = vi.fn();
 const removeAssetFromWatch = vi.fn();
+const getWatchlist = vi.fn(() => []);
 
 vi.mock('../src/data/binance.js', () => ({ fetchOHLCV }));
 vi.mock('../src/chart.js', () => ({ renderChartPNG }));
-vi.mock('../src/watchlist.js', () => ({ addAssetToWatch, removeAssetFromWatch }));
+vi.mock('../src/watchlist.js', () => ({ addAssetToWatch, removeAssetFromWatch, getWatchlist }));
 
 // environment setup for assets
 process.env.BINANCE_SYMBOL_BTC = 'BTCUSDT';
@@ -113,6 +114,25 @@ describe('discord bot interactions', () => {
     expect(removeAssetFromWatch).toHaveBeenCalledWith('BTC');
     expect(interaction.reply).toHaveBeenCalledWith({
       content: 'Ativo BTC removido da watchlist',
+      ephemeral: true,
+    });
+  });
+
+  it('handles /status command', async () => {
+    getWatchlist.mockReturnValue(['BTC', 'ETH']);
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'status',
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(getWatchlist).toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: expect.stringContaining('BTC, ETH'),
       ephemeral: true,
     });
   });

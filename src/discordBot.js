@@ -4,7 +4,27 @@ import { logger, withContext } from './logger.js';
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from './assets.js';
 import { fetchOHLCV } from './data/binance.js';
 import { renderChartPNG } from './chart.js';
-import { addAssetToWatch, removeAssetFromWatch } from './watchlist.js';
+import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from './watchlist.js';
+
+const startTime = Date.now();
+
+function getWatchlist() {
+    return loadWatchlist();
+}
+
+function formatUptime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const parts = [];
+    if (days) parts.push(`${days}d`);
+    if (hours || parts.length) parts.push(`${hours}h`);
+    if (minutes || parts.length) parts.push(`${minutes}m`);
+    parts.push(`${seconds}s`);
+    return parts.join(' ');
+}
 
 let clientPromise;
 function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
@@ -63,6 +83,12 @@ export async function handleInteraction(interaction) {
             msg = removed ? `Ativo ${assetKey} removido da watchlist` : `Ativo ${assetKey} não estava na watchlist`;
         }
         await interaction.reply({ content: msg, ephemeral: true });
+    } else if (interaction.commandName === 'status') {
+        const list = getWatchlist();
+        const watchlistText = list.length ? list.join(', ') : 'Nenhum ativo monitorado';
+        const uptimeText = formatUptime(Date.now() - startTime);
+        const content = `⏱️ Uptime: ${uptimeText}\n👀 Watchlist: ${watchlistText}`;
+        await interaction.reply({ content, ephemeral: true });
     }
 }
 
@@ -129,6 +155,10 @@ function getClient() {
                             ]
                         }
                     ]
+                },
+                {
+                    name: 'status',
+                    description: 'Show watchlist and uptime'
                 }
             ];
             await client.application.commands.set(commands);

@@ -34,6 +34,12 @@ This project posts crypto analysis, charts and alerts to Discord.
   npm run once
   ```
 
+## Discord Commands
+
+- `/chart` – gera um gráfico para o ativo e timeframe informados.
+- `/watch` – adiciona ou remove ativos da watchlist (subcomandos `add` e `remove`).
+- `/status` – mostra o uptime atual do bot e a lista de ativos monitorados.
+
 ## Housekeeping
 
 - Alert deduplication entries older than seven days are pruned automatically once per day. The pruning job also runs on start-up so long-running processes and ephemeral runs stay in sync.
