@@ -1,3 +1,5 @@
+import { ALERT_LEVELS, createAlert } from './shared.js';
+
 export default function rsiAlert({ rsiSeries, thresholds }) {
     const alerts = [];
     const rsi = rsiSeries?.at(-1);
@@ -9,17 +11,17 @@ export default function rsiAlert({ rsiSeries, thresholds }) {
     } = thresholds ?? {};
 
     if (rsi != null && rsiOverbought != null && rsi > rsiOverbought) {
-        alerts.push("📉 RSI>70 (sobrecompra)");
+        alerts.push(createAlert("📉 RSI>70 (sobrecompra)", ALERT_LEVELS.HIGH));
     }
     if (rsi != null && rsiOversold != null && rsi < rsiOversold) {
-        alerts.push("📈 RSI<30 (sobrevenda)");
+        alerts.push(createAlert("📈 RSI<30 (sobrevenda)", ALERT_LEVELS.HIGH));
     }
     if (prevRsi != null && rsi != null) {
         if (rsiOverbought != null && prevRsi > rsiOverbought && rsi <= rsiOverbought) {
-            alerts.push("📉 RSI cross-back ↓ (70→<70)");
+            alerts.push(createAlert("📉 RSI cross-back ↓ (70→<70)", ALERT_LEVELS.MEDIUM));
         }
         if (rsiOversold != null && prevRsi < rsiOversold && rsi >= rsiOversold) {
-            alerts.push("📈 RSI cross-back ↑ (<30→>30)");
+            alerts.push(createAlert("📈 RSI cross-back ↑ (<30→>30)", ALERT_LEVELS.MEDIUM));
         }
         if (
             rsiOverbought != null && rsiMidpoint != null &&
@@ -27,7 +29,7 @@ export default function rsiAlert({ rsiSeries, thresholds }) {
             rsi < rsiOverbought &&
             rsi >= rsiMidpoint
         ) {
-            alerts.push("🔄 RSI neutral (de >70)");
+            alerts.push(createAlert("🔄 RSI neutral (de >70)", ALERT_LEVELS.LOW));
         }
         if (
             rsiOversold != null && rsiMidpoint != null &&
@@ -35,13 +37,13 @@ export default function rsiAlert({ rsiSeries, thresholds }) {
             rsi > rsiOversold &&
             rsi <= rsiMidpoint
         ) {
-            alerts.push("🔄 RSI neutral (de <30)");
+            alerts.push(createAlert("🔄 RSI neutral (de <30)", ALERT_LEVELS.LOW));
         }
         if (rsiMidpoint != null && prevRsi < rsiMidpoint && rsi >= rsiMidpoint) {
-            alerts.push("📈 RSI crossed 50↑ (momentum shift)");
+            alerts.push(createAlert("📈 RSI crossed 50↑ (momentum shift)", ALERT_LEVELS.MEDIUM));
         }
         if (rsiMidpoint != null && prevRsi > rsiMidpoint && rsi <= rsiMidpoint) {
-            alerts.push("📉 RSI crossed 50↓ (momentum shift)");
+            alerts.push(createAlert("📉 RSI crossed 50↓ (momentum shift)", ALERT_LEVELS.MEDIUM));
         }
     }
 

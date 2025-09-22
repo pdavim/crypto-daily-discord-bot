@@ -9,7 +9,7 @@ import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";
 import { renderChartPNG } from "./chart.js";
-import { buildAlerts } from "./alerts.js";
+import { buildAlerts, formatAlertMessage } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
@@ -212,10 +212,13 @@ async function runOnceForAsset(asset) {
                     riskPct: CFG.riskPerTrade
                 });
                 const hasSignals = alerts.some(a =>
-                    !a.startsWith('💰 Preço') && !a.startsWith('📊 Var24h'));
+                    !a.msg.startsWith('💰 Preço') && !a.msg.startsWith('📊 Var24h'));
                 if (hasSignals) {
                     const mention = "@here";
-                    const alertMsg = [`**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`, ...alerts.map(a => `• ${a}`)].join("\n");
+                    const alertMsg = [
+                        `**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`,
+                        ...alerts.map(alert => `• ${formatAlertMessage(alert)}`)
+                    ].join("\n");
                     const hash = buildHash(alertMsg);
                     const windowMs = CFG.alertDedupMinutes * 60 * 1000;
                     if (shouldSend(hash, windowMs)) {

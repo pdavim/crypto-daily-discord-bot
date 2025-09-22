@@ -54,11 +54,11 @@ describe('buildAlerts configuration', () => {
     data.rsiSeries = [65];
 
     const defaultAlerts = await buildAlerts(data);
-    expect(defaultAlerts).not.toContain('📉 RSI>70 (sobrecompra)');
+    expect(defaultAlerts.map(alert => alert.msg)).not.toContain('📉 RSI>70 (sobrecompra)');
 
     CFG.alertThresholds.rsiOverbought = 60;
     const customAlerts = await buildAlerts(data);
-    expect(customAlerts).toContain('📉 RSI>70 (sobrecompra)');
+    expect(customAlerts.map(alert => alert.msg)).toContain('📉 RSI>70 (sobrecompra)');
   });
 
   it('respects configurable volume spike multiplier', async () => {
@@ -66,11 +66,11 @@ describe('buildAlerts configuration', () => {
     data.volumes = Array(20).fill(1000).concat(1500);
 
     const defaultAlerts = await buildAlerts(data);
-    expect(defaultAlerts).not.toContain('🔊 Volume spike (>2x avg)');
+    expect(defaultAlerts.map(alert => alert.msg)).not.toContain('🔊 Volume spike (>2x avg)');
 
     CFG.alertThresholds.volumeSpike = 1.4;
     const customAlerts = await buildAlerts(data);
-    expect(customAlerts).toContain('🔊 Volume spike (>2x avg)');
+    expect(customAlerts.map(alert => alert.msg)).toContain('🔊 Volume spike (>2x avg)');
   });
 });
 

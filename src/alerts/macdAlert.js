@@ -1,4 +1,5 @@
 import { crossUp, crossDown } from '../indicators.js';
+import { ALERT_LEVELS, createAlert } from './shared.js';
 
 export default function macdAlert({ macdObj }) {
     const alerts = [];
@@ -10,20 +11,20 @@ export default function macdAlert({ macdObj }) {
 
     if (macd != null && macdSignal != null && prevMacd != null && prevSignal != null) {
         if (prevMacd < prevSignal && macd > macdSignal) {
-            alerts.push("📈 MACD bullish crossover");
+            alerts.push(createAlert("📈 MACD bullish crossover", ALERT_LEVELS.HIGH));
         }
         if (prevMacd > prevSignal && macd < macdSignal) {
-            alerts.push("📉 MACD bearish crossover");
+            alerts.push(createAlert("📉 MACD bearish crossover", ALERT_LEVELS.HIGH));
         }
     }
 
     if (macdHist && macdHist.length >= 2) {
         const zeros = Array(macdHist.length).fill(0);
         if (crossUp(macdHist, zeros)) {
-            alerts.push("📈 MACD flip ↑");
+            alerts.push(createAlert("📈 MACD flip ↑", ALERT_LEVELS.MEDIUM));
         }
         if (crossDown(macdHist, zeros)) {
-            alerts.push("📉 MACD flip ↓");
+            alerts.push(createAlert("📉 MACD flip ↓", ALERT_LEVELS.MEDIUM));
         }
     }
 

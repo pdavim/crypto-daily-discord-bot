@@ -1,3 +1,5 @@
+import { ALERT_LEVELS, createAlert } from './shared.js';
+
 export default function obvAlert({ obvSeries, thresholds }) {
     const alerts = [];
     const obv = obvSeries?.at(-1);
@@ -6,10 +8,10 @@ export default function obvAlert({ obvSeries, thresholds }) {
 
     if (obv != null && prevObv != null && obvDelta != null) {
         if (obv > prevObv * (1 + obvDelta)) {
-            alerts.push("📈 OBV bullish divergence");
+            alerts.push(createAlert("📈 OBV bullish divergence", ALERT_LEVELS.MEDIUM));
         }
         if (obv < prevObv * (1 - obvDelta)) {
-            alerts.push("📉 OBV bearish divergence");
+            alerts.push(createAlert("📉 OBV bearish divergence", ALERT_LEVELS.MEDIUM));
         }
     }
 

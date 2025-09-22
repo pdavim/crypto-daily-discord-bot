@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAlerts } from '../src/alerts.js';
+import { buildAlerts, ALERT_LEVELS, formatAlertMessage } from '../src/alerts.js';
 
 describe('buildAlerts', () => {
   it('generates alerts based on indicator values', async () => {
@@ -20,12 +20,19 @@ describe('buildAlerts', () => {
       adxSeries: [30]
     };
     const alerts = await buildAlerts(data);
-    expect(alerts).toContain('📉 RSI>70 (sobrecompra)');
-    expect(alerts).toContain('📈 MACD flip ↑');
-    expect(alerts).toContain('📈 Golden cross 20/50');
-    expect(alerts).toContain('📈 KC breakout above');
-    expect(alerts).toContain('💪 ADX>25 (tendência forte)');
-    expect(alerts).toContain('💰 Preço: 100.0000');
+    expect(alerts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ msg: '📉 RSI>70 (sobrecompra)', level: ALERT_LEVELS.HIGH }),
+      expect.objectContaining({ msg: '📈 MACD flip ↑', level: ALERT_LEVELS.MEDIUM }),
+      expect.objectContaining({ msg: '📈 Golden cross 20/50', level: ALERT_LEVELS.HIGH }),
+      expect.objectContaining({ msg: '📈 KC breakout above', level: ALERT_LEVELS.HIGH }),
+      expect.objectContaining({ msg: '💪 ADX>25 (tendência forte)', level: ALERT_LEVELS.HIGH }),
+      expect.objectContaining({ msg: '💰 Preço: 100.0000', level: ALERT_LEVELS.LOW })
+    ]));
+
+    const levels = alerts.map(alert => alert.level);
+    const order = [ALERT_LEVELS.HIGH, ALERT_LEVELS.MEDIUM, ALERT_LEVELS.LOW];
+    const sortedLevels = [...levels].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    expect(levels).toEqual(sortedLevels);
   });
 
   it('detects keltner breakout below', async () => {
@@ -46,7 +53,9 @@ describe('buildAlerts', () => {
       lowerKC: Array(21).fill(75)
     };
     const alerts = await buildAlerts(data);
-    expect(alerts).toContain('📉 KC breakout below');
+    expect(alerts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ msg: '📉 KC breakout below', level: ALERT_LEVELS.HIGH })
+    ]));
   });
 
   it('detects round numbers for cheap assets', async () => {
@@ -67,7 +76,9 @@ describe('buildAlerts', () => {
       lowerKC: Array(21).fill(lastClose - 1)
     };
     const alerts = await buildAlerts(data);
-    expect(alerts).toContain('🔵 Price near round number');
+    expect(alerts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ msg: '🔵 Price near round number', level: ALERT_LEVELS.LOW })
+    ]));
   });
 
   it('detects round numbers for expensive assets', async () => {
@@ -88,6 +99,18 @@ describe('buildAlerts', () => {
       lowerKC: Array(21).fill(lastClose - 10)
     };
     const alerts = await buildAlerts(data);
-    expect(alerts).toContain('🔵 Price near round number');
+    expect(alerts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ msg: '🔵 Price near round number', level: ALERT_LEVELS.LOW })
+    ]));
+  });
+});
+
+describe('formatAlertMessage', () => {
+  it('adds level styling to alert messages', () => {
+    const formatted = formatAlertMessage({
+      msg: '📈 Test alert',
+      level: ALERT_LEVELS.HIGH
+    });
+    expect(formatted).toBe('🔴 **ALTA:** 📈 Test alert');
   });
 });
