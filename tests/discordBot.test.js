@@ -1,5 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// Stub discord.js primitives so the module can be imported without a real client
+const loginMock = vi.fn();
+const onMock = vi.fn();
+const setCommandsMock = vi.fn();
+
+vi.mock('discord.js', () => ({
+  Client: vi.fn().mockImplementation(() => ({
+    login: loginMock.mockResolvedValue(),
+    on: onMock,
+    application: { commands: { set: setCommandsMock } },
+    channels: { fetch: vi.fn() },
+  })),
+  GatewayIntentBits: { Guilds: 1 },
+  ApplicationCommandOptionType: {
+    String: 3,
+    Subcommand: 1,
+  },
+}));
+
 // mock dependencies
 const fetchOHLCV = vi.fn();
 const renderChartPNG = vi.fn();
@@ -98,4 +117,3 @@ describe('discord bot interactions', () => {
     });
   });
 });
-
