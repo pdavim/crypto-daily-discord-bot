@@ -36,6 +36,7 @@ describe('watchlist persistence', () => {
     mod = await loadModule();
     expect(mod.getWatchlist()).toEqual(['ETH']);
     mod.removeAssetFromWatch('ETH');
+    expect(fs.existsSync(file)).toBe(false);
     vi.resetModules();
     mod = await loadModule();
     expect(mod.getWatchlist()).toEqual([]);

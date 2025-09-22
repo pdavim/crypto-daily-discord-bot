@@ -15,7 +15,7 @@ import { getSignature, updateSignature, saveStore } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
 import { logger, withContext } from "./logger.js";
 import pLimit, { calcConcurrency } from "./limit.js";
-import { buildHash, shouldSend } from "./alertCache.js";
+import { buildHash, shouldSend, pruneOlderThan } from "./alertCache.js";
 import { register } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
 import { reportWeeklyPerf } from "./perf.js";
@@ -380,15 +380,21 @@ if (!ONCE) {
         }
     });
     const scheduleLog = withContext(logger);
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
     scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
     cron.schedule('0 18 * * 0', runWeeklyAnalysis, { timezone: CFG.tz });
     scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled weekly at 18h Sunday (TZ=${CFG.tz})`);
+    cron.schedule('0 0 * * *', () => pruneOlderThan(sevenDaysMs), { timezone: CFG.tz });
+    scheduleLog.info({ fn: 'schedule' }, '🧹 Scheduled daily alert cache pruning (older than 7 days)');
     runAll();
+    pruneOlderThan(sevenDaysMs);
     runDailyAnalysis();
     runWeeklyAnalysis();
 } else {
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     runAll();
+    pruneOlderThan(sevenDaysMs);
     runDailyAnalysis();
     runWeeklyAnalysis();
 }

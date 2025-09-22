@@ -1,45 +1,53 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
-import path from 'path';
 import os from 'os';
+import path from 'path';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-let buildHash, shouldSend;
-let tempDir;
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'alerts-'));
+const file = path.join(tmpDir, 'alerts.json');
+process.env.ALERTS_CACHE_FILE = file;
 
-beforeEach(async () => {
-  vi.useFakeTimers();
-  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'alertcache-'));
-  process.env.ALERTS_CACHE_FILE = path.join(tempDir, 'alerts.json');
+async function loadModule() {
+  return import('../src/alertCache.js');
+}
+
+beforeEach(() => {
+  fs.rmSync(file, { force: true });
   vi.resetModules();
-  ({ buildHash, shouldSend } = await import('../src/alertCache.js'));
 });
 
 afterEach(() => {
   vi.useRealTimers();
-  fs.rmSync(tempDir, { recursive: true, force: true });
-  delete process.env.ALERTS_CACHE_FILE;
 });
 
-describe('alertCache', () => {
-  it('deduplicates alerts within time window', () => {
-    const text = 'duplicate alert';
-    const hash = buildHash(text);
-    const windowMs = 60 * 1000;
-    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(true);
-    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(false);
-    vi.advanceTimersByTime(windowMs + 1);
-    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(true);
+describe('alert cache pruning', () => {
+  it('removes entries older than the cutoff', async () => {
+    vi.useFakeTimers();
+    const dayMs = 24 * 60 * 60 * 1000;
+    vi.setSystemTime(new Date('2024-01-01T00:00:00Z'));
+    let mod = await loadModule();
+    expect(mod.shouldSend({ asset: 'BTC', tf: '1h', hash: 'old' }, 10 * dayMs)).toBe(true);
+    vi.setSystemTime(new Date('2024-01-09T00:00:00Z'));
+    expect(mod.shouldSend({ asset: 'BTC', tf: '1h', hash: 'new' }, 10 * dayMs)).toBe(true);
+    expect(fs.existsSync(file)).toBe(true);
+
+    mod.pruneOlderThan(7 * dayMs);
+
+    const persisted = JSON.parse(fs.readFileSync(file, 'utf8'));
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].hash).toBe('new');
   });
 
-  it('allows same hash for different assets and timeframes', () => {
-    const text = 'differentiated alert';
-    const hash = buildHash(text);
-    const windowMs = 60 * 1000;
+  it('deletes the file when the cache becomes empty', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-01T00:00:00Z'));
+    let mod = await loadModule();
+    expect(mod.shouldSend({ asset: 'BTC', tf: '1h', hash: 'only' }, 1000)).toBe(true);
+    expect(fs.existsSync(file)).toBe(true);
 
-    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(true);
-    expect(shouldSend({ asset: 'ETHUSDT', tf: '1h', hash }, windowMs)).toBe(true);
-    expect(shouldSend({ asset: 'BTCUSDT', tf: '4h', hash }, windowMs)).toBe(true);
+    vi.setSystemTime(new Date('2024-01-02T00:00:00Z'));
+    mod.pruneOlderThan(0);
 
-    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(false);
+    expect(fs.existsSync(file)).toBe(false);
   });
 });
