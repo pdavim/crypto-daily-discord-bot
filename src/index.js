@@ -20,7 +20,7 @@ import { register } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
 import { reportWeeklyPerf } from "./perf.js";
 
-initBot();
+initBot({ onAnalysis: handleAnalysisSlashCommand });
 
 const METRICS_PORT = process.env.METRICS_PORT || 3001;
 http.createServer(async (req, res) => {
@@ -55,7 +55,14 @@ function build45mCandles(candles15m) {
 }
 
 
-async function runOnceForAsset(asset) {
+async function runOnceForAsset(asset, options = {}) {
+    const {
+        enableCharts = CFG.enableCharts,
+        enableAlerts = CFG.enableAlerts,
+        enableAnalysis = CFG.enableAnalysis,
+        postAnalysis: shouldPostAnalysis = enableAnalysis,
+        postCharts: shouldPostCharts = enableCharts
+    } = options;
     const dailyPromise = fetchDailyCloses(asset.binance, 32);
     const snapshots = {};
     const chartPaths = [];
@@ -169,7 +176,7 @@ async function runOnceForAsset(asset) {
             });
             snapshots[tf] = snapshot;
 
-            if (CFG.enableCharts) {
+            if (enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
                     ma20: indicators.ma20,
                     ma50: indicators.ma50,
@@ -180,7 +187,7 @@ async function runOnceForAsset(asset) {
                 chartPaths.push(chartPath);
             }
 
-            if (CFG.enableAlerts) {
+            if (enableAlerts) {
                 const alerts = await buildAlerts({
                     rsiSeries: indicators.rsiSeries,
                     macdObj: indicators.macdObj,
@@ -247,21 +254,25 @@ async function runOnceForAsset(asset) {
 
     await Promise.all(timeframeTasks);
     saveStore();
-    if (CFG.enableAnalysis && snapshots["4h"]) {
-        const summary = buildSummary({ assetKey: asset.key, snapshots });
-        const sent = await postAnalysis(asset.key, "4h", summary);
-        if (!sent) {
-            const log = withContext(logger, { asset: asset.key, timeframe: '4h' });
-            log.warn({ fn: 'runOnceForAsset' }, 'report upload failed');
+    let summary = null;
+    if (snapshots["4h"]) {
+        summary = buildSummary({ assetKey: asset.key, snapshots });
+        if (enableAnalysis && shouldPostAnalysis) {
+            const sent = await postAnalysis(asset.key, "4h", summary);
+            if (!sent) {
+                const log = withContext(logger, { asset: asset.key, timeframe: '4h' });
+                log.warn({ fn: 'runOnceForAsset' }, 'report upload failed');
+            }
         }
     }
-    if (CFG.enableCharts && chartPaths.length > 0) {
+    if (enableCharts && shouldPostCharts && chartPaths.length > 0) {
         const chartsSent = await postCharts(chartPaths);
         if (!chartsSent) {
             const log = withContext(logger, { asset: asset.key });
             log.warn({ fn: 'runOnceForAsset' }, 'chart upload failed');
         }
     }
+    return { snapshots, summary, chartPaths };
 }
 
 async function runAll() {
@@ -388,6 +399,17 @@ function scheduleRun(asset) {
     if (runningAssets.has(asset.key)) return;
     runningAssets.add(asset.key);
     runOnceForAsset(asset).finally(() => runningAssets.delete(asset.key));
+}
+
+async function handleAnalysisSlashCommand({ asset, timeframe }) {
+    const { summary } = await runOnceForAsset(asset, {
+        enableCharts: false,
+        postCharts: false,
+        enableAlerts: false,
+        enableAnalysis: true,
+        postAnalysis: false
+    });
+    return summary;
 }
 
 if (!ONCE) {
