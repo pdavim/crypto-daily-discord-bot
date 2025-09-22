@@ -26,13 +26,13 @@ export function buildHash(text) {
     return crypto.createHash('sha256').update(text).digest('hex');
 }
 
-export function shouldSend(hash, windowMs) {
+export function shouldSend({ asset, tf, hash }, windowMs) {
     const now = Date.now();
     cache = cache.filter(entry => now - entry.time <= windowMs);
-    if (cache.some(entry => entry.hash === hash)) {
+    if (cache.some(entry => entry.hash === hash && entry.asset === asset && entry.tf === tf)) {
         return false;
     }
-    cache.push({ hash, time: now });
+    cache.push({ asset, tf, hash, time: now });
     persist();
     return true;
 }

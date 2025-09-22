@@ -25,9 +25,21 @@ describe('alertCache', () => {
     const text = 'duplicate alert';
     const hash = buildHash(text);
     const windowMs = 60 * 1000;
-    expect(shouldSend(hash, windowMs)).toBe(true);
-    expect(shouldSend(hash, windowMs)).toBe(false);
+    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(true);
+    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(false);
     vi.advanceTimersByTime(windowMs + 1);
-    expect(shouldSend(hash, windowMs)).toBe(true);
+    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(true);
+  });
+
+  it('allows same hash for different assets and timeframes', () => {
+    const text = 'differentiated alert';
+    const hash = buildHash(text);
+    const windowMs = 60 * 1000;
+
+    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(true);
+    expect(shouldSend({ asset: 'ETHUSDT', tf: '1h', hash }, windowMs)).toBe(true);
+    expect(shouldSend({ asset: 'BTCUSDT', tf: '4h', hash }, windowMs)).toBe(true);
+
+    expect(shouldSend({ asset: 'BTCUSDT', tf: '1h', hash }, windowMs)).toBe(false);
   });
 });
