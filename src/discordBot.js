@@ -5,6 +5,7 @@ import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from './assets.js';
 import { fetchOHLCV } from './data/binance.js';
 import { renderChartPNG } from './chart.js';
 import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from './watchlist.js';
+import { setSetting } from './settings.js';
 
 const startTime = Date.now();
 
@@ -120,6 +121,29 @@ export async function handleInteraction(interaction) {
             log.error({ fn: 'handleInteraction', err }, 'Failed to run manual analysis');
             await interaction.editReply('Erro ao executar análise. Tente novamente mais tarde.');
         }
+    } else if (interaction.commandName === 'settings') {
+        const group = interaction.options.getSubcommandGroup(false);
+        const sub = interaction.options.getSubcommand(false);
+        if (group === 'risk' && sub === 'percent') {
+            const percent = interaction.options.getNumber('value', true);
+            if (!Number.isFinite(percent) || percent < 0 || percent > 5) {
+                await interaction.reply({ content: 'Informe um percentual entre 0 e 5.', ephemeral: true });
+                return;
+            }
+            const decimal = percent / 100;
+            const log = withContext(logger, { command: 'settings', group, sub });
+            try {
+                setSetting('riskPerTrade', decimal);
+                CFG.riskPerTrade = decimal;
+                const formatted = percent % 1 === 0 ? percent.toFixed(0) : percent.toFixed(2);
+                await interaction.reply({ content: `Risco por trade atualizado para ${formatted}%`, ephemeral: true });
+            } catch (err) {
+                log.error({ fn: 'handleInteraction', err }, 'Failed to update risk settings');
+                await interaction.reply({ content: 'Não foi possível atualizar o risco no momento.', ephemeral: true });
+            }
+        } else {
+            await interaction.reply({ content: 'Configuração não suportada.', ephemeral: true });
+        }
     }
 }
 
@@ -208,6 +232,32 @@ function getClient() {
                             type: ApplicationCommandOptionType.String,
                             required: true,
                             choices: TIMEFRAMES.map(t => ({ name: t, value: t }))
+                        }
+                    ]
+                },
+                {
+                    name: 'settings',
+                    description: 'Atualiza configurações do bot',
+                    options: [
+                        {
+                            name: 'risk',
+                            description: 'Configurações de risco',
+                            type: ApplicationCommandOptionType.SubcommandGroup,
+                            options: [
+                                {
+                                    name: 'percent',
+                                    description: 'Define o risco por trade (0 a 5%)',
+                                    type: ApplicationCommandOptionType.Subcommand,
+                                    options: [
+                                        {
+                                            name: 'value',
+                                            description: 'Percentual de risco permitido (0 a 5)',
+                                            type: ApplicationCommandOptionType.Number,
+                                            required: true
+                                        }
+                                    ]
+                                }
+                            ]
                         }
                     ]
                 }

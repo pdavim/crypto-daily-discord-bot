@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { ASSETS } from './assets.js';
 import { logger, withContext } from './logger.js';
 import { DEFAULT_ALERT_MODULES } from './alerts/registry.js';
+import { loadSettings, getSetting, setSetting } from './settings.js';
 const DEFAULT_BINANCE_CACHE_TTL_MINUTES = 10;
 const parsedBinanceCacheTTL = Number.parseFloat(process.env.BINANCE_CACHE_TTL_MINUTES ?? '');
 const binanceCacheTTL = Number.isFinite(parsedBinanceCacheTTL) && parsedBinanceCacheTTL > 0
@@ -165,7 +166,7 @@ export const CFG = {
     enableReports: process.env.ENABLE_REPORTS === undefined || process.env.ENABLE_REPORTS === 'true',
     debug: process.env.DEBUG?.toLowerCase() === 'true',
     accountEquity: parseFloat(process.env.ACCOUNT_EQUITY || '0'),
-    riskPerTrade: parseFloat(process.env.RISK_PER_TRADE || '0.01'),
+    riskPerTrade: toNumber(process.env.RISK_PER_TRADE, 0.01),
     alertDedupMinutes: parseFloat(process.env.ALERT_DEDUP_MINUTES || '60'),
     binanceCacheTTL,
     maxConcurrency: process.env.MAX_CONCURRENCY ? parseInt(process.env.MAX_CONCURRENCY, 10) : undefined,
@@ -192,6 +193,17 @@ export const CFG = {
     },
     discordRateLimit: buildDiscordRateLimit()
 };
+
+loadSettings({
+    riskPerTrade: CFG.riskPerTrade,
+});
+
+const storedRisk = getSetting('riskPerTrade', CFG.riskPerTrade);
+if (typeof storedRisk === 'number' && Number.isFinite(storedRisk) && storedRisk >= 0 && storedRisk <= 0.05) {
+    CFG.riskPerTrade = storedRisk;
+} else if (storedRisk !== CFG.riskPerTrade) {
+    setSetting('riskPerTrade', CFG.riskPerTrade);
+}
 
 export const config = {
     newsApiKey: process.env.NEWS_API_KEY,
