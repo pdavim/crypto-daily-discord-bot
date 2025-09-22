@@ -18,7 +18,14 @@ try {
 }
 
 function persist() {
-    fs.mkdirSync(path.dirname(ALERTS_FILE), { recursive: true });
+    const dir = path.dirname(ALERTS_FILE);
+    fs.mkdirSync(dir, { recursive: true });
+    if (!cache.length) {
+        if (fs.existsSync(ALERTS_FILE)) {
+            fs.rmSync(ALERTS_FILE);
+        }
+        return;
+    }
     fs.writeFileSync(ALERTS_FILE, JSON.stringify(cache, null, 2));
 }
 
@@ -35,4 +42,13 @@ export function shouldSend({ asset, tf, hash }, windowMs) {
     cache.push({ asset, tf, hash, time: now });
     persist();
     return true;
+}
+
+export function pruneOlderThan(ms) {
+    const cutoff = Date.now() - ms;
+    const before = cache.length;
+    cache = cache.filter(entry => entry.time >= cutoff);
+    if (cache.length !== before) {
+        persist();
+    }
 }

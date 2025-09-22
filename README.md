@@ -34,6 +34,11 @@ This project posts crypto analysis, charts and alerts to Discord.
   npm run once
   ```
 
+## Housekeeping
+
+- Alert deduplication entries older than seven days are pruned automatically once per day. The pruning job also runs on start-up so long-running processes and ephemeral runs stay in sync.
+- Watchlist and alert cache files are deleted when empty, keeping the `data/` directory tidy in clean environments and tests.
+
 ## Environment Variables
 
 The `.env.example` file documents each available variable with a purpose and example value.

@@ -17,7 +17,14 @@ try {
 }
 
 function persist() {
-  fs.mkdirSync(path.dirname(WATCH_FILE), { recursive: true });
+  const dir = path.dirname(WATCH_FILE);
+  fs.mkdirSync(dir, { recursive: true });
+  if (!list.length) {
+    if (fs.existsSync(WATCH_FILE)) {
+      fs.rmSync(WATCH_FILE);
+    }
+    return;
+  }
   fs.writeFileSync(WATCH_FILE, JSON.stringify(list, null, 2));
 }
 
