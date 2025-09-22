@@ -3,7 +3,20 @@ import { CFG } from './config.js';
 
 export function calcConcurrency() {
     const max = Number(CFG.maxConcurrency);
-    return Number.isInteger(max) && max > 0 ? max : os.cpus().length;
+    if (Number.isInteger(max) && max > 0) {
+        return max;
+    }
+
+    try {
+        const cpus = os.cpus();
+        if (Array.isArray(cpus) && cpus.length > 0) {
+            return cpus.length;
+        }
+    } catch (_) {
+        // Fall through to default below when os.cpus() is unavailable.
+    }
+
+    return 1;
 }
 
 export default function pLimit(concurrency) {
