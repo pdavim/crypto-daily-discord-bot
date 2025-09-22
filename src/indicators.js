@@ -322,7 +322,7 @@ export function obv(closes, volumes) {
     return out;
 }
 
-export function atr14(ohlc) {
+export function atr14(ohlc, period = 14) {
     const tr = [];
     for (let i = 0; i < ohlc.length; i++) {
         if (i === 0) { tr.push(ohlc[i].h - ohlc[i].l); continue; }
@@ -333,7 +333,8 @@ export function atr14(ohlc) {
         tr.push(Math.max(a, b, c));
     }
     // EMA ATR(14)
-    const n = 14, k = 2 / (n + 1);
+    const n = Number.isFinite(period) && period > 0 ? Math.round(period) : 14;
+    const k = 2 / (n + 1);
     const out = [];
     tr.forEach((v, i) => out.push(i ? (v * k + out[i - 1] * (1 - k)) : v));
     return out;

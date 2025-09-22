@@ -107,23 +107,24 @@ async function runOnceForAsset(asset) {
             const low = candles.map(c => c.l);
 
             const indicators = indicatorCache.get(tf) ?? (() => {
-                const ma20 = sma(close, 20);
-                const ma50 = sma(close, 50);
-                const ma100 = sma(close, 100);
-                const ma200 = sma(close, 200);
-                const rsiSeries = rsi(close, 14);
-                const macdObj = macd(close, 12, 26, 9);
-                const bb = bollinger(close, 20, 2);
-                const kc = keltnerChannel(close, high, low, 20, 2);
-                const adxSeries = adx(high, low, close, 14);
-                const atrSeries = atr14(candles);
+                const cfg = CFG.indicators;
+                const ma20 = sma(close, cfg.smaPeriods.ma20);
+                const ma50 = sma(close, cfg.smaPeriods.ma50);
+                const ma100 = sma(close, cfg.smaPeriods.ma100);
+                const ma200 = sma(close, cfg.smaPeriods.ma200);
+                const rsiSeries = rsi(close, cfg.rsiPeriod);
+                const macdObj = macd(close, cfg.macd.fast, cfg.macd.slow, cfg.macd.signal);
+                const bb = bollinger(close, cfg.bollinger.period, cfg.bollinger.multiplier);
+                const kc = keltnerChannel(close, high, low, cfg.keltner.period, cfg.keltner.multiplier);
+                const adxSeries = adx(high, low, close, cfg.adxPeriod);
+                const atrSeries = atr14(candles, cfg.atrPeriod);
                 const bbWidth = bollWidth(bb.upper, bb.lower, bb.mid);
                 const vwapSeries = vwap(high, low, close, vol);
-                const ema9Series = ema(close, 9);
-                const ema21Series = ema(close, 21);
-                const { k: stochasticK, d: stochasticD } = stochastic(high, low, close, 14, 3);
-                const willrSeries = williamsR(high, low, close, 14);
-                const cciSeries = cci(high, low, close, 20);
+                const ema9Series = ema(close, cfg.emaPeriods.ema9);
+                const ema21Series = ema(close, cfg.emaPeriods.ema21);
+                const { k: stochasticK, d: stochasticD } = stochastic(high, low, close, cfg.stochastic.kPeriod, cfg.stochastic.dPeriod);
+                const willrSeries = williamsR(high, low, close, cfg.williamsPeriod);
+                const cciSeries = cci(high, low, close, cfg.cciPeriod);
                 const obvSeries = obv(close, vol);
                 const computed = {
                     ma20,

@@ -42,6 +42,17 @@ Key variables:
 
 - `MAX_CONCURRENCY` – optional limit for parallel analyses. When omitted or invalid the bot automatically matches the number of available CPU cores; set to `1` to force sequential processing.
 - `BINANCE_CACHE_TTL_MINUTES` – cache duration for Binance price data in minutes (defaults to 10 minutes when unset or invalid). This value is available at runtime as `CFG.binanceCacheTTL` and controls the TTL of the shared Binance `LRUCache` instance.
+- Indicator overrides – the `CFG.indicators` section centralises every period and multiplier used while computing technical indicators. Environment variables such as `INDICATOR_SMA_PERIODS`, `INDICATOR_MACD_FAST` or `INDICATOR_BB_MULTIPLIER` let you customise the moving averages, MACD windows and Bollinger/Keltner multipliers without touching the codebase. See `.env.example` for concrete values.
+
+Example snippet for `.env`:
+
+```dotenv
+INDICATOR_SMA_PERIODS=10,40,100,200
+INDICATOR_MACD_FAST=8
+INDICATOR_MACD_SLOW=21
+INDICATOR_MACD_SIGNAL=5
+INDICATOR_BB_MULTIPLIER=2.5
+```
 
 ## Technical Articles
 
