@@ -4,6 +4,7 @@ import { logger, withContext } from "./logger.js";
 import { fetchWithRetry } from "./utils.js";
 import { alertCounter, alertHistogram } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
+import { limit } from "./discordRateLimit.js";
 
 export async function postAnalysis(assetKey, tf, text) {
     const url = CFG.webhookAnalysis;
@@ -23,13 +24,37 @@ export async function postAnalysis(assetKey, tf, text) {
     }
 }
 
-export async function sendDiscordAlert(text) {
-    const url = CFG.webhookAlerts ?? CFG.webhook;
+const extractChannelId = (url, fallback = "default") => {
+    if (typeof url !== "string") {
+        return fallback;
+    }
+
+    try {
+        const parsed = new URL(url);
+        const parts = parsed.pathname.split("/").filter(Boolean);
+        const webhookIndex = parts.indexOf("webhooks");
+        if (webhookIndex !== -1 && parts.length > webhookIndex + 1) {
+            return parts[webhookIndex + 1];
+        }
+    } catch (_) {
+        // Ignore parsing errors and fall through to default fallback below.
+    }
+
+    return fallback;
+};
+
+export async function sendDiscordAlert(text, options = {}) {
+    const url = options.webhookUrl ?? CFG.webhookAlerts ?? CFG.webhook;
     const log = withContext(logger);
+    const providedChannelId = typeof options.channelId === "string" && options.channelId.trim() !== ""
+        ? options.channelId
+        : undefined;
+    const channelId = providedChannelId ?? extractChannelId(url);
     alertCounter.inc();
     const end = alertHistogram.startTimer();
 
     try {
+        await limit.consume(channelId);
         await fetchWithRetry(() => axios.post(url, { content: text }), { retries: 2 });
         end();
         return true;
