@@ -58,6 +58,8 @@ Common commands:
 
 - Alert deduplication entries older than seven days are pruned automatically once per day. The pruning job also runs on start-up so long-running processes and ephemeral runs stay in sync.
 - Watchlist and alert cache files are deleted when empty, keeping the `data/` directory tidy in clean environments and tests.
+- Weekly performance snapshots are persisted to `reports/weekly.json`, capturing seven-day returns and runtime metrics without posting to Discord.
+- On the first day of each month (01h in the configured timezone) the bot compiles a performance chart using the stored snapshots and delivers the report via the monthly webhook.
 
 ## Environment Variables
 
@@ -68,6 +70,7 @@ Key variables:
 - `MAX_CONCURRENCY` – optional limit for parallel analyses. When omitted or invalid the bot automatically matches the number of available CPU cores; set to `1` to force sequential processing.
 - `BINANCE_CACHE_TTL_MINUTES` – cache duration for Binance price data in minutes (defaults to 10 minutes when unset or invalid). This value is available at runtime as `CFG.binanceCacheTTL` and controls the TTL of the shared Binance `LRUCache` instance.
 - Indicator overrides – the `CFG.indicators` section centralises every period and multiplier used while computing technical indicators. Environment variables such as `INDICATOR_SMA_PERIODS`, `INDICATOR_MACD_FAST` or `INDICATOR_BB_MULTIPLIER` let you customise the moving averages, MACD windows and Bollinger/Keltner multipliers without touching the codebase. See `.env.example` for concrete values.
+- `DISCORD_WEBHOOK_MONTHLY` – optional webhook URL used to deliver the monthly performance chart. Falls back to `webhookReports`/`webhook` when unset.
 
 Example snippet for `.env`:
 

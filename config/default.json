@@ -4,6 +4,7 @@
   "webhookReports": null,
   "webhookDaily": null,
   "webhookAnalysis": null,
+  "webhookMonthly": null,
   "botToken": null,
   "channelChartsId": null,
   "webhooks": {
