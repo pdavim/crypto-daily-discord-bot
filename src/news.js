@@ -6,6 +6,7 @@ import { callOpenRouter } from "./ai.js";
 import { fetchWithRetry } from "./utils.js";
 import { logger, withContext } from "./logger.js";
 import { filterFreshNewsItems, markNewsItemsAsSeen } from "./newsCache.js";
+import { classifySentimentsLocal, normalizeSentiment, clampSentiment } from "./sentiment.js";
 
 const NEWS_CACHE_PATH = new URL("../data/news-cache.json", import.meta.url);
 const NEWS_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -366,11 +367,74 @@ function sortByRank(a, b) {
     return bw - aw;
 }
 
+export function computeWeightedSentiment(items, now = Date.now()) {
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    for (const item of items) {
+        if (!item) {
+            continue;
+        }
+        const sentiment = clampSentiment(typeof item.sentiment === "number" ? item.sentiment : Number(item.sentiment));
+        if (!Number.isFinite(sentiment)) {
+            continue;
+        }
+        const publishedAt = item.publishedAt instanceof Date ? item.publishedAt : new Date(item.publishedAt);
+        if (!(publishedAt instanceof Date) || Number.isNaN(publishedAt.getTime())) {
+            continue;
+        }
+        const ageHours = Math.max(0, (now - publishedAt.getTime()) / (60 * 60 * 1000));
+        const recencyWeight = Math.exp(-ageHours / 24);
+        const domain = getDomain(item.url);
+        const domainWeight = REPUTABLE_DOMAINS.includes(domain) ? 1.2 : 1;
+        const weight = recencyWeight * domainWeight;
+        if (!Number.isFinite(weight) || weight <= 0) {
+            continue;
+        }
+        weightedSum += sentiment * weight;
+        totalWeight += weight;
+    }
+
+    if (totalWeight <= 0) {
+        return 0;
+    }
+    const avg = weightedSum / totalWeight;
+    return clampSentiment(avg);
+}
+
 async function classifySentiments(items) {
     const titles = items.map(i => i.title);
     if (!titles.length) return [];
-    if (CFG.openrouterApiKey) {
-        const log = withContext(logger);
+    const provider = (CFG.sentimentProvider || "tfjs").toLowerCase();
+    const log = withContext(logger);
+
+    if (provider === "api" && CFG.sentimentApiUrl) {
+        try {
+            const headers = { "content-type": "application/json" };
+            if (CFG.sentimentApiKey) {
+                headers.authorization = `Bearer ${CFG.sentimentApiKey}`;
+            }
+            const response = await axios.post(CFG.sentimentApiUrl, { inputs: titles }, { headers, timeout: 15000 });
+            const data = response?.data;
+            const arr = Array.isArray(data?.sentiments)
+                ? data.sentiments
+                : Array.isArray(data)
+                    ? data
+                    : Array.isArray(data?.scores)
+                        ? data.scores
+                        : null;
+            if (Array.isArray(arr)) {
+                const normalized = arr.map((value) => normalizeSentiment(value));
+                if (normalized.some((value) => Number.isFinite(value))) {
+                    return normalized.map(clampSentiment);
+                }
+            }
+        } catch (err) {
+            log.error({ fn: "classifySentiments", err }, "Sentiment classification via API failed");
+        }
+    }
+
+    if (provider === "openrouter" && CFG.openrouterApiKey) {
         try {
             const prompt = `Classify the sentiment of each headline as -1 for negative, 0 for neutral, and 1 for positive. Return a JSON array of numbers in the same order.\n` +
                 titles.map(t => `- ${t}`).join("\n");
@@ -381,12 +445,22 @@ async function classifySentiments(items) {
             const resp = await callOpenRouter(messages);
             const arr = JSON.parse(resp);
             if (Array.isArray(arr)) {
-                return arr.map(n => Math.max(-1, Math.min(1, Number(n) || 0)));
+                return arr.map((n) => clampSentiment(Number(n)));
             }
         } catch (err) {
-              log.error({ fn: 'classifySentiments', err }, "Sentiment classification via OpenRouter failed");
+            log.error({ fn: "classifySentiments", err }, "Sentiment classification via OpenRouter failed");
         }
     }
+
+    try {
+        const localScores = await classifySentimentsLocal(titles);
+        if (Array.isArray(localScores) && localScores.length === titles.length) {
+            return localScores.map((score) => clampSentiment(score));
+        }
+    } catch (err) {
+        log.error({ fn: "classifySentiments", err }, "Local sentiment classification failed");
+    }
+
     const positive = ["up", "surge", "rally", "gain", "bull", "rise", "soar", "profit", "positive"];
     const negative = ["down", "drop", "fall", "crash", "bear", "decline", "plunge", "loss", "negative"];
     return titles.map(t => {
@@ -402,7 +476,7 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
     const log = withContext(logger, { asset: symbol });
     log.info({ fn: "getAssetNews" }, `Fetching news for ${symbol}`);
     if (!symbol) {
-        return { items: [], summary: "", avgSentiment: 0 };
+        return { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };
     }
 
     const now = Date.now();
@@ -411,6 +485,16 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
     try {
         const cached = await getCachedNews(cacheKey, now, log);
         if (cached) {
+            if (Array.isArray(cached.items) && cached.items.length && typeof cached.weightedSentiment !== "number") {
+                const reconstructed = cached.items.map((item) => ({
+                    ...item,
+                    publishedAt: new Date(item.publishedAt),
+                }));
+                const computedWeighted = computeWeightedSentiment(reconstructed);
+                if (Number.isFinite(computedWeighted)) {
+                    cached.weightedSentiment = computedWeighted;
+                }
+            }
             return cached;
         }
     } catch (err) {
@@ -426,7 +510,7 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
         let combined = [...serpItems, ...rssItems].filter((item) => item && item.title && item.url);
 
         if (!combined.length) {
-            const emptyResult = { items: [], summary: "", avgSentiment: 0 };
+            const emptyResult = { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };
             await setCachedNews(cacheKey, emptyResult, now, log);
             return emptyResult;
         }
@@ -442,14 +526,18 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
         filtered = filtered.slice(0, limit);
 
         if (!filtered.length) {
-            const emptyResult = { items: [], summary: "", avgSentiment: 0 };
+            const emptyResult = { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };
             await setCachedNews(cacheKey, emptyResult, now, log);
             return emptyResult;
         }
 
         const sentiments = await classifySentiments(filtered);
-        const avgSentiment = sentiments.length ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length : 0;
-        filtered = filtered.map((item, idx) => ({ ...item, sentiment: sentiments[idx] ?? 0 }));
+        const normalizedSentiments = filtered.map((_, idx) => clampSentiment(sentiments[idx] ?? 0));
+        const avgSentiment = normalizedSentiments.length
+            ? normalizedSentiments.reduce((a, b) => a + b, 0) / normalizedSentiments.length
+            : 0;
+        filtered = filtered.map((item, idx) => ({ ...item, sentiment: normalizedSentiments[idx] ?? 0 }));
+        const weightedSentiment = computeWeightedSentiment(filtered, now);
 
         let summary = "";
         if (CFG.openrouterApiKey && filtered.length) {
@@ -476,11 +564,11 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
             publishedAt: item.publishedAt.toISOString(),
         }));
 
-        const result = { items: normalized, summary: summary.trim(), avgSentiment };
+        const result = { items: normalized, summary: summary.trim(), avgSentiment: clampSentiment(avgSentiment), weightedSentiment };
         await setCachedNews(cacheKey, result, now, log);
         return result;
     } catch (error) {
         log.error({ fn: "getAssetNews", err: error }, "Error fetching asset news");
-        return { items: [], summary: "", avgSentiment: 0 };
+        return { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };
     }
 }
