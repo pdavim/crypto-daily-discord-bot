@@ -1,5 +1,6 @@
 import axios from "axios";
 import Parser from "rss-parser";
+import translate from "@vitalets/google-translate-api";
 import { readFile, writeFile } from "node:fs/promises";
 import { config, CFG } from "./config.js";
 import { callOpenRouter } from "./ai.js";
@@ -146,6 +147,73 @@ function normalizeSymbolList(value) {
 function normalizeKeywordList(value) {
     const keywords = normalizeList(value, (v) => v.toLowerCase());
     return keywords;
+}
+
+async function translateNewsItems(items, log = withContext(logger)) {
+    if (!Array.isArray(items) || !items.length) {
+        return items;
+    }
+
+    const cache = new Map();
+
+    const translateText = async (text, to) => {
+        if (!text || typeof text !== "string") {
+            return { text: "" };
+        }
+        const normalized = text.trim();
+        if (!normalized) {
+            return { text: "" };
+        }
+        const key = `${to}:${normalized}`;
+        if (cache.has(key)) {
+            return cache.get(key);
+        }
+        try {
+            const result = await translate(normalized, { to });
+            cache.set(key, result);
+            return result;
+        } catch (err) {
+            log.warn({ fn: "translateNewsItems", to, err }, "Failed to translate text");
+            const fallback = { text: normalized };
+            cache.set(key, fallback);
+            return fallback;
+        }
+    };
+
+    const translated = [];
+    for (const item of items) {
+        const title = typeof item?.title === "string" ? item.title : "";
+        const snippet = typeof item?.snippet === "string" ? item.snippet : "";
+
+        const titleEnResult = title ? await translateText(title, "en") : { text: "" };
+        const titlePtResult = title ? await translateText(title, "pt") : { text: "" };
+        const snippetEnResult = snippet ? await translateText(snippet, "en") : { text: "" };
+        const snippetPtResult = snippet ? await translateText(snippet, "pt") : { text: "" };
+
+        let originalLanguage = titleEnResult?.from?.language?.iso
+            || snippetEnResult?.from?.language?.iso
+            || "unknown";
+        if (!originalLanguage || originalLanguage === "auto") {
+            originalLanguage = "unknown";
+        }
+
+        translated.push({
+            ...item,
+            originalLanguage,
+            translations: {
+                title: {
+                    en: titleEnResult?.text ?? title,
+                    pt: titlePtResult?.text ?? title,
+                },
+                snippet: {
+                    en: snippetEnResult?.text ?? snippet,
+                    pt: snippetPtResult?.text ?? snippet,
+                },
+            },
+        });
+    }
+
+    return translated;
 }
 
 function getRssSourceEntries(symbol) {
@@ -537,6 +605,7 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
             ? normalizedSentiments.reduce((a, b) => a + b, 0) / normalizedSentiments.length
             : 0;
         filtered = filtered.map((item, idx) => ({ ...item, sentiment: normalizedSentiments[idx] ?? 0 }));
+        filtered = await translateNewsItems(filtered, log);
         const weightedSentiment = computeWeightedSentiment(filtered, now);
 
         let summary = "";
