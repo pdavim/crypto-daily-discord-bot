@@ -1,4 +1,78 @@
+import puppeteer from "puppeteer";
 import { semaforo, scoreHeuristic, trendFromMAs, sparkline, parabolicSAR, volumeDivergence } from "./indicators.js";
+
+let browserPromise;
+
+async function getBrowser() {
+    if (!browserPromise) {
+        browserPromise = puppeteer.launch({
+            headless: "new",
+            args: ["--no-sandbox", "--disable-setuid-sandbox"]
+        });
+        const shutdown = async () => {
+            try {
+                const browser = await browserPromise;
+                await browser.close();
+            } catch (_) {
+                // Ignore shutdown errors.
+            }
+        };
+        process.once("exit", shutdown);
+    }
+    return browserPromise;
+}
+
+function escapeHtml(value = "") {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function summaryToHtml(summary, { assetKey, timeframe } = {}) {
+    const titleParts = [];
+    if (assetKey) titleParts.push(assetKey);
+    if (timeframe) titleParts.push(timeframe);
+    const title = titleParts.join(" • ") || "Análise";
+    const escapedSummary = escapeHtml(summary ?? "");
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <title>${escapeHtml(title)}</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 24px; }
+        h1 { font-size: 20px; margin-bottom: 16px; }
+        pre { background: #f8f9fb; padding: 16px; border-radius: 8px; white-space: pre-wrap; font-size: 12px; line-height: 1.5; }
+    </style>
+ </head>
+ <body>
+    <h1>${escapeHtml(title)}</h1>
+    <pre>${escapedSummary}</pre>
+ </body>
+</html>`;
+}
+
+export async function buildSummaryPdf(summary, options = {}) {
+    if (!summary) {
+        throw new Error("Cannot build PDF from empty summary");
+    }
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+    try {
+        await page.setContent(summaryToHtml(summary, options), { waitUntil: "domcontentloaded" });
+        const pdf = await page.pdf({
+            format: "A4",
+            printBackground: true,
+            margin: { top: "20mm", bottom: "20mm", left: "15mm", right: "15mm" }
+        });
+        return pdf;
+    } finally {
+        await page.close();
+    }
+}
 
 export function pct(v) { return v == null ? '—' : `${(v * 100).toFixed(2)}%`; }
 export function num(v, p = 4) { return v == null ? '—' : `${(+v).toFixed(p)}`; }
