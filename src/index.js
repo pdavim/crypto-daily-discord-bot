@@ -258,10 +258,10 @@ async function runOnceForAsset(asset, options = {}) {
     if (snapshots["4h"]) {
         summary = buildSummary({ assetKey: asset.key, snapshots });
         if (enableAnalysis && shouldPostAnalysis) {
-            const sent = await postAnalysis(asset.key, "4h", summary);
-            if (!sent) {
+            const analysisResult = await postAnalysis(asset.key, "4h", summary);
+            if (!analysisResult?.posted) {
                 const log = withContext(logger, { asset: asset.key, timeframe: '4h' });
-                log.warn({ fn: 'runOnceForAsset' }, 'report upload failed');
+                log.warn({ fn: 'runOnceForAsset', reportPath: analysisResult?.path }, 'report upload failed');
             }
         }
     }
@@ -315,12 +315,12 @@ async function runDailyAnalysis() {
                 log.info({ fn: 'runDailyAnalysis' }, 'Skipping daily analysis post (duplicate hash)');
                 return;
             }
-            const sent = await postAnalysis("DAILY", "1d", finalReport);
-            if (sent) {
+            const analysisResult = await postAnalysis("DAILY", "1d", finalReport);
+            if (analysisResult?.posted) {
                 updateAlertHash(DAILY_ALERT_SCOPE, DAILY_ALERT_KEY, hash);
                 saveStore();
             } else {
-                log.warn({ fn: 'runDailyAnalysis' }, 'report upload failed');
+                log.warn({ fn: 'runDailyAnalysis', reportPath: analysisResult?.path }, 'report upload failed');
             }
         }
     } catch (e) {
@@ -378,12 +378,12 @@ async function runWeeklyAnalysis() {
                 log.info({ fn: 'runWeeklyAnalysis' }, 'Skipping weekly analysis post (duplicate hash)');
                 return;
             }
-            const sent = await postAnalysis("WEEKLY", "1w", finalReport);
-            if (sent) {
+            const analysisResult = await postAnalysis("WEEKLY", "1w", finalReport);
+            if (analysisResult?.posted) {
                 updateAlertHash(WEEKLY_ALERT_SCOPE, WEEKLY_ALERT_KEY, hash);
                 saveStore();
             } else {
-                log.warn({ fn: 'runWeeklyAnalysis' }, 'report upload failed');
+                log.warn({ fn: 'runWeeklyAnalysis', reportPath: analysisResult?.path }, 'report upload failed');
             }
         }
     } catch (e) {
