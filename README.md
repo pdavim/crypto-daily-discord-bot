@@ -34,6 +34,20 @@ This project posts crypto analysis, charts and alerts to Discord.
   npm run once
   ```
 
+## Configuration CLI
+
+Manage `config/custom.json` without editing files manually using the bundled helper:
+
+```bash
+npm exec config-cli list
+```
+
+Common commands:
+
+- `npm exec config-cli list` – print the merged configuration as formatted JSON.
+- `npm exec config-cli get alerts.modules.rsi` – inspect a nested value using dot notation.
+- `npm exec config-cli set alerts.modules.rsi false` – persist a value to `config/custom.json` (numbers, booleans and JSON strings are parsed automatically).
+
 ## Discord Commands
 
 - `/chart` – gera um gráfico para o ativo e timeframe informados.
