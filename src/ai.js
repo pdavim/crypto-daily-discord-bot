@@ -180,7 +180,10 @@ export async function runAgent() {
             const ret7d = calcReturn(dailyCloses, 7);
             const ret30d = calcReturn(dailyCloses, 30);
 
-            const { summary: newsSummary } = await getAssetNews({ symbol: key });
+            const { summary: newsSummary, weightedSentiment } = await getAssetNews({ symbol: key });
+            const sentimentLabel = Number.isFinite(weightedSentiment)
+                ? weightedSentiment.toFixed(2)
+                : '0.00';
             const webSnips = await searchWeb(key);
 
             const baseReport = [
@@ -196,7 +199,8 @@ export async function runAgent() {
                 `- Trend from MAs: ${trendLabel}`,
                 `- Heuristic Score: ${heuristic?.toFixed(2)} Semaforo: ${semaf}`,
                 `- Cross Up: ${crossUpSignal} Cross Down: ${crossDownSignal}`,
-                `- Sparkline: ${spark}`
+                `- Sparkline: ${spark}`,
+                `- Weighted news sentiment: ${sentimentLabel}`
             ];
 
             const prompt = `Asset: ${key}\n` +
@@ -213,6 +217,7 @@ export async function runAgent() {
                 `Cross Up: ${crossUpSignal} Cross Down: ${crossDownSignal}\n` +
                 `Sparkline: ${spark}\n` +
                 `News: ${newsSummary}\n` +
+                `Weighted news sentiment: ${sentimentLabel}\n` +
                 `Web: ${webSnips.join(' | ')}\n` +
                 `Macro: ${macro}\n` +
                 `Provide a detailed analysis of the asset's current market position, social hypes, and potential future movements.\n` +
@@ -235,6 +240,7 @@ export async function runAgent() {
                     const partial = [
                         ...baseReport,
                         `- News: ${newsSummary || 'n/a'}`,
+                        `- Weighted sentiment: ${sentimentLabel}`,
                         `- Web: ${webSnips.slice(0, 2).join(' | ') || 'n/a'}`,
                         `- Macro: ${macro || 'n/a'}`,
                         `- Verdict: ${fallbackVerdict({ ma20, ma50, rsi14 })}`,
@@ -282,6 +288,7 @@ export async function runAgent() {
                 `**Alert Status:**`,
                 ...alerts.map(alert => `- ${formatAlertMessage(alert)}`),
                 `- News: ${newsSummary || 'n/a'}`,
+                `- Weighted sentiment: ${sentimentLabel}`,
                 `- Web: ${webSnips.slice(0, 2).join(' | ') || 'n/a'}`,
                 `- Macro: ${macro || 'n/a'}`,
                 `- Verdict: ${verdict.trim()}`,

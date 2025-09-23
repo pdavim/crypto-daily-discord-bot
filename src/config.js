@@ -360,6 +360,9 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.analysisFrequency = process.env.ANALYSIS_FREQUENCY ?? nextCFG.analysisFrequency ?? 'hourly';
     nextCFG.openrouterApiKey = process.env.OPENROUTER_API_KEY ?? nextCFG.openrouterApiKey ?? null;
     nextCFG.openrouterModel = process.env.OPENROUTER_MODEL ?? nextCFG.openrouterModel ?? 'openrouter/sonoma-dusk-alpha';
+    nextCFG.sentimentProvider = (process.env.SENTIMENT_PROVIDER ?? nextCFG.sentimentProvider ?? 'tfjs').toLowerCase();
+    nextCFG.sentimentApiUrl = process.env.SENTIMENT_API_URL ?? nextCFG.sentimentApiUrl ?? null;
+    nextCFG.sentimentApiKey = process.env.SENTIMENT_API_KEY ?? nextCFG.sentimentApiKey ?? null;
     nextCFG.enableCharts = toBoolean(process.env.ENABLE_CHARTS, nextCFG.enableCharts ?? true);
     nextCFG.enableAlerts = toBoolean(process.env.ENABLE_ALERTS, nextCFG.enableAlerts ?? true);
     nextCFG.enableAnalysis = toBoolean(process.env.ENABLE_ANALYSIS, nextCFG.enableAnalysis ?? true);
