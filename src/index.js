@@ -424,8 +424,20 @@ if (!ONCE) {
     });
     const scheduleLog = withContext(logger);
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    cron.schedule(`0 ${CFG.dailyReportHour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
-    scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled daily at ${CFG.dailyReportHour}h (TZ=${CFG.tz})`);
+    const rawDailyReportHours = Array.isArray(CFG.dailyReportHours)
+        ? CFG.dailyReportHours
+        : Array.isArray(CFG.dailyReportHour)
+            ? CFG.dailyReportHour
+            : [CFG.dailyReportHour];
+    const dailyReportHours = Array.from(new Set(
+        rawDailyReportHours
+            .map((hour) => Number.parseInt(hour, 10))
+            .filter((hour) => Number.isInteger(hour) && hour >= 0 && hour <= 23)
+    )).sort((a, b) => a - b);
+    for (const hour of dailyReportHours) {
+        cron.schedule(`0 ${hour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
+        scheduleLog.info({ fn: 'schedule', channel: 'analysis', hour }, `⏱️ Scheduled daily at ${hour}h (TZ=${CFG.tz})`);
+    }
     cron.schedule('0 18 * * 0', runWeeklyAnalysis, { timezone: CFG.tz });
     scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled weekly at 18h Sunday (TZ=${CFG.tz})`);
     cron.schedule('0 0 * * 0', () => {

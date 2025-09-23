@@ -9,10 +9,33 @@ import { limit } from "./discordRateLimit.js";
 import { buildSummaryPdf } from "./reporter.js";
 
 export async function postAnalysis(assetKey, tf, text) {
-    const url = CFG.webhookAnalysis;
-    const log = withContext(logger, { asset: assetKey, timeframe: tf });
+    const normalizedAssetKey = typeof assetKey === 'string' ? assetKey.toUpperCase() : undefined;
+    const candidateKeys = [];
+    if (normalizedAssetKey) {
+        candidateKeys.push(`webhookReports_${normalizedAssetKey}`);
+        if (normalizedAssetKey === 'DAILY') {
+            candidateKeys.push('webhookDaily');
+        }
+    }
+    candidateKeys.push('webhookReports');
+    candidateKeys.push('webhookAnalysis');
+    if (normalizedAssetKey !== 'DAILY') {
+        candidateKeys.push('webhookDaily');
+    }
+    const filteredCandidates = candidateKeys.filter((key, idx) => key && candidateKeys.indexOf(key) === idx);
+    let resolvedConfigKey;
+    let url;
+    for (const key of filteredCandidates) {
+        if (CFG[key]) {
+            resolvedConfigKey = key;
+            url = CFG[key];
+            break;
+        }
+    }
+
+    const log = withContext(logger, { asset: assetKey, timeframe: tf, webhookConfigKey: resolvedConfigKey });
     if (!url) {
-        log.warn({ fn: 'postAnalysis' }, "DISCORD_WEBHOOK_ANALYSIS_URL not configured—skipping post.");
+        log.warn({ fn: 'postAnalysis', tried: filteredCandidates }, 'No Discord webhook configured for analysis posts—skipping post.');
         return false;
     }
 
