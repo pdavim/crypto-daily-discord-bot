@@ -1,8 +1,18 @@
 import axios from "axios";
+import Parser from "rss-parser";
+import { readFile, writeFile } from "node:fs/promises";
 import { config, CFG } from "./config.js";
 import { callOpenRouter } from "./ai.js";
 import { fetchWithRetry } from "./utils.js";
 import { logger, withContext } from "./logger.js";
+
+const NEWS_CACHE_PATH = new URL("../data/news-cache.json", import.meta.url);
+const NEWS_CACHE_TTL_MS = 60 * 60 * 1000;
+const rssParser = new Parser({ timeout: 15000 });
+
+let newsCache = {};
+let cacheLoaded = false;
+let cacheLoadPromise;
 
 const REPUTABLE_DOMAINS = [
     "coindesk.com",
@@ -48,6 +58,305 @@ function dedupeByTrigram(items) {
     });
 }
 
+function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+async function ensureNewsCacheLoaded(log = withContext(logger)) {
+    if (cacheLoaded) {
+        return;
+    }
+    if (!cacheLoadPromise) {
+        cacheLoadPromise = (async () => {
+            try {
+                const raw = await readFile(NEWS_CACHE_PATH, "utf8");
+                const parsed = JSON.parse(raw);
+                newsCache = isPlainObject(parsed) ? parsed : {};
+            } catch (err) {
+                if (err?.code !== "ENOENT") {
+                    log.warn({ fn: "ensureNewsCacheLoaded", err }, "Failed to load news cache; starting with empty cache");
+                }
+                newsCache = {};
+            }
+            cacheLoaded = true;
+        })();
+    }
+    await cacheLoadPromise;
+}
+
+async function persistNewsCache(log = withContext(logger)) {
+    try {
+        await writeFile(NEWS_CACHE_PATH, JSON.stringify(newsCache, null, 2));
+    } catch (err) {
+        log.error({ fn: "persistNewsCache", err }, "Failed to persist news cache");
+    }
+}
+
+function cloneResult(data) {
+    return JSON.parse(JSON.stringify(data));
+}
+
+async function getCachedNews(cacheKey, now, log) {
+    await ensureNewsCacheLoaded(log);
+    const entry = newsCache?.[cacheKey];
+    if (!entry) {
+        return null;
+    }
+    if (typeof entry.timestamp !== "number" || now - entry.timestamp > NEWS_CACHE_TTL_MS) {
+        delete newsCache[cacheKey];
+        await persistNewsCache(log);
+        return null;
+    }
+    return cloneResult(entry.data);
+}
+
+async function setCachedNews(cacheKey, data, now, log) {
+    await ensureNewsCacheLoaded(log);
+    newsCache[cacheKey] = {
+        timestamp: now,
+        data: cloneResult(data),
+    };
+    await persistNewsCache(log);
+}
+
+function getCacheKey(symbol, lookbackHours, limit) {
+    return `${(symbol || "").toLowerCase()}:${lookbackHours}:${limit}`;
+}
+
+function normalizeList(value, transform = (v) => v) {
+    if (!value && value !== 0) return null;
+    const list = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [value];
+    const normalized = list
+        .map((item) => transform(String(item).trim()))
+        .filter(Boolean);
+    if (!normalized.length) {
+        return null;
+    }
+    normalized.sort((a, b) => a.localeCompare(b));
+    return normalized;
+}
+
+function normalizeSymbolList(value) {
+    const symbols = normalizeList(value, (v) => v.toUpperCase());
+    return symbols;
+}
+
+function normalizeKeywordList(value) {
+    const keywords = normalizeList(value, (v) => v.toLowerCase());
+    return keywords;
+}
+
+function getRssSourceEntries(symbol) {
+    const sources = CFG.rssSources;
+    if (!sources) {
+        return [];
+    }
+    const symbolUpper = symbol ? symbol.toUpperCase() : "";
+    const results = [];
+
+    const pushEntry = (entry) => {
+        if (!entry && entry !== 0) {
+            return;
+        }
+        if (Array.isArray(entry)) {
+            for (const value of entry) {
+                pushEntry(value);
+            }
+            return;
+        }
+        if (typeof entry === "string") {
+            const trimmed = entry.trim();
+            if (trimmed) {
+                results.push({ url: trimmed });
+            }
+            return;
+        }
+        if (!isPlainObject(entry)) {
+            return;
+        }
+
+        const url = entry.url || entry.href || entry.link;
+        if (!url) {
+            return;
+        }
+
+        const includeSymbols = normalizeSymbolList(entry.symbols ?? entry.includeSymbols);
+        if (includeSymbols && includeSymbols.length && symbolUpper) {
+            if (!includeSymbols.includes(symbolUpper) && !includeSymbols.includes("*")) {
+                return;
+            }
+        }
+
+        const excludeSymbols = normalizeSymbolList(entry.excludeSymbols);
+        if (excludeSymbols && excludeSymbols.length && symbolUpper && excludeSymbols.includes(symbolUpper)) {
+            return;
+        }
+
+        const includeKeywords = normalizeKeywordList(entry.keywords ?? entry.includeKeywords);
+        const excludeKeywords = normalizeKeywordList(entry.excludeKeywords);
+
+        results.push({
+            url,
+            includeKeywords,
+            excludeKeywords,
+            name: entry.name,
+        });
+    };
+
+    if (Array.isArray(sources) || typeof sources === "string") {
+        pushEntry(sources);
+    } else if (isPlainObject(sources)) {
+        const candidates = [];
+        if (symbolUpper && sources[symbolUpper]) {
+            candidates.push(sources[symbolUpper]);
+        }
+        if (symbol && sources[symbol]) {
+            candidates.push(sources[symbol]);
+        }
+        if (sources["*"]) {
+            candidates.push(sources["*"]);
+        }
+        if (sources.default) {
+            candidates.push(sources.default);
+        }
+        if (!candidates.length) {
+            for (const value of Object.values(sources)) {
+                pushEntry(value);
+            }
+        } else {
+            for (const value of candidates) {
+                pushEntry(value);
+            }
+        }
+    }
+
+    const seen = new Set();
+    return results.filter((entry) => {
+        const key = JSON.stringify([
+            entry.url,
+            entry.name,
+            entry.includeKeywords ?? [],
+            entry.excludeKeywords ?? [],
+        ]);
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+
+async function fetchSerpApiNews({ symbol, lookbackHours, limit, log }) {
+    if (!config.serpapiApiKey) {
+        return [];
+    }
+    try {
+        const params = {
+            engine: "google_news",
+            q: symbol,
+            tbs: "qdr:d",
+            api_key: config.serpapiApiKey,
+            num: limit * 2,
+        };
+        const resp = await fetchWithRetry(() => axios.get("https://serpapi.com/search", { params }));
+        const now = Date.now();
+        const cutoff = now - lookbackHours * 60 * 60 * 1000;
+        return (resp.data.news_results || [])
+            .map((n) => {
+                let date = parseDate(n.date);
+                if (!date || Number.isNaN(date.getTime())) {
+                    date = new Date();
+                }
+                return {
+                    title: n.title,
+                    source: n.source || getDomain(n.link),
+                    publishedAt: date,
+                    url: n.link,
+                    snippet: n.snippet || "",
+                };
+            })
+            .filter((item) => item && item.publishedAt.getTime() >= cutoff);
+    } catch (err) {
+        log.error({ fn: "fetchSerpApiNews", err }, "Failed to fetch SerpAPI news");
+        return [];
+    }
+}
+
+function keywordsMatch(text, includeKeywords, excludeKeywords) {
+    if (!text) {
+        return !includeKeywords || includeKeywords.length === 0;
+    }
+    const normalized = text.toLowerCase();
+    if (includeKeywords && includeKeywords.length && !includeKeywords.some((keyword) => normalized.includes(keyword))) {
+        return false;
+    }
+    if (excludeKeywords && excludeKeywords.some((keyword) => normalized.includes(keyword))) {
+        return false;
+    }
+    return true;
+}
+
+async function fetchRssNews({ symbol, lookbackHours, limit, log }) {
+    const sources = getRssSourceEntries(symbol);
+    if (!sources.length) {
+        return [];
+    }
+    const cutoff = Date.now() - lookbackHours * 60 * 60 * 1000;
+    const items = [];
+    const seenUrls = new Set();
+
+    for (const source of sources) {
+        const { url } = source;
+        if (!url) {
+            continue;
+        }
+        try {
+            const feed = await fetchWithRetry(() => rssParser.parseURL(url));
+            const sourceName = source.name || feed?.title || getDomain(url);
+            for (const item of feed?.items ?? []) {
+                const title = item?.title?.trim();
+                if (!title) {
+                    continue;
+                }
+                const link = item?.link || item?.guid || item?.id;
+                if (!link || seenUrls.has(link)) {
+                    continue;
+                }
+                const dateStr = item?.isoDate || item?.pubDate || item?.pubdate || item?.date || item?.updated;
+                const publishedAt = parseDate(dateStr);
+                if (!publishedAt || Number.isNaN(publishedAt.getTime())) {
+                    continue;
+                }
+                if (publishedAt.getTime() < cutoff) {
+                    continue;
+                }
+                const snippetSource = item?.contentSnippet || item?.summary || (typeof item?.content === "string" ? item.content : "");
+                const snippet = typeof snippetSource === "string" ? snippetSource.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : "";
+                const keywordText = `${title} ${snippet}`.trim();
+                if (!keywordsMatch(keywordText, source.includeKeywords, source.excludeKeywords)) {
+                    continue;
+                }
+                seenUrls.add(link);
+                items.push({
+                    title,
+                    source: sourceName || getDomain(link),
+                    publishedAt,
+                    url: link,
+                    snippet,
+                });
+            }
+        } catch (err) {
+            log.error({ fn: "fetchRssNews", url, err }, "Failed to fetch RSS feed");
+        }
+    }
+
+    items.sort((a, b) => b.publishedAt - a.publishedAt);
+    const numericLimit = Number(limit);
+    const effectiveLimit = Number.isFinite(numericLimit) && numericLimit > 0 ? numericLimit : 6;
+    const maxItems = Math.max(effectiveLimit * 4, effectiveLimit);
+    return items.slice(0, maxItems);
+}
+
 function sortByRank(a, b) {
     const diff = b.publishedAt - a.publishedAt;
     if (diff !== 0) return diff;
@@ -90,69 +399,77 @@ async function classifySentiments(items) {
 
 export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
     const log = withContext(logger, { asset: symbol });
-    log.info({ fn: 'getAssetNews' }, `Fetching news for ${symbol}`);
-    if (!config.serpapiApiKey || !symbol) {
+    log.info({ fn: "getAssetNews" }, `Fetching news for ${symbol}`);
+    if (!symbol) {
         return { items: [], summary: "", avgSentiment: 0 };
     }
-    try {
-        const params = {
-            engine: "google_news",
-            q: symbol,
-            tbs: "qdr:d",
-            api_key: config.serpapiApiKey,
-            num: limit * 2,
-        };
-        const resp = await fetchWithRetry(() => axios.get("https://serpapi.com/search", { params }));
-        const now = Date.now();
-        const cutoff = now - lookbackHours * 60 * 60 * 1000;
-        let items = (resp.data.news_results || []).map(n => {
-            const date = parseDate(n.date);
-            return {
-                title: n.title,
-                source: n.source || getDomain(n.link),
-                publishedAt: date ? date : new Date(),
-                url: n.link,
-                snippet: n.snippet || "",
-            };
-        }).filter(n => n.publishedAt.getTime() >= cutoff);
 
-        let filtered = items.filter(n => REPUTABLE_DOMAINS.includes(getDomain(n.url)));
-        if (filtered.length < 2) filtered = items;
+    const now = Date.now();
+    const cacheKey = getCacheKey(symbol, lookbackHours, limit);
+
+    try {
+        const cached = await getCachedNews(cacheKey, now, log);
+        if (cached) {
+            return cached;
+        }
+    } catch (err) {
+        log.warn({ fn: "getAssetNews", err }, "Failed to read news cache; continuing without cache");
+    }
+
+    try {
+        const [serpItems, rssItems] = await Promise.all([
+            fetchSerpApiNews({ symbol, lookbackHours, limit, log }),
+            fetchRssNews({ symbol, lookbackHours, limit, log }),
+        ]);
+
+        let combined = [...serpItems, ...rssItems].filter((item) => item && item.title && item.url);
+
+        if (!combined.length) {
+            const emptyResult = { items: [], summary: "", avgSentiment: 0 };
+            await setCachedNews(cacheKey, emptyResult, now, log);
+            return emptyResult;
+        }
+
+        let filtered = combined.filter((item) => REPUTABLE_DOMAINS.includes(getDomain(item.url)));
+        if (filtered.length < 2) {
+            filtered = combined;
+        }
 
         filtered.sort(sortByRank);
         filtered = dedupeByTrigram(filtered).slice(0, limit);
 
         const sentiments = await classifySentiments(filtered);
         const avgSentiment = sentiments.length ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length : 0;
-        filtered = filtered.map((i, idx) => ({ ...i, sentiment: sentiments[idx] ?? 0 }));
+        filtered = filtered.map((item, idx) => ({ ...item, sentiment: sentiments[idx] ?? 0 }));
 
         let summary = "";
-        if (CFG.openrouterApiKey) {
+        if (CFG.openrouterApiKey && filtered.length) {
             try {
                 const prompt = `Summarize in a couple sentences the following news about ${symbol}:\n` +
-                    filtered.map(i => `- ${i.title} (${i.source})`).join("\n");
+                    filtered.map((item) => `- ${item.title} (${item.source})`).join("\n");
                 const messages = [
                     { role: "system", content: "You are a concise financial news assistant." },
-                    { role: "user", content: [{ type: "text", text: prompt }] }
+                    { role: "user", content: [{ type: "text", text: prompt }] },
                 ];
                 summary = await callOpenRouter(messages);
-            } catch {
-                summary = "";
+            } catch (err) {
+                log.warn({ fn: "getAssetNews", err }, "Failed to summarize news via OpenRouter");
             }
         }
         if (!summary) {
-            summary = filtered.slice(0, 3).map(i => `${i.source}: ${i.title}`).join(" | ");
+            summary = filtered.slice(0, 3).map((item) => `${item.source}: ${item.title}`).join(" | ");
         }
 
-        // convert publishedAt to ISO strings
-        const normalized = filtered.map(i => ({
-            ...i,
-            publishedAt: i.publishedAt.toISOString(),
+        const normalized = filtered.map((item) => ({
+            ...item,
+            publishedAt: item.publishedAt.toISOString(),
         }));
 
-        return { items: normalized, summary: summary.trim(), avgSentiment };
+        const result = { items: normalized, summary: summary.trim(), avgSentiment };
+        await setCachedNews(cacheKey, result, now, log);
+        return result;
     } catch (error) {
-          log.error({ fn: 'getAssetNews', err: error }, "Error fetching asset news");
+        log.error({ fn: "getAssetNews", err: error }, "Error fetching asset news");
         return { items: [], summary: "", avgSentiment: 0 };
     }
 }
