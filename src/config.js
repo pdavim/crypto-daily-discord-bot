@@ -1,13 +1,26 @@
 import 'dotenv/config';
+import { readFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { ASSETS } from './assets.js';
 import { logger, withContext } from './logger.js';
 import { DEFAULT_ALERT_MODULES } from './alerts/registry.js';
 import { loadSettings, getSetting, setSetting } from './settings.js';
-const DEFAULT_BINANCE_CACHE_TTL_MINUTES = 10;
-const parsedBinanceCacheTTL = Number.parseFloat(process.env.BINANCE_CACHE_TTL_MINUTES ?? '');
-const binanceCacheTTL = Number.isFinite(parsedBinanceCacheTTL) && parsedBinanceCacheTTL > 0
-    ? parsedBinanceCacheTTL
-    : DEFAULT_BINANCE_CACHE_TTL_MINUTES;
+
+const DEFAULT_CONFIG_PATH = new URL('../config/default.json', import.meta.url);
+
+const clone = (value) => JSON.parse(JSON.stringify(value ?? {}));
+
+let DEFAULT_CONFIG = {};
+try {
+    DEFAULT_CONFIG = JSON.parse(readFileSync(DEFAULT_CONFIG_PATH, 'utf-8'));
+} catch (error) {
+    console.warn('Failed to load default configuration, falling back to empty object.', error);
+    DEFAULT_CONFIG = {};
+}
+
+export const CFG = clone(DEFAULT_CONFIG);
+
+const DEFAULT_BINANCE_CACHE_TTL_MINUTES = DEFAULT_CONFIG.binanceCacheTTL ?? 10;
 
 const toNumber = (value, fallback) => {
     const parsed = Number.parseFloat(value ?? '');
@@ -40,14 +53,58 @@ const toStringList = (value) => {
         : [];
 };
 
-const buildDiscordRateLimit = () => {
+const toBoolean = (value, fallback) => {
+    if (value === undefined) {
+        return fallback;
+    }
+
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (['true', '1', 'yes', 'on'].includes(normalized)) {
+            return true;
+        }
+        if (['false', '0', 'no', 'off'].includes(normalized)) {
+            return false;
+        }
+    }
+
+    return fallback;
+};
+
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const deepMerge = (target, source) => {
+    if (!isPlainObject(source)) {
+        return target;
+    }
+
+    for (const [key, value] of Object.entries(source)) {
+        if (Array.isArray(value)) {
+            target[key] = value.slice();
+        } else if (isPlainObject(value)) {
+            if (!isPlainObject(target[key])) {
+                target[key] = {};
+            }
+            deepMerge(target[key], value);
+        } else {
+            target[key] = value;
+        }
+    }
+
+    return target;
+};
+
+const buildDiscordRateLimit = (baseConfig = {}) => {
+    const baseDefault = isPlainObject(baseConfig.default) ? baseConfig.default : {};
+    const baseWebhooks = isPlainObject(baseConfig.webhooks) ? baseConfig.webhooks : {};
     const fallback = {
         default: {
             capacity: 5,
             refillAmount: 1,
             refillIntervalMs: 1000,
+            ...baseDefault,
         },
-        webhooks: {},
+        webhooks: { ...baseWebhooks },
     };
 
     const raw = process.env.DISCORD_RATE_LIMIT;
@@ -57,11 +114,11 @@ const buildDiscordRateLimit = () => {
 
     try {
         const parsed = JSON.parse(raw);
-        const defaultLimit = typeof parsed.default === 'object' && parsed.default !== null
+        const defaultLimit = isPlainObject(parsed.default)
             ? { ...fallback.default, ...parsed.default }
             : fallback.default;
-        const webhooks = typeof parsed.webhooks === 'object' && parsed.webhooks !== null
-            ? parsed.webhooks
+        const webhooks = isPlainObject(parsed.webhooks)
+            ? { ...fallback.webhooks, ...parsed.webhooks }
             : fallback.webhooks;
 
         return {
@@ -74,10 +131,15 @@ const buildDiscordRateLimit = () => {
     }
 };
 
-const buildAlertModuleConfig = () => {
+const DEFAULT_ALERT_MODULE_BASE = Object.fromEntries(DEFAULT_ALERT_MODULES.map(name => [name, true]));
+
+const buildAlertModuleConfig = (baseModules = {}) => {
     const enabledList = toStringList(process.env.ALERTS_ENABLED);
     const disabledList = toStringList(process.env.ALERTS_DISABLED);
-    const base = Object.fromEntries(DEFAULT_ALERT_MODULES.map(name => [name, true]));
+    const base = {
+        ...DEFAULT_ALERT_MODULE_BASE,
+        ...baseModules,
+    };
 
     if (enabledList.length > 0) {
         for (const name of DEFAULT_ALERT_MODULES) {
@@ -97,102 +159,111 @@ const buildAlertModuleConfig = () => {
     return base;
 };
 
-const buildIndicatorConfig = () => {
-    const defaultSma = [20, 50, 100, 200];
-    const smaValues = toNumberList(process.env.INDICATOR_SMA_PERIODS, defaultSma, defaultSma.length);
-    const defaultEma = [9, 21];
-    const emaValues = toNumberList(process.env.INDICATOR_EMA_PERIODS, defaultEma, defaultEma.length);
+const buildIndicatorConfig = (baseConfig = {}) => {
+    const baseSma = [
+        baseConfig?.smaPeriods?.ma20 ?? 20,
+        baseConfig?.smaPeriods?.ma50 ?? 50,
+        baseConfig?.smaPeriods?.ma100 ?? 100,
+        baseConfig?.smaPeriods?.ma200 ?? 200,
+    ];
+    const baseEma = [
+        baseConfig?.emaPeriods?.ema9 ?? 9,
+        baseConfig?.emaPeriods?.ema21 ?? 21,
+    ];
+    const smaValues = toNumberList(process.env.INDICATOR_SMA_PERIODS, baseSma, baseSma.length);
+    const emaValues = toNumberList(process.env.INDICATOR_EMA_PERIODS, baseEma, baseEma.length);
 
     return {
         smaPeriods: {
-            ma20: smaValues[0] ?? defaultSma[0],
-            ma50: smaValues[1] ?? defaultSma[1],
-            ma100: smaValues[2] ?? defaultSma[2],
-            ma200: smaValues[3] ?? defaultSma[3]
+            ma20: smaValues[0] ?? baseSma[0],
+            ma50: smaValues[1] ?? baseSma[1],
+            ma100: smaValues[2] ?? baseSma[2],
+            ma200: smaValues[3] ?? baseSma[3],
         },
         emaPeriods: {
-            ema9: emaValues[0] ?? defaultEma[0],
-            ema21: emaValues[1] ?? defaultEma[1]
+            ema9: emaValues[0] ?? baseEma[0],
+            ema21: emaValues[1] ?? baseEma[1],
         },
-        rsiPeriod: toInt(process.env.INDICATOR_RSI_PERIOD, 14),
+        rsiPeriod: toInt(process.env.INDICATOR_RSI_PERIOD, baseConfig?.rsiPeriod ?? 14),
         macd: {
-            fast: toInt(process.env.INDICATOR_MACD_FAST, 12),
-            slow: toInt(process.env.INDICATOR_MACD_SLOW, 26),
-            signal: toInt(process.env.INDICATOR_MACD_SIGNAL, 9)
+            fast: toInt(process.env.INDICATOR_MACD_FAST, baseConfig?.macd?.fast ?? 12),
+            slow: toInt(process.env.INDICATOR_MACD_SLOW, baseConfig?.macd?.slow ?? 26),
+            signal: toInt(process.env.INDICATOR_MACD_SIGNAL, baseConfig?.macd?.signal ?? 9),
         },
         bollinger: {
-            period: toInt(process.env.INDICATOR_BB_PERIOD, 20),
-            multiplier: toNumber(process.env.INDICATOR_BB_MULTIPLIER, 2)
+            period: toInt(process.env.INDICATOR_BB_PERIOD, baseConfig?.bollinger?.period ?? 20),
+            multiplier: toNumber(process.env.INDICATOR_BB_MULTIPLIER, baseConfig?.bollinger?.multiplier ?? 2),
         },
         keltner: {
-            period: toInt(process.env.INDICATOR_KC_PERIOD, 20),
-            multiplier: toNumber(process.env.INDICATOR_KC_MULTIPLIER, 2)
+            period: toInt(process.env.INDICATOR_KC_PERIOD, baseConfig?.keltner?.period ?? 20),
+            multiplier: toNumber(process.env.INDICATOR_KC_MULTIPLIER, baseConfig?.keltner?.multiplier ?? 2),
         },
-        adxPeriod: toInt(process.env.INDICATOR_ADX_PERIOD, 14),
-        atrPeriod: toInt(process.env.INDICATOR_ATR_PERIOD, 14),
+        adxPeriod: toInt(process.env.INDICATOR_ADX_PERIOD, baseConfig?.adxPeriod ?? 14),
+        atrPeriod: toInt(process.env.INDICATOR_ATR_PERIOD, baseConfig?.atrPeriod ?? 14),
         stochastic: {
-            kPeriod: toInt(process.env.INDICATOR_STOCH_K_PERIOD, 14),
-            dPeriod: toInt(process.env.INDICATOR_STOCH_D_PERIOD, 3)
+            kPeriod: toInt(process.env.INDICATOR_STOCH_K_PERIOD, baseConfig?.stochastic?.kPeriod ?? 14),
+            dPeriod: toInt(process.env.INDICATOR_STOCH_D_PERIOD, baseConfig?.stochastic?.dPeriod ?? 3),
         },
-        williamsPeriod: toInt(process.env.INDICATOR_WILLR_PERIOD, 14),
-        cciPeriod: toInt(process.env.INDICATOR_CCI_PERIOD, 20)
+        williamsPeriod: toInt(process.env.INDICATOR_WILLR_PERIOD, baseConfig?.williamsPeriod ?? 14),
+        cciPeriod: toInt(process.env.INDICATOR_CCI_PERIOD, baseConfig?.cciPeriod ?? 20),
     };
 };
 
-export const CFG = {
-    webhook: process.env.DISCORD_WEBHOOK_URL,
-    webhookAlerts: process.env.DISCORD_WEBHOOK_ALERTS_URL,
-    webhookReports: process.env.DISCORD_WEBHOOK_REPORTS_URL,
-    webhookDaily: process.env.DISCORD_WEBHOOK_DAILY,
-    webhookAnalysis: process.env.DISCORD_WEBHOOK_ANALYSIS_URL,
-    botToken: process.env.DISCORD_BOT_TOKEN,
-    channelChartsId: process.env.DISCORD_CHANNEL_CHARTS_ID,
-    webhooks: {
-        BTC: process.env.DISCORD_WEBHOOK_BTC,
-        ETH: process.env.DISCORD_WEBHOOK_ETH,
-        POL: process.env.DISCORD_WEBHOOK_POL,
-        SUI: process.env.DISCORD_WEBHOOK_SUI,
-        SOL: process.env.DISCORD_WEBHOOK_SOL,
-        TRX: process.env.DISCORD_WEBHOOK_TRX
-    },
-    tz: process.env.TZ || 'Europe/Lisbon',
-    dailyReportHour: process.env.DAILY_REPORT_HOUR || '8',
-    analysisFrequency: process.env.ANALYSIS_FREQUENCY || 'hourly',
-    openrouterApiKey: process.env.OPENROUTER_API_KEY,
-    openrouterModel: process.env.OPENROUTER_MODEL || 'openrouter/sonoma-dusk-alpha',
-    enableCharts: process.env.ENABLE_CHARTS === undefined || process.env.ENABLE_CHARTS === 'true',
-    enableAlerts: process.env.ENABLE_ALERTS === undefined || process.env.ENABLE_ALERTS === 'true',
-    enableAnalysis: process.env.ENABLE_ANALYSIS === undefined || process.env.ENABLE_ANALYSIS === 'true',
-    enableReports: process.env.ENABLE_REPORTS === undefined || process.env.ENABLE_REPORTS === 'true',
-    debug: process.env.DEBUG?.toLowerCase() === 'true',
-    accountEquity: parseFloat(process.env.ACCOUNT_EQUITY || '0'),
-    riskPerTrade: toNumber(process.env.RISK_PER_TRADE, 0.01),
-    alertDedupMinutes: parseFloat(process.env.ALERT_DEDUP_MINUTES || '60'),
-    binanceCacheTTL,
-    maxConcurrency: process.env.MAX_CONCURRENCY ? parseInt(process.env.MAX_CONCURRENCY, 10) : undefined,
-    indicators: buildIndicatorConfig(),
-    alerts: {
-        modules: buildAlertModuleConfig(),
-    },
-    alertThresholds: {
-        rsiOverbought: 70,
-        rsiOversold: 30,
-        rsiMidpoint: 50,
-        adxStrongTrend: 25,
-        volumeSpike: 2,
-        atrSpike: 1.5,
-        stochasticOverbought: 80,
-        stochasticOversold: 20,
-        williamsROverbought: -20,
-        williamsROversold: -80,
-        cciOverbought: 100,
-        cciOversold: -100,
-        heuristicHigh: 80,
-        heuristicLow: 20,
-        obvDelta: 0.05
-    },
-    discordRateLimit: buildDiscordRateLimit()
-};
+CFG.webhook = process.env.DISCORD_WEBHOOK_URL ?? CFG.webhook ?? null;
+CFG.webhookAlerts = process.env.DISCORD_WEBHOOK_ALERTS_URL ?? CFG.webhookAlerts ?? null;
+CFG.webhookReports = process.env.DISCORD_WEBHOOK_REPORTS_URL ?? CFG.webhookReports ?? null;
+CFG.webhookDaily = process.env.DISCORD_WEBHOOK_DAILY ?? CFG.webhookDaily ?? null;
+CFG.webhookAnalysis = process.env.DISCORD_WEBHOOK_ANALYSIS_URL ?? CFG.webhookAnalysis ?? null;
+CFG.botToken = process.env.DISCORD_BOT_TOKEN ?? CFG.botToken ?? null;
+CFG.channelChartsId = process.env.DISCORD_CHANNEL_CHARTS_ID ?? CFG.channelChartsId ?? null;
+
+CFG.webhooks = isPlainObject(CFG.webhooks) ? CFG.webhooks : {};
+const defaultWebhookMap = isPlainObject(DEFAULT_CONFIG.webhooks) ? DEFAULT_CONFIG.webhooks : {};
+const webhookKeys = new Set([
+    ...Object.keys(defaultWebhookMap),
+    ...Object.keys(CFG.webhooks),
+]);
+for (const envKey of Object.keys(process.env)) {
+    if (envKey.startsWith('DISCORD_WEBHOOK_')) {
+        webhookKeys.add(envKey.substring('DISCORD_WEBHOOK_'.length));
+    }
+}
+for (const key of webhookKeys) {
+    const envKey = `DISCORD_WEBHOOK_${key}`;
+    CFG.webhooks[key] = process.env[envKey] ?? CFG.webhooks[key] ?? defaultWebhookMap[key] ?? null;
+}
+
+CFG.tz = process.env.TZ ?? CFG.tz ?? 'Europe/Lisbon';
+CFG.dailyReportHour = process.env.DAILY_REPORT_HOUR ?? CFG.dailyReportHour ?? '8';
+CFG.analysisFrequency = process.env.ANALYSIS_FREQUENCY ?? CFG.analysisFrequency ?? 'hourly';
+CFG.openrouterApiKey = process.env.OPENROUTER_API_KEY ?? CFG.openrouterApiKey ?? null;
+CFG.openrouterModel = process.env.OPENROUTER_MODEL ?? CFG.openrouterModel ?? 'openrouter/sonoma-dusk-alpha';
+CFG.enableCharts = toBoolean(process.env.ENABLE_CHARTS, CFG.enableCharts ?? true);
+CFG.enableAlerts = toBoolean(process.env.ENABLE_ALERTS, CFG.enableAlerts ?? true);
+CFG.enableAnalysis = toBoolean(process.env.ENABLE_ANALYSIS, CFG.enableAnalysis ?? true);
+CFG.enableReports = toBoolean(process.env.ENABLE_REPORTS, CFG.enableReports ?? true);
+CFG.debug = toBoolean(process.env.DEBUG, CFG.debug ?? false);
+CFG.accountEquity = toNumber(process.env.ACCOUNT_EQUITY, CFG.accountEquity ?? 0);
+CFG.riskPerTrade = toNumber(process.env.RISK_PER_TRADE, CFG.riskPerTrade ?? 0.01);
+CFG.alertDedupMinutes = toNumber(process.env.ALERT_DEDUP_MINUTES, CFG.alertDedupMinutes ?? 60);
+const computedBinanceCacheTTL = toNumber(
+    process.env.BINANCE_CACHE_TTL_MINUTES,
+    CFG.binanceCacheTTL ?? DEFAULT_BINANCE_CACHE_TTL_MINUTES,
+);
+CFG.binanceCacheTTL = Number.isFinite(computedBinanceCacheTTL) && computedBinanceCacheTTL > 0
+    ? computedBinanceCacheTTL
+    : DEFAULT_BINANCE_CACHE_TTL_MINUTES;
+
+const defaultMaxConcurrency = Number.isFinite(CFG.maxConcurrency) ? CFG.maxConcurrency : undefined;
+const computedMaxConcurrency = process.env.MAX_CONCURRENCY !== undefined
+    ? toInt(process.env.MAX_CONCURRENCY, defaultMaxConcurrency)
+    : defaultMaxConcurrency;
+CFG.maxConcurrency = Number.isFinite(computedMaxConcurrency) ? computedMaxConcurrency : undefined;
+CFG.indicators = buildIndicatorConfig(DEFAULT_CONFIG.indicators ?? CFG.indicators ?? {});
+CFG.alerts = isPlainObject(CFG.alerts) ? CFG.alerts : {};
+CFG.alerts.modules = buildAlertModuleConfig(DEFAULT_CONFIG.alerts?.modules ?? CFG.alerts?.modules ?? {});
+CFG.alertThresholds = clone(DEFAULT_CONFIG.alertThresholds ?? CFG.alertThresholds ?? {});
+CFG.discordRateLimit = buildDiscordRateLimit(DEFAULT_CONFIG.discordRateLimit ?? CFG.discordRateLimit ?? {});
 
 loadSettings({
     riskPerTrade: CFG.riskPerTrade,
@@ -206,14 +277,25 @@ if (typeof storedRisk === 'number' && Number.isFinite(storedRisk) && storedRisk 
 }
 
 export const config = {
-    newsApiKey: process.env.NEWS_API_KEY,
-    serpapiApiKey: process.env.SERPAPI_API_KEY,
+    newsApiKey: process.env.NEWS_API_KEY ?? DEFAULT_CONFIG.newsApiKey ?? null,
+    serpapiApiKey: process.env.SERPAPI_API_KEY ?? DEFAULT_CONFIG.serpapiApiKey ?? null,
 };
+
+export async function saveConfig(partialConfig) {
+    if (!isPlainObject(partialConfig)) {
+        throw new TypeError('saveConfig expects a plain object.');
+    }
+
+    deepMerge(DEFAULT_CONFIG, partialConfig);
+    deepMerge(CFG, partialConfig);
+
+    await writeFile(DEFAULT_CONFIG_PATH, `${JSON.stringify(CFG, null, 4)}\n`);
+}
 
 export function validateConfig() {
     const missing = [];
 
-    if (!process.env.DISCORD_WEBHOOK_URL) {
+    if (!CFG.webhook) {
         missing.push('DISCORD_WEBHOOK_URL');
     }
 
@@ -223,10 +305,14 @@ export function validateConfig() {
         }
     }
 
-    const apiKeys = ['OPENROUTER_API_KEY', 'NEWS_API_KEY', 'SERPAPI_API_KEY'];
-    for (const key of apiKeys) {
-        if (!process.env[key]) {
-            missing.push(key);
+    const apiKeys = [
+        ['OPENROUTER_API_KEY', CFG.openrouterApiKey],
+        ['NEWS_API_KEY', config.newsApiKey],
+        ['SERPAPI_API_KEY', config.serpapiApiKey],
+    ];
+    for (const [envKey, value] of apiKeys) {
+        if (!value) {
+            missing.push(envKey);
         }
     }
 
