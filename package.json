@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "main": "src/index.js",
+  "bin": {
+    "config-cli": "./bin/config-cli.js"
+  },
   "scripts": {
     "start": "node src/index.js",
     "once": "node src/index.js --once",
