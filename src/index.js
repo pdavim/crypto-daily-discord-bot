@@ -6,7 +6,7 @@ import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { streamKlines } from "./data/binanceStream.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, adx, stochastic, williamsR, cci, obv, keltnerChannel } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
-import { postAnalysis, sendDiscordAlert } from "./discord.js";
+import { postAnalysis, sendDiscordAlert, postMonthlyReport } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";
 import { renderChartPNG } from "./chart.js";
 import { buildAlerts, formatAlertMessage } from "./alerts.js";
@@ -19,6 +19,8 @@ import { buildHash, shouldSend, pruneOlderThan } from "./alertCache.js";
 import { register } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
 import { reportWeeklyPerf } from "./perf.js";
+import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
+import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 
 initBot({ onAnalysis: handleAnalysisSlashCommand });
 
@@ -284,8 +286,6 @@ async function runAll() {
 
 const DAILY_ALERT_SCOPE = 'daily';
 const DAILY_ALERT_KEY = 'analysis';
-const WEEKLY_ALERT_SCOPE = 'weekly';
-const WEEKLY_ALERT_KEY = 'analysis';
 
 async function runDailyAnalysis() {
     const log = withContext(logger, { asset: 'DAILY', timeframe: '1d' });
@@ -329,66 +329,184 @@ async function runDailyAnalysis() {
     }
 }
 
-async function runWeeklyAnalysis() {
-    const log = withContext(logger, { asset: 'WEEKLY', timeframe: '1w' });
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function toMonthKey(date, timeZone) {
+    try {
+        const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit' });
+        const parts = formatter.formatToParts(date);
+        const year = parts.find(part => part.type === 'year')?.value;
+        const month = parts.find(part => part.type === 'month')?.value;
+        if (year && month) {
+            return `${year}-${month}`;
+        }
+    } catch (_) {
+        // Fall back to UTC computation below.
+    }
+    const fallbackYear = date.getUTCFullYear();
+    const fallbackMonth = String(date.getUTCMonth() + 1).padStart(2, '0');
+    return `${fallbackYear}-${fallbackMonth}`;
+}
+
+function monthKeyFromIso(isoString, timeZone) {
+    if (!isoString) return null;
+    const parsed = new Date(isoString);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+    return toMonthKey(parsed, timeZone);
+}
+
+function previousMonthKey(referenceDate, timeZone) {
+    const previousDay = new Date(referenceDate.getTime() - DAY_MS);
+    return toMonthKey(previousDay, timeZone);
+}
+
+async function generateWeeklySnapshot() {
+    const log = withContext(logger, { fn: 'generateWeeklySnapshot' });
     try {
         const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 8);
         const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
-        const key = "WEEKLY:1w";
-        const weekMs = 7 * 24 * 60 * 60 * 1000;
-        const weekSig = lastTime != null ? Math.floor(lastTime / weekMs) : null;
-        if (weekSig != null && getSignature(key) === weekSig) {
+        const signatureKey = 'WEEKLY:SNAPSHOT';
+        const weekMs = 7 * DAY_MS;
+        const weekSignature = lastTime != null ? Math.floor(lastTime / weekMs) : null;
+        if (weekSignature != null && getSignature(signatureKey) === weekSignature) {
+            log.debug({ weekSignature }, 'Weekly snapshot already stored for current window.');
             return;
         }
-        if (weekSig != null) {
-            updateSignature(key, weekSig);
-            saveStore();
-        }
-        const report = await runAgent();
-        const lines = ["**Weekly performance (7d)**"];
+
+        const assets = {};
         for (const asset of ASSETS) {
+            const assetLog = withContext(logger, { fn: 'generateWeeklySnapshot', asset: asset.key });
             try {
                 const candles = await fetchDailyCloses(asset.binance, 8);
                 const last = candles.at(-1);
                 const prev = candles.at(-8);
-                const pct = (last?.c != null && prev?.c != null)
-                    ? ((last.c / prev.c - 1) * 100).toFixed(2)
+                const variation = (last?.c != null && prev?.c != null)
+                    ? ((last.c / prev.c - 1) * 100)
                     : null;
-                lines.push(`- ${asset.key}: ${pct != null ? pct + '%': 'n/a'}`);
+                assets[asset.key] = {
+                    close: last?.c ?? null,
+                    variationPct: Number.isFinite(variation) ? Number.parseFloat(variation.toFixed(2)) : null,
+                };
             } catch (err) {
-                lines.push(`- ${asset.key}: error`);
+                assetLog.warn({ err }, 'Failed to compute weekly variation.');
+                assets[asset.key] = { error: true };
             }
         }
-        const perfSummary = reportWeeklyPerf();
-        const perfEntries = Object.entries(perfSummary)
-            .filter(([, { count }]) => count > 0)
-            .map(([name, { avg, count }]) => {
-                const ms = avg.toFixed(2);
-                return `- ${name}: ${ms} ms (n=${count})`;
-            });
-        const sections = [lines.join("\n")];
-        if (perfEntries.length) {
-            sections.push(["**Weekly runtime averages (ms)**", ...perfEntries].join("\n"));
+
+        const performance = reportWeeklyPerf();
+        const entry = {
+            generatedAt: new Date().toISOString(),
+            weekSignature,
+            timezone: CFG.tz,
+            assets,
+            performance,
+        };
+        await saveWeeklySnapshot(entry);
+        if (weekSignature != null) {
+            updateSignature(signatureKey, weekSignature);
+            saveStore();
         }
-        sections.push(report);
-        const finalReport = sections.join("\n\n");
-        if (CFG.enableReports) {
-            const hash = buildHash(finalReport);
-            if (getAlertHash(WEEKLY_ALERT_SCOPE, WEEKLY_ALERT_KEY) === hash) {
-                log.info({ fn: 'runWeeklyAnalysis' }, 'Skipping weekly analysis post (duplicate hash)');
-                return;
-            }
-            const analysisResult = await postAnalysis("WEEKLY", "1w", finalReport);
-            if (analysisResult?.posted) {
-                updateAlertHash(WEEKLY_ALERT_SCOPE, WEEKLY_ALERT_KEY, hash);
-                saveStore();
-            } else {
-                log.warn({ fn: 'runWeeklyAnalysis', reportPath: analysisResult?.path }, 'report upload failed');
+        log.info({ weekSignature }, 'Saved weekly performance snapshot.');
+    } catch (err) {
+        log.error({ err }, 'Error generating weekly snapshot');
+        await notifyOps(`Error generating weekly snapshot: ${err.message || err}`);
+    }
+}
+
+async function compileMonthlyPerformanceReport() {
+    const log = withContext(logger, { fn: 'compileMonthlyPerformanceReport' });
+    try {
+        const now = new Date();
+        const monthKey = previousMonthKey(now, CFG.tz);
+        if (!monthKey) {
+            log.warn('Unable to determine month key for monthly report.');
+            return;
+        }
+
+        const signatureKey = `MONTHLY:${monthKey}`;
+        if (getSignature(signatureKey) === monthKey) {
+            log.debug({ monthKey }, 'Monthly report already processed.');
+            return;
+        }
+
+        const snapshots = await loadWeeklySnapshots();
+        const monthEntries = snapshots.filter(entry => monthKeyFromIso(entry?.generatedAt, CFG.tz) === monthKey);
+        if (monthEntries.length === 0) {
+            log.info({ monthKey }, 'No weekly snapshots available for monthly report.');
+            return;
+        }
+
+        const assetStats = new Map();
+        for (const entry of monthEntries) {
+            for (const [assetKey, stats] of Object.entries(entry.assets ?? {})) {
+                const rawValue = stats?.variationPct ?? stats?.performancePct ?? stats?.variation ?? null;
+                const variation = typeof rawValue === 'string' ? Number.parseFloat(rawValue) : rawValue;
+                if (!Number.isFinite(variation)) {
+                    continue;
+                }
+                if (!assetStats.has(assetKey)) {
+                    assetStats.set(assetKey, { total: 0, count: 0, min: variation, max: variation });
+                }
+                const agg = assetStats.get(assetKey);
+                agg.total += variation;
+                agg.count += 1;
+                agg.min = Math.min(agg.min, variation);
+                agg.max = Math.max(agg.max, variation);
             }
         }
-    } catch (e) {
-        log.error({ fn: 'runWeeklyAnalysis', err: e }, 'Error in weekly analysis');
-        await notifyOps(`Error in weekly analysis: ${e.message || e}`);
+
+        const ordered = Array.from(assetStats.entries())
+            .filter(([, value]) => value.count > 0)
+            .map(([assetKey, value]) => {
+                const average = value.total / value.count;
+                return {
+                    assetKey,
+                    average,
+                    count: value.count,
+                    min: value.min,
+                    max: value.max,
+                };
+            })
+            .sort((a, b) => b.average - a.average);
+
+        if (ordered.length === 0) {
+            log.info({ monthKey }, 'No valid asset data found for monthly report.');
+            updateSignature(signatureKey, monthKey);
+            saveStore();
+            return;
+        }
+
+        const labels = ordered.map(item => item.assetKey);
+        const values = ordered.map(item => item.average);
+        let chartPath;
+        try {
+            chartPath = await renderMonthlyPerformanceChart({ monthKey, labels, values });
+        } catch (err) {
+            log.error({ err, monthKey }, 'Failed to render monthly performance chart.');
+        }
+
+        const lines = [
+            `📊 Relatório mensal ${monthKey}`,
+            '',
+            `Semanas consideradas: ${monthEntries.length}`,
+        ];
+        for (const item of ordered) {
+            lines.push(`- ${item.assetKey}: média ${item.average.toFixed(2)}% (min ${item.min.toFixed(2)}%, máx ${item.max.toFixed(2)}%, amostras=${item.count})`);
+        }
+        const content = lines.join("\n");
+        const posted = await postMonthlyReport({ content, filePath: chartPath });
+        if (posted) {
+            updateSignature(signatureKey, monthKey);
+            saveStore();
+            log.info({ monthKey }, 'Monthly performance report sent.');
+        } else {
+            log.warn({ monthKey }, 'Monthly performance report was not sent.');
+        }
+    } catch (err) {
+        log.error({ err }, 'Error compiling monthly performance report');
+        await notifyOps(`Error compiling monthly performance report: ${err.message || err}`);
     }
 }
 
@@ -438,8 +556,10 @@ if (!ONCE) {
         cron.schedule(`0 ${hour} * * *`, runDailyAnalysis, { timezone: CFG.tz });
         scheduleLog.info({ fn: 'schedule', channel: 'analysis', hour }, `⏱️ Scheduled daily at ${hour}h (TZ=${CFG.tz})`);
     }
-    cron.schedule('0 18 * * 0', runWeeklyAnalysis, { timezone: CFG.tz });
-    scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled weekly at 18h Sunday (TZ=${CFG.tz})`);
+    cron.schedule('0 18 * * 0', generateWeeklySnapshot, { timezone: CFG.tz });
+    scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled weekly snapshot at 18h Sunday (TZ=${CFG.tz})`);
+    cron.schedule('0 1 1 * *', compileMonthlyPerformanceReport, { timezone: CFG.tz });
+    scheduleLog.info({ fn: 'schedule' }, `📈 Scheduled monthly performance report on day 1 at 01h (TZ=${CFG.tz})`);
     cron.schedule('0 0 * * 0', () => {
         const log = withContext(logger, { fn: 'resetAlertHashesJob' });
         resetAlertHashes();
@@ -452,11 +572,13 @@ if (!ONCE) {
     runAll();
     pruneOlderThan(sevenDaysMs);
     runDailyAnalysis();
-    runWeeklyAnalysis();
+    generateWeeklySnapshot();
+    compileMonthlyPerformanceReport();
 } else {
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     runAll();
     pruneOlderThan(sevenDaysMs);
     runDailyAnalysis();
-    runWeeklyAnalysis();
+    generateWeeklySnapshot();
+    compileMonthlyPerformanceReport();
 }

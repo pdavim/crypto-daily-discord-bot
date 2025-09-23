@@ -323,6 +323,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.webhookReports = process.env.DISCORD_WEBHOOK_REPORTS_URL ?? nextCFG.webhookReports ?? null;
     nextCFG.webhookDaily = process.env.DISCORD_WEBHOOK_DAILY ?? nextCFG.webhookDaily ?? null;
     nextCFG.webhookAnalysis = process.env.DISCORD_WEBHOOK_ANALYSIS_URL ?? nextCFG.webhookAnalysis ?? null;
+    nextCFG.webhookMonthly = process.env.DISCORD_WEBHOOK_MONTHLY ?? nextCFG.webhookMonthly ?? null;
     nextCFG.botToken = process.env.DISCORD_BOT_TOKEN ?? nextCFG.botToken ?? null;
     nextCFG.channelChartsId = process.env.DISCORD_CHANNEL_CHARTS_ID ?? nextCFG.channelChartsId ?? null;
 

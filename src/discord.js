@@ -123,6 +123,60 @@ export async function postAnalysis(assetKey, tf, text) {
     }
 }
 
+export async function postMonthlyReport({ content, filePath } = {}) {
+    const candidateKeys = [
+        'webhookMonthly',
+        'webhookReports',
+        'webhookAnalysis',
+        'webhookDaily',
+        'webhook',
+    ];
+    let resolvedConfigKey;
+    let url;
+    for (const key of candidateKeys) {
+        if (CFG[key]) {
+            resolvedConfigKey = key;
+            url = CFG[key];
+            break;
+        }
+    }
+
+    const log = withContext(logger, { fn: 'postMonthlyReport', webhookConfigKey: resolvedConfigKey });
+    if (!url) {
+        log.warn({ fn: 'postMonthlyReport', tried: candidateKeys }, 'No Discord webhook configured for monthly report.');
+        return false;
+    }
+
+    let buffer;
+    let filename;
+    if (filePath) {
+        try {
+            buffer = await fs.readFile(filePath);
+            filename = path.basename(filePath);
+        } catch (err) {
+            log.error({ fn: 'postMonthlyReport', err, filePath }, 'Failed to read monthly chart file.');
+        }
+    }
+
+    const payload = { content: content ?? '' };
+
+    try {
+        if (buffer && filename) {
+            const form = new FormData();
+            form.append('payload_json', JSON.stringify(payload));
+            form.append('files[0]', buffer, { filename, contentType: 'image/png' });
+            await fetchWithRetry(() => axios.post(url, form, { headers: form.getHeaders() }), { retries: 2 });
+            return true;
+        }
+        await fetchWithRetry(() => axios.post(url, payload), { retries: 2 });
+        return true;
+    } catch (err) {
+        log.error({ fn: 'postMonthlyReport', err }, 'Failed to post monthly report after retries');
+        await notifyOps(`Failed to post monthly report: ${err.message || err}`);
+        return false;
+    }
+}
+
 const extractChannelId = (url, fallback = "default") => {
     if (typeof url !== "string") {
         return fallback;
