@@ -1,0 +1,96 @@
+{
+  "webhook": null,
+  "webhookAlerts": null,
+  "webhookReports": null,
+  "webhookDaily": null,
+  "webhookAnalysis": null,
+  "botToken": null,
+  "channelChartsId": null,
+  "webhooks": {
+    "BTC": null,
+    "ETH": null,
+    "POL": null,
+    "SUI": null,
+    "SOL": null,
+    "TRX": null
+  },
+  "tz": "Europe/Lisbon",
+  "dailyReportHour": "8",
+  "analysisFrequency": "hourly",
+  "openrouterApiKey": null,
+  "openrouterModel": "openrouter/sonoma-dusk-alpha",
+  "enableCharts": true,
+  "enableAlerts": true,
+  "enableAnalysis": true,
+  "enableReports": true,
+  "debug": false,
+  "accountEquity": 0,
+  "riskPerTrade": 0.01,
+  "alertDedupMinutes": 60,
+  "binanceCacheTTL": 10,
+  "maxConcurrency": null,
+  "indicators": {
+    "smaPeriods": {
+      "ma20": 20,
+      "ma50": 50,
+      "ma100": 100,
+      "ma200": 200
+    },
+    "emaPeriods": {
+      "ema9": 9,
+      "ema21": 21
+    },
+    "rsiPeriod": 14,
+    "macd": {
+      "fast": 12,
+      "slow": 26,
+      "signal": 9
+    },
+    "bollinger": {
+      "period": 20,
+      "multiplier": 2
+    },
+    "keltner": {
+      "period": 20,
+      "multiplier": 2
+    },
+    "adxPeriod": 14,
+    "atrPeriod": 14,
+    "stochastic": {
+      "kPeriod": 14,
+      "dPeriod": 3
+    },
+    "williamsPeriod": 14,
+    "cciPeriod": 20
+  },
+  "alerts": {
+    "modules": {}
+  },
+  "alertThresholds": {
+    "rsiOverbought": 70,
+    "rsiOversold": 30,
+    "rsiMidpoint": 50,
+    "adxStrongTrend": 25,
+    "volumeSpike": 2,
+    "atrSpike": 1.5,
+    "stochasticOverbought": 80,
+    "stochasticOversold": 20,
+    "williamsROverbought": -20,
+    "williamsROversold": -80,
+    "cciOverbought": 100,
+    "cciOversold": -100,
+    "heuristicHigh": 80,
+    "heuristicLow": 20,
+    "obvDelta": 0.05
+  },
+  "discordRateLimit": {
+    "default": {
+      "capacity": 5,
+      "refillAmount": 1,
+      "refillIntervalMs": 1000
+    },
+    "webhooks": {}
+  },
+  "newsApiKey": null,
+  "serpapiApiKey": null
+}
