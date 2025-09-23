@@ -42,6 +42,15 @@ const hasTimeAdapter = () => {
 };
 
 // renderização
+/**
+ * Renders a candlestick chart PNG for the provided asset and timeframe.
+ * @param {string} assetKey - Asset identifier used in the filename.
+ * @param {string} tf - Timeframe label.
+ * @param {Array<{t:Date,o:number,h:number,l:number,c:number,v:number}>} candles - Candle data.
+ * @param {object} [indicators={}] - Indicator series to draw.
+ * @param {object} [overlays={}] - Additional chart overlays.
+ * @returns {Promise} Absolute path to the generated PNG file.
+ */
 export async function renderChartPNG(assetKey, tf, candles, indicators = {}, overlays = {}) {
     const start = performance.now();
     if (!fs.existsSync("charts")) fs.mkdirSync("charts", { recursive: true });

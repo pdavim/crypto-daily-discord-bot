@@ -59,7 +59,11 @@ const openrouter = CFG.openrouterApiKey
     ? new OpenAi({ baseURL: 'https://openrouter.ai/api/v1', apiKey: CFG.openrouterApiKey })
     : null;
 
-// OpenRouter chat completion
+/**
+ * Requests a chat completion from OpenRouter using the configured model.
+ * @param {Array<Object>} messages - Conversation history.
+ * @returns {Promise} Completion text returned by OpenRouter.
+ */
 export async function callOpenRouter(messages) {
     const log = withContext(logger);
     log.info({ fn: 'callOpenRouter' }, "Calling OpenRouter...");
@@ -110,6 +114,10 @@ async function getMacroContext() {
     }
 }
 
+/**
+ * Builds a multi-asset analysis report using market data, news and AI summarization.
+ * @returns {Promise} Markdown report describing the analysed assets.
+ */
 // Gather metrics for several assets and use OpenRouter for a brief analysis
 export async function runAgent() {
     const log = withContext(logger);

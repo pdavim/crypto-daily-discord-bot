@@ -55,6 +55,14 @@ function summaryToHtml(summary, { assetKey, timeframe } = {}) {
 </html>`;
 }
 
+/**
+ * Renders a Markdown summary into a PDF document using Puppeteer.
+ * @param {string} summary - Markdown content to render.
+ * @param {Object} [options={}] - Metadata for the document header.
+ * @param {string} [options.assetKey] - Asset identifier displayed in the PDF title.
+ * @param {string} [options.timeframe] - Timeframe label displayed in the PDF title.
+ * @returns {Promise} PDF binary data.
+ */
 export async function buildSummaryPdf(summary, options = {}) {
     if (!summary) {
         throw new Error("Cannot build PDF from empty summary");
@@ -74,10 +82,44 @@ export async function buildSummaryPdf(summary, options = {}) {
     }
 }
 
+/**
+ * Formats a decimal value as a percentage string.
+ * @param {number} v - Value to format.
+ * @returns {string} Percentage with two decimals or an em dash when unavailable.
+ */
 export function pct(v) { return v == null ? '—' : `${(v * 100).toFixed(2)}%`; }
+/**
+ * Formats a numeric value with a fixed precision.
+ * @param {number} v - Value to format.
+ * @param {number} [p=4] - Number of decimal places.
+ * @returns {string} Formatted number or an em dash when unavailable.
+ */
 export function num(v, p = 4) { return v == null ? '—' : `${(+v).toFixed(p)}`; }
+/**
+ * Formats a number using the default locale.
+ * @param {number} n - Value to format.
+ * @returns {string} Localized representation or an em dash when unavailable.
+ */
 export function fmt(n) { return n == null ? '—' : Intl.NumberFormat().format(n); }
 
+/**
+ * Builds KPI snapshots combining multiple indicators for reporting.
+ * @param {Object} params - Indicator data used in the report.
+ * @param {Array<Object>} params.candles - Intraday candles.
+ * @param {Array<Object>} params.daily - Daily candles.
+ * @param {Array<number>} params.ma20 - 20-period moving average series.
+ * @param {Array<number>} params.ma50 - 50-period moving average series.
+ * @param {Array<number>} params.ma100 - 100-period moving average series.
+ * @param {Array<number>} params.ma200 - 200-period moving average series.
+ * @param {Array<number>} params.rsi - RSI series.
+ * @param {Object} params.macdObj - MACD calculation.
+ * @param {Object} params.bb - Bollinger bands.
+ * @param {Object} params.kc - Keltner channel values.
+ * @param {Array<number>} params.atr - ATR series.
+ * @param {Array<number>} params.adx - ADX series.
+ * @param {Array<number>} params.volSeries - Volume series.
+ * @returns {Object} Snapshot ready for summary generation.
+ */
 export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma200, rsi, macdObj, bb, kc, atr, adx, volSeries }) {
     const last = candles.at(-1);
     const closeSeries = candles.map(c => c.c);
@@ -141,6 +183,13 @@ export function buildSnapshotForReport({ candles, daily, ma20, ma50, ma100, ma20
     };
 }
 
+/**
+ * Generates a Markdown summary from multi-timeframe KPI snapshots.
+ * @param {Object} params - Summary inputs.
+ * @param {string} params.assetKey - Asset identifier.
+ * @param {Object} params.snapshots - Snapshot data indexed by timeframe.
+ * @returns {string} Markdown text describing the asset status.
+ */
 export function buildSummary({ assetKey, snapshots }) {
     const s = snapshots;
 

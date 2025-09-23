@@ -35,6 +35,14 @@ function buildDataset(values) {
     });
 }
 
+/**
+ * Generates a monthly performance bar chart and saves it to disk.
+ * @param {Object} params - Chart configuration.
+ * @param {string} params.monthKey - Month identifier used in the chart title.
+ * @param {Array<string>} params.labels - Asset labels.
+ * @param {Array<number>} params.values - Average performance values per asset.
+ * @returns {Promise} Absolute path to the rendered PNG file.
+ */
 export async function renderMonthlyPerformanceChart({ monthKey, labels, values }) {
     if (!Array.isArray(labels) || !Array.isArray(values) || labels.length !== values.length) {
         throw new Error('Labels and values must be arrays of the same length.');

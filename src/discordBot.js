@@ -47,6 +47,11 @@ function build45mCandles(candles15m) {
     return out;
 }
 
+/**
+ * Handles Discord slash command interactions for charts, watchlists and analysis.
+ * @param {Object} interaction - Discord interaction payload.
+ * @returns {Promise} Resolves once the interaction response is handled.
+ */
 export async function handleInteraction(interaction) {
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName === 'chart') {
@@ -271,6 +276,11 @@ function getClient() {
     return clientPromise;
 }
 
+/**
+ * Uploads chart image files to the configured Discord channel.
+ * @param {string[]|string} files - Paths to chart images to upload.
+ * @returns {Promise} True when the upload succeeds.
+ */
 export async function postCharts(files) {
     if (!Array.isArray(files)) files = [files];
     const log = withContext(logger);
@@ -290,6 +300,12 @@ export async function postCharts(files) {
     }
 }
 
+/**
+ * Initializes the Discord bot client and registers optional command handlers.
+ * @param {Object} [options={}] - Hook used to satisfy analysis slash commands.
+ * @param {Function} [options.onAnalysis] - Callback executed when the analysis command runs.
+ * @returns {Promise} Shared Discord client promise.
+ */
 export function initBot(options = {}) {
     analysisCommandHandler = options.onAnalysis ?? analysisCommandHandler;
     return getClient();

@@ -83,6 +83,13 @@ export const logger = pino({
   ...(transport ? { transport } : {}),
 });
 
+/**
+ * Constructs a structured logging context ensuring a request identifier is present.
+ * @param {Object} [ctx={}] - Contextual metadata.
+ * @param {string} [ctx.asset] - Asset identifier.
+ * @param {string} [ctx.timeframe] - Timeframe label.
+ * @returns {Object} Context enriched with a unique identifier.
+ */
 export function createContext(ctx = {}) {
   const { asset, timeframe, ...rest } = ctx;
   return {
@@ -93,6 +100,13 @@ export function createContext(ctx = {}) {
   };
 }
 
+/**
+ * Derives a child logger bound to the provided context.
+ * @param {Object} baseLogger - Logger instance to augment.
+ * @param {Object} [ctx={}] - Context to attach to log entries.
+ * @param {string} [ctx.requestId] - Optional existing request identifier.
+ * @returns {Object} Child logger including the context.
+ */
 export function withContext(baseLogger, ctx = {}) {
   const context = ctx?.requestId ? ctx : createContext(ctx);
   return baseLogger.child(context);

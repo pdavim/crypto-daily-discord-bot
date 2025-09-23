@@ -38,6 +38,13 @@ async function saveAnalysisReport(text, { assetKey, timeframe }) {
     return relativePath;
 }
 
+/**
+ * Sends a technical analysis report to the configured Discord webhook.
+ * @param {string} assetKey - Asset identifier.
+ * @param {string} tf - Timeframe label.
+ * @param {string} text - Markdown analysis content.
+ * @returns {Promise} Result containing the persisted report path and delivery status.
+ */
 export async function postAnalysis(assetKey, tf, text) {
     const normalizedAssetKey = typeof assetKey === 'string' ? assetKey.toUpperCase() : undefined;
     const candidateKeys = [];
@@ -123,6 +130,13 @@ export async function postAnalysis(assetKey, tf, text) {
     }
 }
 
+/**
+ * Posts the monthly performance summary to Discord, optionally attaching a chart.
+ * @param {Object} [params={}] - Report payload options.
+ * @param {string} [params.content] - Text content to send.
+ * @param {string} [params.filePath] - Path to an image file that will be attached.
+ * @returns {Promise} True when the report is successfully sent.
+ */
 export async function postMonthlyReport({ content, filePath } = {}) {
     const candidateKeys = [
         'webhookMonthly',
@@ -196,6 +210,14 @@ const extractChannelId = (url, fallback = "default") => {
     return fallback;
 };
 
+/**
+ * Dispatches an alert message to Discord honouring webhook rate limits.
+ * @param {string} text - Alert message body.
+ * @param {Object} [options={}] - Override options for delivery.
+ * @param {string} [options.webhookUrl] - Custom webhook URL.
+ * @param {string} [options.channelId] - Explicit channel identifier used for rate limiting.
+ * @returns {Promise} True when the alert is delivered successfully.
+ */
 export async function sendDiscordAlert(text, options = {}) {
     const url = options.webhookUrl ?? CFG.webhookAlerts ?? CFG.webhook;
     const log = withContext(logger);

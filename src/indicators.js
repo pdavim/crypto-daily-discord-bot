@@ -1,3 +1,9 @@
+/**
+ * Calculates the simple moving average for the provided series.
+ * @param {number[]} arr - Values to average.
+ * @param {number} period - Window length used for the average.
+ * @returns {Array<number>} Array containing the SMA values aligned with the input; positions without enough data remain null.
+ */
 export function sma(arr, period) {
     const out = Array(arr.length).fill(null);
     let sum = 0;
@@ -9,6 +15,12 @@ export function sma(arr, period) {
     return out;
 }
 
+/**
+ * Computes the relative strength index (RSI) for a series of closing prices.
+ * @param {number[]} closes - Closing price series.
+ * @param {number} [period=14] - Lookback period for the indicator.
+ * @returns {Array<number>} RSI values where unavailable entries are null.
+ */
 export function rsi(closes, period = 14) {
     const out = Array(closes.length).fill(null);
     let gains = 0, losses = 0;
@@ -34,6 +46,14 @@ export function rsi(closes, period = 14) {
 }
 
 // MACD (12,26,9)
+/**
+ * Calculates the Moving Average Convergence Divergence (MACD) indicator.
+ * @param {number[]} closes - Closing prices used to compute the MACD.
+ * @param {number} [fast=12] - Fast EMA period.
+ * @param {number} [slow=26] - Slow EMA period.
+ * @param {number} [signal=9] - Signal line EMA period.
+ * @returns {Object} MACD components with line, signal and histogram arrays.
+ */
 export function macd(closes, fast = 12, slow = 26, signal = 9) {
     const ema = (p) => {
         const k = 2 / (p + 1); const out = []; let prev;
@@ -50,6 +70,13 @@ export function macd(closes, fast = 12, slow = 26, signal = 9) {
     return { line, signal: signalE, hist };
 }
 
+/**
+ * Calculates Bollinger Bands for the provided closing prices.
+ * @param {number[]} closes - Closing price series.
+ * @param {number} [period=20] - Length of the moving average.
+ * @param {number} [mult=2] - Standard deviation multiplier for the bands.
+ * @returns {Object} Bollinger band values containing middle, upper and lower arrays.
+ */
 export function bollinger(closes, period = 20, mult = 2) {
     const ma = sma(closes, period);
     const out = { mid: ma, upper: Array(closes.length).fill(null), lower: Array(closes.length).fill(null) };
@@ -65,6 +92,15 @@ export function bollinger(closes, period = 20, mult = 2) {
     return out;
 }
 
+/**
+ * Calculates Keltner Channels for the provided price series.
+ * @param {number[]} closes - Closing prices.
+ * @param {number[]} highs - High prices aligned with closes.
+ * @param {number[]} lows - Low prices aligned with closes.
+ * @param {number} [period=20] - Lookback period for the EMA and ATR.
+ * @param {number} [multiplier=2] - Multiplier applied to the ATR for the band width.
+ * @returns {Object} Channel values containing middle, upper and lower arrays.
+ */
 export function keltnerChannel(closes, highs, lows, period = 20, multiplier = 2) {
     const len = Math.min(closes?.length ?? 0, highs?.length ?? 0, lows?.length ?? 0);
     const out = {
@@ -107,6 +143,13 @@ export function keltnerChannel(closes, highs, lows, period = 20, multiplier = 2)
 }
 
 // Parabolic SAR (passo padrão 0.02, aceleração máx 0.2)
+/**
+ * Computes the Parabolic SAR trend indicator for OHLC candles.
+ * @param {Array<Object>} ohlc - Candle data including high, low and close.
+ * @param {number} [step=0.02] - Acceleration factor step.
+ * @param {number} [max=0.2] - Maximum acceleration factor.
+ * @returns {Array<number>} Parabolic SAR values for each candle.
+ */
 export function parabolicSAR(ohlc, step = 0.02, max = 0.2) {
     const out = Array(ohlc.length).fill(null);
     if (!ohlc || ohlc.length < 2) return out;
@@ -153,6 +196,13 @@ export function parabolicSAR(ohlc, step = 0.02, max = 0.2) {
 }
 
 // Divergência de volume normalizada por EMA
+/**
+ * Detects bullish or bearish volume divergence against the price series.
+ * @param {number[]} closes - Closing prices.
+ * @param {number[]} volumes - Volume series aligned with closes.
+ * @param {number} [period=20] - EMA period used for normalization.
+ * @returns {Array<string|null>} Divergence labels per candle.
+ */
 export function volumeDivergence(closes, volumes, period = 20) {
     const out = Array(closes.length).fill(null);
     if (!closes || closes.length !== volumes.length) return out;
@@ -177,6 +227,14 @@ export function volumeDivergence(closes, volumes, period = 20) {
     return out;
 }
 
+/**
+ * Computes the Volume Weighted Average Price (VWAP).
+ * @param {number[]} highs - High prices.
+ * @param {number[]} lows - Low prices.
+ * @param {number[]} closes - Closing prices.
+ * @param {number[]} volumes - Trade volumes.
+ * @returns {Array<number>} VWAP series aligned with the inputs.
+ */
 export function vwap(highs, lows, closes, volumes) {
     const out = Array(closes.length).fill(null);
     let cumPV = 0, cumVol = 0;
@@ -190,6 +248,12 @@ export function vwap(highs, lows, closes, volumes) {
     return out;
 }
 
+/**
+ * Calculates the exponential moving average of a numeric series.
+ * @param {number[]} arr - Values to smooth.
+ * @param {number} period - Lookback period for the EMA.
+ * @returns {Array<number>} EMA values.
+ */
 export function ema(arr, period) {
     const k = 2 / (period + 1);
     const out = [];
@@ -200,6 +264,14 @@ export function ema(arr, period) {
     return out;
 }
 
+/**
+ * Computes the Average Directional Index (ADX) from high, low and close series.
+ * @param {number[]} highs - High price series.
+ * @param {number[]} lows - Low price series.
+ * @param {number[]} closes - Closing price series.
+ * @param {number} [period=14] - Smoothing period for the calculation.
+ * @returns {Array<number>} ADX values.
+ */
 export function adx(highs, lows, closes, period = 14) {
     const len = Math.min(highs?.length ?? 0, lows?.length ?? 0, closes?.length ?? 0);
     if (!len) return [];
@@ -263,6 +335,15 @@ export function adx(highs, lows, closes, period = 14) {
     return wilderRMA(dx, period);
 }
 
+/**
+ * Calculates the stochastic oscillator for the given price series.
+ * @param {number[]} highs - High prices.
+ * @param {number[]} lows - Low prices.
+ * @param {number[]} closes - Closing prices.
+ * @param {number} [kPeriod=14] - Lookback period for the %K line.
+ * @param {number} [dPeriod=3] - Smoothing period for the %D line.
+ * @returns {Object} Stochastic oscillator values with %K and %D arrays.
+ */
 export function stochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
     const k = Array(closes.length).fill(null);
     for (let i = 0; i < closes.length; i++) {
@@ -284,6 +365,14 @@ export function stochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
     return { k, d };
 }
 
+/**
+ * Computes the Williams %R oscillator for the given prices.
+ * @param {number[]} highs - High prices.
+ * @param {number[]} lows - Low prices.
+ * @param {number[]} closes - Closing prices.
+ * @param {number} [period=14] - Lookback period for the indicator.
+ * @returns {Array<number>} Williams %R values.
+ */
 export function williamsR(highs, lows, closes, period = 14) {
     const out = Array(closes.length).fill(null);
     for (let i = 0; i < closes.length; i++) {
@@ -296,6 +385,14 @@ export function williamsR(highs, lows, closes, period = 14) {
     return out;
 }
 
+/**
+ * Calculates the Commodity Channel Index (CCI) for the given prices.
+ * @param {number[]} highs - High prices.
+ * @param {number[]} lows - Low prices.
+ * @param {number[]} closes - Closing prices.
+ * @param {number} [period=20] - Lookback period for the indicator.
+ * @returns {Array<number>} CCI values.
+ */
 export function cci(highs, lows, closes, period = 20) {
     const tp = highs.map((h, i) => (h + lows[i] + closes[i]) / 3);
     const smaTp = sma(tp, period);
@@ -311,6 +408,12 @@ export function cci(highs, lows, closes, period = 20) {
     return out;
 }
 
+/**
+ * Computes the On Balance Volume (OBV) cumulative indicator.
+ * @param {number[]} closes - Closing prices.
+ * @param {number[]} volumes - Volume series aligned with closes.
+ * @returns {Array<number>} OBV values.
+ */
 export function obv(closes, volumes) {
     const out = [];
     for (let i = 0; i < closes.length; i++) {
@@ -322,6 +425,12 @@ export function obv(closes, volumes) {
     return out;
 }
 
+/**
+ * Calculates the Average True Range (ATR) using an EMA smoothing.
+ * @param {Array<Object>} ohlc - Candle objects containing high, low and close.
+ * @param {number} [period=14] - Period for the ATR smoothing.
+ * @returns {Array<number>} ATR values.
+ */
 export function atr14(ohlc, period = 14) {
     const tr = [];
     for (let i = 0; i < ohlc.length; i++) {
@@ -340,6 +449,13 @@ export function atr14(ohlc, period = 14) {
     return out;
 }
 
+/**
+ * Computes the relative width of Bollinger Bands.
+ * @param {Array<number>} upper - Upper band values.
+ * @param {Array<number>} lower - Lower band values.
+ * @param {Array<number>} mid - Middle band values.
+ * @returns {Array<number>} Relative band width for each point.
+ */
 export function bollWidth(upper, lower, mid) {
     return upper.map((u, i) => {
         const l = lower[i], m = mid[i];
@@ -348,6 +464,13 @@ export function bollWidth(upper, lower, mid) {
     });
 }
 
+/**
+ * Determines whether the current Bollinger Band width is in squeeze conditions.
+ * @param {Array<number>} widthSeries - Bollinger band width values.
+ * @param {number} [lookback=40] - Number of samples considered for the percentile.
+ * @param {number} [pct=0.15] - Percentile threshold that defines a squeeze.
+ * @returns {boolean} True when the latest value is below the configured percentile.
+ */
 export function isBBSqueeze(widthSeries, lookback = 40, pct = 0.15) {
     // squeeze se o valor atual <= percentil 15% dos últimos N
     const arr = widthSeries.slice(-lookback).filter(x => x != null);
@@ -358,9 +481,27 @@ export function isBBSqueeze(widthSeries, lookback = 40, pct = 0.15) {
     return last != null && last <= threshold;
 }
 
+/**
+ * Checks whether series A crossed above series B between the last two samples.
+ * @param {number[]} a - First series to evaluate.
+ * @param {number[]} b - Second series to evaluate.
+ * @returns {boolean} True when a cross-over occurred.
+ */
 export function crossUp(a, b) { const n = a.length; return n > 1 && a[n - 2] < b[n - 2] && a[n - 1] >= b[n - 1]; }
+/**
+ * Checks whether series A crossed below series B between the last two samples.
+ * @param {number[]} a - First series to evaluate.
+ * @param {number[]} b - Second series to evaluate.
+ * @returns {boolean} True when a cross-under occurred.
+ */
 export function crossDown(a, b) { const n = a.length; return n > 1 && a[n - 2] > b[n - 2] && a[n - 1] <= b[n - 1]; }
 
+/**
+ * Generates a unicode sparkline from the provided values.
+ * @param {number[]} values - Series to visualize.
+ * @param {number} [points=20] - Number of trailing points to include.
+ * @returns {string} Sparkline string.
+ */
 export function sparkline(values, points = 20) {
     const chars = "▁▂▃▄▅▆▇█";
     const arr = values.slice(-points);
@@ -372,6 +513,13 @@ export function sparkline(values, points = 20) {
     }).join("");
 }
 
+/**
+ * Estimates trend direction from moving averages.
+ * @param {Array<number>} ma20 - 20-period moving average series.
+ * @param {Array<number>} ma50 - 50-period moving average series.
+ * @param {Array<number>} [ma200] - 200-period moving average series.
+ * @returns {number} 1 for bullish trend, -1 for bearish and 0 for neutral.
+ */
 export function trendFromMAs(ma20, ma50, ma200) {
     const m20 = ma20.at(-1), m50 = ma50.at(-1), m200 = ma200?.at(-1);
     if (m20 == null || m50 == null) return 0;
@@ -380,6 +528,15 @@ export function trendFromMAs(ma20, ma50, ma200) {
     return 0;
 }
 
+/**
+ * Aggregates several indicators into a heuristic score.
+ * @param {Object} params - Indicator inputs.
+ * @param {number} [params.rsi]
+ * @param {number} [params.macdHist]
+ * @param {number} [params.width]
+ * @param {number} [params.trend]
+ * @returns {number} Score between 0 and 100.
+ */
 export function scoreHeuristic({ rsi, macdHist, width, trend }) {
     let s = 50;
     if (rsi != null) { if (rsi > 70) s -= 10; else if (rsi < 30) s += 10; }
@@ -389,6 +546,11 @@ export function scoreHeuristic({ rsi, macdHist, width, trend }) {
     return Math.max(0, Math.min(100, Math.round(s)));
 }
 
+/**
+ * Maps a heuristic score into a traffic light emoji.
+ * @param {number} score - Score between 0 and 100.
+ * @returns {string} Emoji representing bullish, neutral or bearish context.
+ */
 export function semaforo(score) {
     if (score >= 66) return "🟢";
     if (score >= 33) return "🟡";

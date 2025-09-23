@@ -1,0 +1,588 @@
+<!DOCTYPE html><html lang="en" style="font-size:16px"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Source: indicators.js</title><!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]--><script src="scripts/third-party/hljs.js" defer="defer"></script><script src="scripts/third-party/hljs-line-num.js" defer="defer"></script><script src="scripts/third-party/popper.js" defer="defer"></script><script src="scripts/third-party/tippy.js" defer="defer"></script><script src="scripts/third-party/tocbot.min.js"></script><script>var baseURL="/",locationPathname="";baseURL=(locationPathname=document.location.pathname).substr(0,locationPathname.lastIndexOf("/")+1)</script><link rel="stylesheet" href="styles/clean-jsdoc-theme.min.css"><svg aria-hidden="true" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="display:none"><defs><symbol id="copy-icon" viewbox="0 0 488.3 488.3"><g><path d="M314.25,85.4h-227c-21.3,0-38.6,17.3-38.6,38.6v325.7c0,21.3,17.3,38.6,38.6,38.6h227c21.3,0,38.6-17.3,38.6-38.6V124    C352.75,102.7,335.45,85.4,314.25,85.4z M325.75,449.6c0,6.4-5.2,11.6-11.6,11.6h-227c-6.4,0-11.6-5.2-11.6-11.6V124    c0-6.4,5.2-11.6,11.6-11.6h227c6.4,0,11.6,5.2,11.6,11.6V449.6z"/><path d="M401.05,0h-227c-21.3,0-38.6,17.3-38.6,38.6c0,7.5,6,13.5,13.5,13.5s13.5-6,13.5-13.5c0-6.4,5.2-11.6,11.6-11.6h227    c6.4,0,11.6,5.2,11.6,11.6v325.7c0,6.4-5.2,11.6-11.6,11.6c-7.5,0-13.5,6-13.5,13.5s6,13.5,13.5,13.5c21.3,0,38.6-17.3,38.6-38.6    V38.6C439.65,17.3,422.35,0,401.05,0z"/></g></symbol><symbol id="search-icon" viewBox="0 0 512 512"><g><g><path d="M225.474,0C101.151,0,0,101.151,0,225.474c0,124.33,101.151,225.474,225.474,225.474    c124.33,0,225.474-101.144,225.474-225.474C450.948,101.151,349.804,0,225.474,0z M225.474,409.323    c-101.373,0-183.848-82.475-183.848-183.848S124.101,41.626,225.474,41.626s183.848,82.475,183.848,183.848    S326.847,409.323,225.474,409.323z"/></g></g><g><g><path d="M505.902,476.472L386.574,357.144c-8.131-8.131-21.299-8.131-29.43,0c-8.131,8.124-8.131,21.306,0,29.43l119.328,119.328    c4.065,4.065,9.387,6.098,14.715,6.098c5.321,0,10.649-2.033,14.715-6.098C514.033,497.778,514.033,484.596,505.902,476.472z"/></g></g></symbol><symbol id="font-size-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M11.246 15H4.754l-2 5H.6L7 4h2l6.4 16h-2.154l-2-5zm-.8-2L8 6.885 5.554 13h4.892zM21 12.535V12h2v8h-2v-.535a4 4 0 1 1 0-6.93zM19 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></symbol><symbol id="add-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2z"/></symbol><symbol id="minus-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M5 11h14v2H5z"/></symbol><symbol id="dark-theme-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M10 7a7 7 0 0 0 12 4.9v.1c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2h.1A6.979 6.979 0 0 0 10 7zm-6 5a8 8 0 0 0 15.062 3.762A9 9 0 0 1 8.238 4.938 7.999 7.999 0 0 0 4 12z"/></symbol><symbol id="light-theme-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 1h2v3h-2V1zm0 19h2v3h-2v-3zM3.515 4.929l1.414-1.414L7.05 5.636 5.636 7.05 3.515 4.93zM16.95 18.364l1.414-1.414 2.121 2.121-1.414 1.414-2.121-2.121zm2.121-14.85l1.414 1.415-2.121 2.121-1.414-1.414 2.121-2.121zM5.636 16.95l1.414 1.414-2.121 2.121-1.414-1.414 2.121-2.121zM23 11v2h-3v-2h3zM4 11v2H1v-2h3z"/></symbol><symbol id="reset-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M18.537 19.567A9.961 9.961 0 0 1 12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10c0 2.136-.67 4.116-1.81 5.74L17 12h3a8 8 0 1 0-2.46 5.772l.997 1.795z"/></symbol><symbol id="down-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7803 6.21967C13.0732 6.51256 13.0732 6.98744 12.7803 7.28033L8.53033 11.5303C8.23744 11.8232 7.76256 11.8232 7.46967 11.5303L3.21967 7.28033C2.92678 6.98744 2.92678 6.51256 3.21967 6.21967C3.51256 5.92678 3.98744 5.92678 4.28033 6.21967L8 9.93934L11.7197 6.21967C12.0126 5.92678 12.4874 5.92678 12.7803 6.21967Z"></path></symbol><symbol id="codepen-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M16.5 13.202L13 15.535v3.596L19.197 15 16.5 13.202zM14.697 12L12 10.202 9.303 12 12 13.798 14.697 12zM20 10.869L18.303 12 20 13.131V10.87zM19.197 9L13 4.869v3.596l3.5 2.333L19.197 9zM7.5 10.798L11 8.465V4.869L4.803 9 7.5 10.798zM4.803 15L11 19.131v-3.596l-3.5-2.333L4.803 15zM4 13.131L5.697 12 4 10.869v2.262zM2 9a1 1 0 0 1 .445-.832l9-6a1 1 0 0 1 1.11 0l9 6A1 1 0 0 1 22 9v6a1 1 0 0 1-.445.832l-9 6a1 1 0 0 1-1.11 0l-9-6A1 1 0 0 1 2 15V9z"/></symbol><symbol id="close-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z"/></symbol><symbol id="menu-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"/></symbol></defs></svg></head><body data-theme="light"><div class="sidebar-container"><div class="sidebar" id="sidebar"><a href="/" class="sidebar-title sidebar-title-anchor">Crypto Daily Discord Bot API</a><div class="sidebar-items-container"><div class="sidebar-section-title with-arrow" data-isopen="false" id="sidebar-classes"><div>Classes</div><svg><use xlink:href="#down-icon"></use></svg></div><div class="sidebar-section-children-container"><div class="sidebar-section-children"><a href="DiscordRateLimit.html">DiscordRateLimit</a></div><div class="sidebar-section-children"><a href="TokenBucket.html">TokenBucket</a></div></div><div class="sidebar-section-title with-arrow" data-isopen="false" id="sidebar-global"><div>Global</div><svg><use xlink:href="#down-icon"></use></svg></div><div class="sidebar-section-children-container"><div class="sidebar-section-children"><a href="global.html#addAssetToWatch">addAssetToWatch</a></div><div class="sidebar-section-children"><a href="global.html#adx">adx</a></div><div class="sidebar-section-children"><a href="global.html#atr14">atr14</a></div><div class="sidebar-section-children"><a href="global.html#bollWidth">bollWidth</a></div><div class="sidebar-section-children"><a href="global.html#bollinger">bollinger</a></div><div class="sidebar-section-children"><a href="global.html#build45mCandles">build45mCandles</a></div><div class="sidebar-section-children"><a href="global.html#buildAlerts">buildAlerts</a></div><div class="sidebar-section-children"><a href="global.html#buildHash">buildHash</a></div><div class="sidebar-section-children"><a href="global.html#buildSnapshotForReport">buildSnapshotForReport</a></div><div class="sidebar-section-children"><a href="global.html#buildSummary">buildSummary</a></div><div class="sidebar-section-children"><a href="global.html#buildSummaryPdf">buildSummaryPdf</a></div><div class="sidebar-section-children"><a href="global.html#calcConcurrency">calcConcurrency</a></div><div class="sidebar-section-children"><a href="global.html#callOpenRouter">callOpenRouter</a></div><div class="sidebar-section-children"><a href="global.html#cci">cci</a></div><div class="sidebar-section-children"><a href="global.html#clampSentiment">clampSentiment</a></div><div class="sidebar-section-children"><a href="global.html#classifySentimentsLocal">classifySentimentsLocal</a></div><div class="sidebar-section-children"><a href="global.html#compileMonthlyPerformanceReport">compileMonthlyPerformanceReport</a></div><div class="sidebar-section-children"><a href="global.html#computeWeightedSentiment">computeWeightedSentiment</a></div><div class="sidebar-section-children"><a href="global.html#createContext">createContext</a></div><div class="sidebar-section-children"><a href="global.html#crossDown">crossDown</a></div><div class="sidebar-section-children"><a href="global.html#crossUp">crossUp</a></div><div class="sidebar-section-children"><a href="global.html#ema">ema</a></div><div class="sidebar-section-children"><a href="global.html#fetchWithRetry">fetchWithRetry</a></div><div class="sidebar-section-children"><a href="global.html#filterFreshNewsItems">filterFreshNewsItems</a></div><div class="sidebar-section-children"><a href="global.html#fmt">fmt</a></div><div class="sidebar-section-children"><a href="global.html#formatAlertMessage">formatAlertMessage</a></div><div class="sidebar-section-children"><a href="global.html#generateWeeklySnapshot">generateWeeklySnapshot</a></div><div class="sidebar-section-children"><a href="global.html#getAlertHash">getAlertHash</a></div><div class="sidebar-section-children"><a href="global.html#getAssetNews">getAssetNews</a></div><div class="sidebar-section-children"><a href="global.html#getSetting">getSetting</a></div><div class="sidebar-section-children"><a href="global.html#getSettings">getSettings</a></div><div class="sidebar-section-children"><a href="global.html#getSignature">getSignature</a></div><div class="sidebar-section-children"><a href="global.html#getWatchlist">getWatchlist</a></div><div class="sidebar-section-children"><a href="global.html#handleAnalysisSlashCommand">handleAnalysisSlashCommand</a></div><div class="sidebar-section-children"><a href="global.html#handleInteraction">handleInteraction</a></div><div class="sidebar-section-children"><a href="global.html#initBot">initBot</a></div><div class="sidebar-section-children"><a href="global.html#isBBSqueeze">isBBSqueeze</a></div><div class="sidebar-section-children"><a href="global.html#keltnerChannel">keltnerChannel</a></div><div class="sidebar-section-children"><a href="global.html#limit">limit</a></div><div class="sidebar-section-children"><a href="global.html#loadSettings">loadSettings</a></div><div class="sidebar-section-children"><a href="global.html#loadWeeklySnapshots">loadWeeklySnapshots</a></div><div class="sidebar-section-children"><a href="global.html#macd">macd</a></div><div class="sidebar-section-children"><a href="global.html#markNewsItemsAsSeen">markNewsItemsAsSeen</a></div><div class="sidebar-section-children"><a href="global.html#monthKeyFromIso">monthKeyFromIso</a></div><div class="sidebar-section-children"><a href="global.html#normalizeSentiment">normalizeSentiment</a></div><div class="sidebar-section-children"><a href="global.html#notifyOps">notifyOps</a></div><div class="sidebar-section-children"><a href="global.html#num">num</a></div><div class="sidebar-section-children"><a href="global.html#obv">obv</a></div><div class="sidebar-section-children"><a href="global.html#parabolicSAR">parabolicSAR</a></div><div class="sidebar-section-children"><a href="global.html#pct">pct</a></div><div class="sidebar-section-children"><a href="global.html#postAnalysis">postAnalysis</a></div><div class="sidebar-section-children"><a href="global.html#postCharts">postCharts</a></div><div class="sidebar-section-children"><a href="global.html#postMonthlyReport">postMonthlyReport</a></div><div class="sidebar-section-children"><a href="global.html#previousMonthKey">previousMonthKey</a></div><div class="sidebar-section-children"><a href="global.html#pruneOlderThan">pruneOlderThan</a></div><div class="sidebar-section-children"><a href="global.html#recordPerf">recordPerf</a></div><div class="sidebar-section-children"><a href="global.html#removeAssetFromWatch">removeAssetFromWatch</a></div><div class="sidebar-section-children"><a href="global.html#renderChartPNG">renderChartPNG</a></div><div class="sidebar-section-children"><a href="global.html#renderMonthlyPerformanceChart">renderMonthlyPerformanceChart</a></div><div class="sidebar-section-children"><a href="global.html#reportWeeklyPerf">reportWeeklyPerf</a></div><div class="sidebar-section-children"><a href="global.html#resetAlertHashes">resetAlertHashes</a></div><div class="sidebar-section-children"><a href="global.html#resetSettings">resetSettings</a></div><div class="sidebar-section-children"><a href="global.html#roundThreshold">roundThreshold</a></div><div class="sidebar-section-children"><a href="global.html#rsi">rsi</a></div><div class="sidebar-section-children"><a href="global.html#runAgent">runAgent</a></div><div class="sidebar-section-children"><a href="global.html#runAll">runAll</a></div><div class="sidebar-section-children"><a href="global.html#runDailyAnalysis">runDailyAnalysis</a></div><div class="sidebar-section-children"><a href="global.html#runOnceForAsset">runOnceForAsset</a></div><div class="sidebar-section-children"><a href="global.html#saveStore">saveStore</a></div><div class="sidebar-section-children"><a href="global.html#saveWeeklySnapshot">saveWeeklySnapshot</a></div><div class="sidebar-section-children"><a href="global.html#scheduleRun">scheduleRun</a></div><div class="sidebar-section-children"><a href="global.html#scoreHeuristic">scoreHeuristic</a></div><div class="sidebar-section-children"><a href="global.html#searchWeb">searchWeb</a></div><div class="sidebar-section-children"><a href="global.html#semaforo">semaforo</a></div><div class="sidebar-section-children"><a href="global.html#sendDiscordAlert">sendDiscordAlert</a></div><div class="sidebar-section-children"><a href="global.html#setSetting">setSetting</a></div><div class="sidebar-section-children"><a href="global.html#shouldSend">shouldSend</a></div><div class="sidebar-section-children"><a href="global.html#sma">sma</a></div><div class="sidebar-section-children"><a href="global.html#sparkline">sparkline</a></div><div class="sidebar-section-children"><a href="global.html#stochastic">stochastic</a></div><div class="sidebar-section-children"><a href="global.html#streamKlines">streamKlines</a></div><div class="sidebar-section-children"><a href="global.html#tfToInterval">tfToInterval</a></div><div class="sidebar-section-children"><a href="global.html#toMonthKey">toMonthKey</a></div><div class="sidebar-section-children"><a href="global.html#trendFromMAs">trendFromMAs</a></div><div class="sidebar-section-children"><a href="global.html#updateAlertHash">updateAlertHash</a></div><div class="sidebar-section-children"><a href="global.html#updateSignature">updateSignature</a></div><div class="sidebar-section-children"><a href="global.html#volumeDivergence">volumeDivergence</a></div><div class="sidebar-section-children"><a href="global.html#vwap">vwap</a></div><div class="sidebar-section-children"><a href="global.html#williamsR">williamsR</a></div><div class="sidebar-section-children"><a href="global.html#withContext">withContext</a></div></div></div></div></div><div class="navbar-container" id="VuAckcnZhf"><nav class="navbar"><div class="navbar-left-items"></div><div class="navbar-right-items"><div class="navbar-right-item"><button class="icon-button search-button" aria-label="open-search"><svg><use xlink:href="#search-icon"></use></svg></button></div><div class="navbar-right-item"><button class="icon-button theme-toggle" aria-label="toggle-theme"><svg><use class="theme-svg-use" xlink:href="#dark-theme-icon"></use></svg></button></div><div class="navbar-right-item"><button class="icon-button font-size" aria-label="change-font-size"><svg><use xlink:href="#font-size-icon"></use></svg></button></div></div><nav></nav></nav></div><div class="toc-container"><div class="toc-content"><span class="bold">On this page</span><div id="eed4d2a0bfd64539bb9df78095dec881"></div></div></div><div class="body-wrapper"><div class="main-content"><div class="main-wrapper"><section id="source-page" class="source-page"><header><h1 id="title" class="has-anchor">indicators.js</h1></header><article><pre class="prettyprint source lang-js"><code>/**
+ * Calculates the simple moving average for the provided series.
+ * @param {number[]} arr - Values to average.
+ * @param {number} period - Window length used for the average.
+ * @returns {Array&lt;number>} Array containing the SMA values aligned with the input; positions without enough data remain null.
+ */
+export function sma(arr, period) {
+    const out = Array(arr.length).fill(null);
+    let sum = 0;
+    for (let i = 0; i &lt; arr.length; i++) {
+        sum += arr[i];
+        if (i >= period) sum -= arr[i - period];
+        if (i >= period - 1) out[i] = sum / period;
+    }
+    return out;
+}
+
+/**
+ * Computes the relative strength index (RSI) for a series of closing prices.
+ * @param {number[]} closes - Closing price series.
+ * @param {number} [period=14] - Lookback period for the indicator.
+ * @returns {Array&lt;number>} RSI values where unavailable entries are null.
+ */
+export function rsi(closes, period = 14) {
+    const out = Array(closes.length).fill(null);
+    let gains = 0, losses = 0;
+    for (let i = 1; i &lt; closes.length; i++) {
+        const d = closes[i] - closes[i - 1];
+        if (i &lt;= period) {
+            if (d > 0) gains += d; else losses -= d;
+            if (i === period) {
+                let avgG = gains / period, avgL = losses / period;
+                const rs = avgL === 0 ? 100 : avgG / avgL;
+                out[i] = 100 - (100 / (1 + rs));
+                var prevG = avgG, prevL = avgL;
+            }
+        } else {
+            const g = d > 0 ? d : 0, l = d &lt; 0 ? -d : 0;
+            prevG = (prevG * (period - 1) + g) / period;
+            prevL = (prevL * (period - 1) + l) / period;
+            const rs = prevL === 0 ? 100 : prevG / prevL;
+            out[i] = 100 - (100 / (1 + rs));
+        }
+    }
+    return out;
+}
+
+// MACD (12,26,9)
+/**
+ * Calculates the Moving Average Convergence Divergence (MACD) indicator.
+ * @param {number[]} closes - Closing prices used to compute the MACD.
+ * @param {number} [fast=12] - Fast EMA period.
+ * @param {number} [slow=26] - Slow EMA period.
+ * @param {number} [signal=9] - Signal line EMA period.
+ * @returns {Object} MACD components with line, signal and histogram arrays.
+ */
+export function macd(closes, fast = 12, slow = 26, signal = 9) {
+    const ema = (p) => {
+        const k = 2 / (p + 1); const out = []; let prev;
+        closes.forEach((c, i) => { prev = i ? (c * k + prev * (1 - k)) : c; out.push(prev); });
+        return out;
+    };
+    const fastE = ema(fast), slowE = ema(slow);
+    const line = fastE.map((v, i) => v - slowE[i]);
+    const signalE = (() => {
+        const k = 2 / (signal + 1); const out = []; let prev;
+        line.forEach((v, i) => { prev = i ? (v * k + prev * (1 - k)) : v; out.push(prev); }); return out;
+    })();
+    const hist = line.map((v, i) => v - signalE[i]);
+    return { line, signal: signalE, hist };
+}
+
+/**
+ * Calculates Bollinger Bands for the provided closing prices.
+ * @param {number[]} closes - Closing price series.
+ * @param {number} [period=20] - Length of the moving average.
+ * @param {number} [mult=2] - Standard deviation multiplier for the bands.
+ * @returns {Object} Bollinger band values containing middle, upper and lower arrays.
+ */
+export function bollinger(closes, period = 20, mult = 2) {
+    const ma = sma(closes, period);
+    const out = { mid: ma, upper: Array(closes.length).fill(null), lower: Array(closes.length).fill(null) };
+    for (let i = 0; i &lt; closes.length; i++) {
+        if (i >= period - 1) {
+            const slice = closes.slice(i - period + 1, i + 1);
+            const mean = ma[i];
+            const std = Math.sqrt(slice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / slice.length);
+            out.upper[i] = mean + mult * std;
+            out.lower[i] = mean - mult * std;
+        }
+    }
+    return out;
+}
+
+/**
+ * Calculates Keltner Channels for the provided price series.
+ * @param {number[]} closes - Closing prices.
+ * @param {number[]} highs - High prices aligned with closes.
+ * @param {number[]} lows - Low prices aligned with closes.
+ * @param {number} [period=20] - Lookback period for the EMA and ATR.
+ * @param {number} [multiplier=2] - Multiplier applied to the ATR for the band width.
+ * @returns {Object} Channel values containing middle, upper and lower arrays.
+ */
+export function keltnerChannel(closes, highs, lows, period = 20, multiplier = 2) {
+    const len = Math.min(closes?.length ?? 0, highs?.length ?? 0, lows?.length ?? 0);
+    const out = {
+        mid: Array(len).fill(null),
+        upper: Array(len).fill(null),
+        lower: Array(len).fill(null)
+    };
+    if (!len) return out;
+
+    const typical = Array(len);
+    for (let i = 0; i &lt; len; i++) {
+        typical[i] = (highs[i] + lows[i] + closes[i]) / 3;
+    }
+    const midEma = ema(typical, period);
+
+    const tr = Array(len).fill(0);
+    for (let i = 0; i &lt; len; i++) {
+        if (i === 0) {
+            tr[i] = highs[i] - lows[i];
+        } else {
+            const prevClose = closes[i - 1];
+            const range = highs[i] - lows[i];
+            const highClose = Math.abs(highs[i] - prevClose);
+            const lowClose = Math.abs(lows[i] - prevClose);
+            tr[i] = Math.max(range, highClose, lowClose);
+        }
+    }
+    const atrEma = ema(tr, period);
+
+    for (let i = 0; i &lt; len; i++) {
+        if (i &lt; period - 1) continue;
+        const mid = midEma[i];
+        const atr = atrEma[i];
+        out.mid[i] = mid;
+        out.upper[i] = mid + multiplier * atr;
+        out.lower[i] = mid - multiplier * atr;
+    }
+
+    return out;
+}
+
+// Parabolic SAR (passo padrão 0.02, aceleração máx 0.2)
+/**
+ * Computes the Parabolic SAR trend indicator for OHLC candles.
+ * @param {Array&lt;Object>} ohlc - Candle data including high, low and close.
+ * @param {number} [step=0.02] - Acceleration factor step.
+ * @param {number} [max=0.2] - Maximum acceleration factor.
+ * @returns {Array&lt;number>} Parabolic SAR values for each candle.
+ */
+export function parabolicSAR(ohlc, step = 0.02, max = 0.2) {
+    const out = Array(ohlc.length).fill(null);
+    if (!ohlc || ohlc.length &lt; 2) return out;
+
+    let up = ohlc[1].c > ohlc[0].c; // tendência inicial
+    let sar = up ? ohlc[0].l : ohlc[0].h;
+    let ep = up ? Math.max(ohlc[0].h, ohlc[1].h) : Math.min(ohlc[0].l, ohlc[1].l);
+    let af = step;
+
+    out[1] = sar;
+
+    for (let i = 2; i &lt; ohlc.length; i++) {
+        sar = sar + af * (ep - sar);
+
+        if (up) {
+            sar = Math.min(sar, ohlc[i - 1].l, ohlc[i - 2].l);
+            if (ohlc[i].h > ep) {
+                ep = ohlc[i].h;
+                af = Math.min(af + step, max);
+            }
+            if (sar > ohlc[i].l) { // reversão para baixa
+                up = false;
+                sar = Math.max(ep, ohlc[i - 1].h, ohlc[i - 2].h);
+                ep = ohlc[i].l;
+                af = step;
+            }
+        } else {
+            sar = Math.max(sar, ohlc[i - 1].h, ohlc[i - 2].h);
+            if (ohlc[i].l &lt; ep) {
+                ep = ohlc[i].l;
+                af = Math.min(af + step, max);
+            }
+            if (sar &lt; ohlc[i].h) { // reversão para alta
+                up = true;
+                sar = Math.min(ep, ohlc[i - 1].l, ohlc[i - 2].l);
+                ep = ohlc[i].h;
+                af = step;
+            }
+        }
+        out[i] = sar;
+    }
+
+    return out;
+}
+
+// Divergência de volume normalizada por EMA
+/**
+ * Detects bullish or bearish volume divergence against the price series.
+ * @param {number[]} closes - Closing prices.
+ * @param {number[]} volumes - Volume series aligned with closes.
+ * @param {number} [period=20] - EMA period used for normalization.
+ * @returns {Array&lt;string|null>} Divergence labels per candle.
+ */
+export function volumeDivergence(closes, volumes, period = 20) {
+    const out = Array(closes.length).fill(null);
+    if (!closes || closes.length !== volumes.length) return out;
+
+    const ema = (arr, p) => {
+        const k = 2 / (p + 1);
+        const res = [];
+        let prev;
+        arr.forEach((v, i) => { prev = i ? (v * k + prev * (1 - k)) : v; res.push(prev); });
+        return res;
+    };
+
+    const pEma = ema(closes, period);
+    const vEma = ema(volumes, period);
+
+    for (let i = period; i &lt; closes.length; i++) {
+        const pRel = pEma[i] ? (closes[i] - pEma[i]) / pEma[i] : 0;
+        const vRel = vEma[i] ? (volumes[i] - vEma[i]) / vEma[i] : 0;
+        if (pRel > 0 &amp;&amp; vRel &lt; 0) out[i] = "bear";
+        else if (pRel &lt; 0 &amp;&amp; vRel > 0) out[i] = "bull";
+    }
+    return out;
+}
+
+/**
+ * Computes the Volume Weighted Average Price (VWAP).
+ * @param {number[]} highs - High prices.
+ * @param {number[]} lows - Low prices.
+ * @param {number[]} closes - Closing prices.
+ * @param {number[]} volumes - Trade volumes.
+ * @returns {Array&lt;number>} VWAP series aligned with the inputs.
+ */
+export function vwap(highs, lows, closes, volumes) {
+    const out = Array(closes.length).fill(null);
+    let cumPV = 0, cumVol = 0;
+    for (let i = 0; i &lt; closes.length; i++) {
+        const tp = (highs[i] + lows[i] + closes[i]) / 3;
+        const v = volumes[i];
+        cumPV += tp * v;
+        cumVol += v;
+        out[i] = cumVol ? cumPV / cumVol : null;
+    }
+    return out;
+}
+
+/**
+ * Calculates the exponential moving average of a numeric series.
+ * @param {number[]} arr - Values to smooth.
+ * @param {number} period - Lookback period for the EMA.
+ * @returns {Array&lt;number>} EMA values.
+ */
+export function ema(arr, period) {
+    const k = 2 / (period + 1);
+    const out = [];
+    arr.forEach((val, i) => {
+        if (i === 0) out.push(val);
+        else out.push(val * k + out[i - 1] * (1 - k));
+    });
+    return out;
+}
+
+/**
+ * Computes the Average Directional Index (ADX) from high, low and close series.
+ * @param {number[]} highs - High price series.
+ * @param {number[]} lows - Low price series.
+ * @param {number[]} closes - Closing price series.
+ * @param {number} [period=14] - Smoothing period for the calculation.
+ * @returns {Array&lt;number>} ADX values.
+ */
+export function adx(highs, lows, closes, period = 14) {
+    const len = Math.min(highs?.length ?? 0, lows?.length ?? 0, closes?.length ?? 0);
+    if (!len) return [];
+
+    const plusDM = Array(len).fill(0);
+    const minusDM = Array(len).fill(0);
+    const tr = Array(len).fill(0);
+
+    if (len > 0) {
+        tr[0] = highs[0] - lows[0];
+    }
+
+    for (let i = 1; i &lt; len; i++) {
+        const upMove = highs[i] - highs[i - 1];
+        const downMove = lows[i - 1] - lows[i];
+        plusDM[i] = (upMove > downMove &amp;&amp; upMove > 0) ? upMove : 0;
+        minusDM[i] = (downMove > upMove &amp;&amp; downMove > 0) ? downMove : 0;
+
+        const range = highs[i] - lows[i];
+        const rangeHigh = Math.abs(highs[i] - closes[i - 1]);
+        const rangeLow = Math.abs(lows[i] - closes[i - 1]);
+        tr[i] = Math.max(range, rangeHigh, rangeLow);
+    }
+
+    const wilderRMA = (values, p, seedWithSMA = false) => {
+        const out = Array(values.length).fill(null);
+        let prev = null;
+        const alpha = 1 / p;
+        if (seedWithSMA &amp;&amp; values.length >= p) {
+            let seed = 0;
+            for (let i = 0; i &lt; p; i++) seed += values[i] ?? 0;
+            values = values.slice();
+            for (let i = 0; i &lt; p - 1; i++) values[i] = null;
+            values[p - 1] = seed / p;
+        }
+        for (let i = 0; i &lt; values.length; i++) {
+            const v = values[i];
+            if (v == null) continue;
+            prev = prev == null ? v : prev + alpha * (v - prev);
+            out[i] = prev;
+        }
+        return out;
+    };
+
+    const atr = wilderRMA(tr, period, true);
+    const plusRma = wilderRMA(plusDM, period);
+    const minusRma = wilderRMA(minusDM, period);
+
+    const dx = Array(len).fill(null);
+    for (let i = 0; i &lt; len; i++) {
+        const atrVal = atr[i];
+        if (atrVal == null || atrVal === 0) continue;
+        const plusVal = plusRma[i] ?? 0;
+        const minusVal = minusRma[i] ?? 0;
+        const plusDI = (plusVal / atrVal) * 100;
+        const minusDI = (minusVal / atrVal) * 100;
+        const denom = plusDI + minusDI;
+        dx[i] = denom === 0 ? 0 : Math.abs(plusDI - minusDI) / denom * 100;
+    }
+
+    return wilderRMA(dx, period);
+}
+
+/**
+ * Calculates the stochastic oscillator for the given price series.
+ * @param {number[]} highs - High prices.
+ * @param {number[]} lows - Low prices.
+ * @param {number[]} closes - Closing prices.
+ * @param {number} [kPeriod=14] - Lookback period for the %K line.
+ * @param {number} [dPeriod=3] - Smoothing period for the %D line.
+ * @returns {Object} Stochastic oscillator values with %K and %D arrays.
+ */
+export function stochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
+    const k = Array(closes.length).fill(null);
+    for (let i = 0; i &lt; closes.length; i++) {
+        if (i >= kPeriod - 1) {
+            const hh = Math.max(...highs.slice(i - kPeriod + 1, i + 1));
+            const ll = Math.min(...lows.slice(i - kPeriod + 1, i + 1));
+            k[i] = hh === ll ? 0 : ((closes[i] - ll) / (hh - ll)) * 100;
+        }
+    }
+    const d = Array(closes.length).fill(null);
+    for (let i = 0; i &lt; closes.length; i++) {
+        if (i >= kPeriod - 1 + dPeriod - 1) {
+            const slice = k.slice(i - dPeriod + 1, i + 1);
+            if (slice.every(v => v != null)) {
+                d[i] = slice.reduce((a, b) => a + b, 0) / dPeriod;
+            }
+        }
+    }
+    return { k, d };
+}
+
+/**
+ * Computes the Williams %R oscillator for the given prices.
+ * @param {number[]} highs - High prices.
+ * @param {number[]} lows - Low prices.
+ * @param {number[]} closes - Closing prices.
+ * @param {number} [period=14] - Lookback period for the indicator.
+ * @returns {Array&lt;number>} Williams %R values.
+ */
+export function williamsR(highs, lows, closes, period = 14) {
+    const out = Array(closes.length).fill(null);
+    for (let i = 0; i &lt; closes.length; i++) {
+        if (i >= period - 1) {
+            const hh = Math.max(...highs.slice(i - period + 1, i + 1));
+            const ll = Math.min(...lows.slice(i - period + 1, i + 1));
+            out[i] = hh === ll ? 0 : ((hh - closes[i]) / (hh - ll)) * -100;
+        }
+    }
+    return out;
+}
+
+/**
+ * Calculates the Commodity Channel Index (CCI) for the given prices.
+ * @param {number[]} highs - High prices.
+ * @param {number[]} lows - Low prices.
+ * @param {number[]} closes - Closing prices.
+ * @param {number} [period=20] - Lookback period for the indicator.
+ * @returns {Array&lt;number>} CCI values.
+ */
+export function cci(highs, lows, closes, period = 20) {
+    const tp = highs.map((h, i) => (h + lows[i] + closes[i]) / 3);
+    const smaTp = sma(tp, period);
+    const out = Array(closes.length).fill(null);
+    for (let i = 0; i &lt; closes.length; i++) {
+        if (i >= period - 1) {
+            const slice = tp.slice(i - period + 1, i + 1);
+            const mean = smaTp[i];
+            const md = slice.reduce((sum, v) => sum + Math.abs(v - mean), 0) / period;
+            out[i] = md === 0 ? 0 : (tp[i] - mean) / (0.015 * md);
+        }
+    }
+    return out;
+}
+
+/**
+ * Computes the On Balance Volume (OBV) cumulative indicator.
+ * @param {number[]} closes - Closing prices.
+ * @param {number[]} volumes - Volume series aligned with closes.
+ * @returns {Array&lt;number>} OBV values.
+ */
+export function obv(closes, volumes) {
+    const out = [];
+    for (let i = 0; i &lt; closes.length; i++) {
+        if (i === 0) { out.push(0); continue; }
+        if (closes[i] > closes[i - 1]) out.push(out[i - 1] + volumes[i]);
+        else if (closes[i] &lt; closes[i - 1]) out.push(out[i - 1] - volumes[i]);
+        else out.push(out[i - 1]);
+    }
+    return out;
+}
+
+/**
+ * Calculates the Average True Range (ATR) using an EMA smoothing.
+ * @param {Array&lt;Object>} ohlc - Candle objects containing high, low and close.
+ * @param {number} [period=14] - Period for the ATR smoothing.
+ * @returns {Array&lt;number>} ATR values.
+ */
+export function atr14(ohlc, period = 14) {
+    const tr = [];
+    for (let i = 0; i &lt; ohlc.length; i++) {
+        if (i === 0) { tr.push(ohlc[i].h - ohlc[i].l); continue; }
+        const prevClose = ohlc[i - 1].c;
+        const a = ohlc[i].h - ohlc[i].l;
+        const b = Math.abs(ohlc[i].h - prevClose);
+        const c = Math.abs(ohlc[i].l - prevClose);
+        tr.push(Math.max(a, b, c));
+    }
+    // EMA ATR(14)
+    const n = Number.isFinite(period) &amp;&amp; period > 0 ? Math.round(period) : 14;
+    const k = 2 / (n + 1);
+    const out = [];
+    tr.forEach((v, i) => out.push(i ? (v * k + out[i - 1] * (1 - k)) : v));
+    return out;
+}
+
+/**
+ * Computes the relative width of Bollinger Bands.
+ * @param {Array&lt;number>} upper - Upper band values.
+ * @param {Array&lt;number>} lower - Lower band values.
+ * @param {Array&lt;number>} mid - Middle band values.
+ * @returns {Array&lt;number>} Relative band width for each point.
+ */
+export function bollWidth(upper, lower, mid) {
+    return upper.map((u, i) => {
+        const l = lower[i], m = mid[i];
+        if (u == null || l == null || m == null || m === 0) return null;
+        return (u - l) / m; // largura relativa
+    });
+}
+
+/**
+ * Determines whether the current Bollinger Band width is in squeeze conditions.
+ * @param {Array&lt;number>} widthSeries - Bollinger band width values.
+ * @param {number} [lookback=40] - Number of samples considered for the percentile.
+ * @param {number} [pct=0.15] - Percentile threshold that defines a squeeze.
+ * @returns {boolean} True when the latest value is below the configured percentile.
+ */
+export function isBBSqueeze(widthSeries, lookback = 40, pct = 0.15) {
+    // squeeze se o valor atual &lt;= percentil 15% dos últimos N
+    const arr = widthSeries.slice(-lookback).filter(x => x != null);
+    if (arr.length &lt; 10) return false;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const threshold = sorted[Math.floor(sorted.length * pct)];
+    const last = widthSeries[widthSeries.length - 1];
+    return last != null &amp;&amp; last &lt;= threshold;
+}
+
+/**
+ * Checks whether series A crossed above series B between the last two samples.
+ * @param {number[]} a - First series to evaluate.
+ * @param {number[]} b - Second series to evaluate.
+ * @returns {boolean} True when a cross-over occurred.
+ */
+export function crossUp(a, b) { const n = a.length; return n > 1 &amp;&amp; a[n - 2] &lt; b[n - 2] &amp;&amp; a[n - 1] >= b[n - 1]; }
+/**
+ * Checks whether series A crossed below series B between the last two samples.
+ * @param {number[]} a - First series to evaluate.
+ * @param {number[]} b - Second series to evaluate.
+ * @returns {boolean} True when a cross-under occurred.
+ */
+export function crossDown(a, b) { const n = a.length; return n > 1 &amp;&amp; a[n - 2] > b[n - 2] &amp;&amp; a[n - 1] &lt;= b[n - 1]; }
+
+/**
+ * Generates a unicode sparkline from the provided values.
+ * @param {number[]} values - Series to visualize.
+ * @param {number} [points=20] - Number of trailing points to include.
+ * @returns {string} Sparkline string.
+ */
+export function sparkline(values, points = 20) {
+    const chars = "▁▂▃▄▅▆▇█";
+    const arr = values.slice(-points);
+    const min = Math.min(...arr), max = Math.max(...arr);
+    if (max === min) return chars[0].repeat(arr.length);
+    return arr.map(v => {
+        const idx = Math.floor(((v - min) / (max - min)) * (chars.length - 1));
+        return chars[idx];
+    }).join("");
+}
+
+/**
+ * Estimates trend direction from moving averages.
+ * @param {Array&lt;number>} ma20 - 20-period moving average series.
+ * @param {Array&lt;number>} ma50 - 50-period moving average series.
+ * @param {Array&lt;number>} [ma200] - 200-period moving average series.
+ * @returns {number} 1 for bullish trend, -1 for bearish and 0 for neutral.
+ */
+export function trendFromMAs(ma20, ma50, ma200) {
+    const m20 = ma20.at(-1), m50 = ma50.at(-1), m200 = ma200?.at(-1);
+    if (m20 == null || m50 == null) return 0;
+    if (m20 > m50 &amp;&amp; (m200 == null || m50 > m200)) return 1;
+    if (m20 &lt; m50 &amp;&amp; (m200 == null || m50 &lt; m200)) return -1;
+    return 0;
+}
+
+/**
+ * Aggregates several indicators into a heuristic score.
+ * @param {Object} params - Indicator inputs.
+ * @param {number} [params.rsi]
+ * @param {number} [params.macdHist]
+ * @param {number} [params.width]
+ * @param {number} [params.trend]
+ * @returns {number} Score between 0 and 100.
+ */
+export function scoreHeuristic({ rsi, macdHist, width, trend }) {
+    let s = 50;
+    if (rsi != null) { if (rsi > 70) s -= 10; else if (rsi &lt; 30) s += 10; }
+    if (macdHist != null) { if (macdHist > 0) s += 5; else s -= 5; }
+    if (width != null) { if (width &lt; 0.1) s += 3; } // squeeze pode anteceder movimento
+    if (trend != null) { if (trend > 0) s += 7; else if (trend &lt; 0) s -= 7; }
+    return Math.max(0, Math.min(100, Math.round(s)));
+}
+
+/**
+ * Maps a heuristic score into a traffic light emoji.
+ * @param {number} score - Score between 0 and 100.
+ * @returns {string} Emoji representing bullish, neutral or bearish context.
+ */
+export function semaforo(score) {
+    if (score >= 66) return "🟢";
+    if (score >= 33) return "🟡";
+    return "🔴";
+}
+
+
+// indicators list:
+// - SMA (20,50,200)
+// - RSI (14)
+// - MACD (12,26,9)
+// - Bollinger Bands (20,2) + width + squeeze
+// - Parabolic SAR
+// - Volume Divergence
+// - ATR (14)
+// - Trend from MAs
+// - Heuristic Score (0-100) + semaforo
+// - Sparkline of closes
+// - atr14
+// - bollWidth
+// - isBBSqueeze
+// - crossUp
+// - crossDown
+// - sparkline
+// - trendFromMAs
+// - scoreHeuristic
+// - semaforo
+
+// Example usage:
+// const closes = [....]; // array of closing prices
+// const volumes = [....]; // array of volumes
+// const ohlc = [ {o,h,l,c,v}, ... ]; // array of OHLCV objects
+</code></pre></article></section></div></div></div><div class="search-container" id="PkfLWpAbet" style="display:none"><div class="wrapper" id="iCxFxjkHbP"><button class="icon-button search-close-button" id="VjLlGakifb" aria-label="close search"><svg><use xlink:href="#close-icon"></use></svg></button><div class="search-box-c"><svg><use xlink:href="#search-icon"></use></svg> <input type="text" id="vpcKVYIppa" class="search-input" placeholder="Search..." autofocus></div><div class="search-result-c" id="fWwVHRuDuN"><span class="search-result-c-text">Type anything to view search result</span></div></div></div><div class="mobile-menu-icon-container"><button class="icon-button" id="mobile-menu" data-isopen="false" aria-label="menu"><svg><use xlink:href="#menu-icon"></use></svg></button></div><div id="mobile-sidebar" class="mobile-sidebar-container"><div class="mobile-sidebar-wrapper"><a href="/" class="sidebar-title sidebar-title-anchor">Crypto Daily Discord Bot API</a><div class="mobile-nav-links"></div><div class="mobile-sidebar-items-c"><div class="sidebar-section-title with-arrow" data-isopen="false" id="sidebar-classes"><div>Classes</div><svg><use xlink:href="#down-icon"></use></svg></div><div class="sidebar-section-children-container"><div class="sidebar-section-children"><a href="DiscordRateLimit.html">DiscordRateLimit</a></div><div class="sidebar-section-children"><a href="TokenBucket.html">TokenBucket</a></div></div><div class="sidebar-section-title with-arrow" data-isopen="false" id="sidebar-global"><div>Global</div><svg><use xlink:href="#down-icon"></use></svg></div><div class="sidebar-section-children-container"><div class="sidebar-section-children"><a href="global.html#addAssetToWatch">addAssetToWatch</a></div><div class="sidebar-section-children"><a href="global.html#adx">adx</a></div><div class="sidebar-section-children"><a href="global.html#atr14">atr14</a></div><div class="sidebar-section-children"><a href="global.html#bollWidth">bollWidth</a></div><div class="sidebar-section-children"><a href="global.html#bollinger">bollinger</a></div><div class="sidebar-section-children"><a href="global.html#build45mCandles">build45mCandles</a></div><div class="sidebar-section-children"><a href="global.html#buildAlerts">buildAlerts</a></div><div class="sidebar-section-children"><a href="global.html#buildHash">buildHash</a></div><div class="sidebar-section-children"><a href="global.html#buildSnapshotForReport">buildSnapshotForReport</a></div><div class="sidebar-section-children"><a href="global.html#buildSummary">buildSummary</a></div><div class="sidebar-section-children"><a href="global.html#buildSummaryPdf">buildSummaryPdf</a></div><div class="sidebar-section-children"><a href="global.html#calcConcurrency">calcConcurrency</a></div><div class="sidebar-section-children"><a href="global.html#callOpenRouter">callOpenRouter</a></div><div class="sidebar-section-children"><a href="global.html#cci">cci</a></div><div class="sidebar-section-children"><a href="global.html#clampSentiment">clampSentiment</a></div><div class="sidebar-section-children"><a href="global.html#classifySentimentsLocal">classifySentimentsLocal</a></div><div class="sidebar-section-children"><a href="global.html#compileMonthlyPerformanceReport">compileMonthlyPerformanceReport</a></div><div class="sidebar-section-children"><a href="global.html#computeWeightedSentiment">computeWeightedSentiment</a></div><div class="sidebar-section-children"><a href="global.html#createContext">createContext</a></div><div class="sidebar-section-children"><a href="global.html#crossDown">crossDown</a></div><div class="sidebar-section-children"><a href="global.html#crossUp">crossUp</a></div><div class="sidebar-section-children"><a href="global.html#ema">ema</a></div><div class="sidebar-section-children"><a href="global.html#fetchWithRetry">fetchWithRetry</a></div><div class="sidebar-section-children"><a href="global.html#filterFreshNewsItems">filterFreshNewsItems</a></div><div class="sidebar-section-children"><a href="global.html#fmt">fmt</a></div><div class="sidebar-section-children"><a href="global.html#formatAlertMessage">formatAlertMessage</a></div><div class="sidebar-section-children"><a href="global.html#generateWeeklySnapshot">generateWeeklySnapshot</a></div><div class="sidebar-section-children"><a href="global.html#getAlertHash">getAlertHash</a></div><div class="sidebar-section-children"><a href="global.html#getAssetNews">getAssetNews</a></div><div class="sidebar-section-children"><a href="global.html#getSetting">getSetting</a></div><div class="sidebar-section-children"><a href="global.html#getSettings">getSettings</a></div><div class="sidebar-section-children"><a href="global.html#getSignature">getSignature</a></div><div class="sidebar-section-children"><a href="global.html#getWatchlist">getWatchlist</a></div><div class="sidebar-section-children"><a href="global.html#handleAnalysisSlashCommand">handleAnalysisSlashCommand</a></div><div class="sidebar-section-children"><a href="global.html#handleInteraction">handleInteraction</a></div><div class="sidebar-section-children"><a href="global.html#initBot">initBot</a></div><div class="sidebar-section-children"><a href="global.html#isBBSqueeze">isBBSqueeze</a></div><div class="sidebar-section-children"><a href="global.html#keltnerChannel">keltnerChannel</a></div><div class="sidebar-section-children"><a href="global.html#limit">limit</a></div><div class="sidebar-section-children"><a href="global.html#loadSettings">loadSettings</a></div><div class="sidebar-section-children"><a href="global.html#loadWeeklySnapshots">loadWeeklySnapshots</a></div><div class="sidebar-section-children"><a href="global.html#macd">macd</a></div><div class="sidebar-section-children"><a href="global.html#markNewsItemsAsSeen">markNewsItemsAsSeen</a></div><div class="sidebar-section-children"><a href="global.html#monthKeyFromIso">monthKeyFromIso</a></div><div class="sidebar-section-children"><a href="global.html#normalizeSentiment">normalizeSentiment</a></div><div class="sidebar-section-children"><a href="global.html#notifyOps">notifyOps</a></div><div class="sidebar-section-children"><a href="global.html#num">num</a></div><div class="sidebar-section-children"><a href="global.html#obv">obv</a></div><div class="sidebar-section-children"><a href="global.html#parabolicSAR">parabolicSAR</a></div><div class="sidebar-section-children"><a href="global.html#pct">pct</a></div><div class="sidebar-section-children"><a href="global.html#postAnalysis">postAnalysis</a></div><div class="sidebar-section-children"><a href="global.html#postCharts">postCharts</a></div><div class="sidebar-section-children"><a href="global.html#postMonthlyReport">postMonthlyReport</a></div><div class="sidebar-section-children"><a href="global.html#previousMonthKey">previousMonthKey</a></div><div class="sidebar-section-children"><a href="global.html#pruneOlderThan">pruneOlderThan</a></div><div class="sidebar-section-children"><a href="global.html#recordPerf">recordPerf</a></div><div class="sidebar-section-children"><a href="global.html#removeAssetFromWatch">removeAssetFromWatch</a></div><div class="sidebar-section-children"><a href="global.html#renderChartPNG">renderChartPNG</a></div><div class="sidebar-section-children"><a href="global.html#renderMonthlyPerformanceChart">renderMonthlyPerformanceChart</a></div><div class="sidebar-section-children"><a href="global.html#reportWeeklyPerf">reportWeeklyPerf</a></div><div class="sidebar-section-children"><a href="global.html#resetAlertHashes">resetAlertHashes</a></div><div class="sidebar-section-children"><a href="global.html#resetSettings">resetSettings</a></div><div class="sidebar-section-children"><a href="global.html#roundThreshold">roundThreshold</a></div><div class="sidebar-section-children"><a href="global.html#rsi">rsi</a></div><div class="sidebar-section-children"><a href="global.html#runAgent">runAgent</a></div><div class="sidebar-section-children"><a href="global.html#runAll">runAll</a></div><div class="sidebar-section-children"><a href="global.html#runDailyAnalysis">runDailyAnalysis</a></div><div class="sidebar-section-children"><a href="global.html#runOnceForAsset">runOnceForAsset</a></div><div class="sidebar-section-children"><a href="global.html#saveStore">saveStore</a></div><div class="sidebar-section-children"><a href="global.html#saveWeeklySnapshot">saveWeeklySnapshot</a></div><div class="sidebar-section-children"><a href="global.html#scheduleRun">scheduleRun</a></div><div class="sidebar-section-children"><a href="global.html#scoreHeuristic">scoreHeuristic</a></div><div class="sidebar-section-children"><a href="global.html#searchWeb">searchWeb</a></div><div class="sidebar-section-children"><a href="global.html#semaforo">semaforo</a></div><div class="sidebar-section-children"><a href="global.html#sendDiscordAlert">sendDiscordAlert</a></div><div class="sidebar-section-children"><a href="global.html#setSetting">setSetting</a></div><div class="sidebar-section-children"><a href="global.html#shouldSend">shouldSend</a></div><div class="sidebar-section-children"><a href="global.html#sma">sma</a></div><div class="sidebar-section-children"><a href="global.html#sparkline">sparkline</a></div><div class="sidebar-section-children"><a href="global.html#stochastic">stochastic</a></div><div class="sidebar-section-children"><a href="global.html#streamKlines">streamKlines</a></div><div class="sidebar-section-children"><a href="global.html#tfToInterval">tfToInterval</a></div><div class="sidebar-section-children"><a href="global.html#toMonthKey">toMonthKey</a></div><div class="sidebar-section-children"><a href="global.html#trendFromMAs">trendFromMAs</a></div><div class="sidebar-section-children"><a href="global.html#updateAlertHash">updateAlertHash</a></div><div class="sidebar-section-children"><a href="global.html#updateSignature">updateSignature</a></div><div class="sidebar-section-children"><a href="global.html#volumeDivergence">volumeDivergence</a></div><div class="sidebar-section-children"><a href="global.html#vwap">vwap</a></div><div class="sidebar-section-children"><a href="global.html#williamsR">williamsR</a></div><div class="sidebar-section-children"><a href="global.html#withContext">withContext</a></div></div></div><div class="mobile-navbar-actions"><div class="navbar-right-item"><button class="icon-button search-button" aria-label="open-search"><svg><use xlink:href="#search-icon"></use></svg></button></div><div class="navbar-right-item"><button class="icon-button theme-toggle" aria-label="toggle-theme"><svg><use class="theme-svg-use" xlink:href="#dark-theme-icon"></use></svg></button></div><div class="navbar-right-item"><button class="icon-button font-size" aria-label="change-font-size"><svg><use xlink:href="#font-size-icon"></use></svg></button></div></div></div></div><script type="text/javascript" src="scripts/core.min.js"></script><script src="scripts/search.min.js" defer="defer"></script><script src="scripts/third-party/fuse.js" defer="defer"></script><script type="text/javascript">var tocbotInstance=tocbot.init({tocSelector:"#eed4d2a0bfd64539bb9df78095dec881",contentSelector:".main-content",headingSelector:"h1, h2, h3",hasInnerContainers:!0,scrollContainer:".main-content",headingsOffset:130,onClick:bringLinkToView})</script></body></html>

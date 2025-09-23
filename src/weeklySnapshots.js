@@ -41,11 +41,20 @@ function sortEntries(entries) {
     });
 }
 
+/**
+ * Loads stored weekly snapshot entries sorted by generation time.
+ * @returns {Promise} Weekly snapshot entries.
+ */
 export async function loadWeeklySnapshots() {
     const data = await readFileSafe(WEEKLY_SNAPSHOT_FILE);
     return sortEntries(data.entries);
 }
 
+/**
+ * Persists a weekly snapshot entry, replacing any existing entry for the same signature.
+ * @param {Object} entry - Snapshot data to store.
+ * @returns {Promise} Absolute path to the snapshot file.
+ */
 export async function saveWeeklySnapshot(entry) {
     if (!entry || typeof entry !== 'object') {
         throw new TypeError('Weekly snapshot entry must be an object.');

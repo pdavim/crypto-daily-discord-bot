@@ -66,6 +66,11 @@ function normalizeAlerts(result) {
         .filter(Boolean);
 }
 
+/**
+ * Executes all registered alert modules and returns normalized alert objects.
+ * @param {object} context - Technical indicators and metadata for alert generation.
+ * @returns {Promise} Generated alerts ordered by severity.
+ */
 export async function buildAlerts(context) {
     const start = performance.now();
     const alerts = [];
@@ -102,6 +107,15 @@ export async function buildAlerts(context) {
     return alerts;
 }
 
+/**
+ * Formats an alert for presentation on Discord.
+ * @param {Object} alert - Alert details.
+ * @param {string} alert.msg - Message text.
+ * @param {string} alert.level - Severity level identifier.
+ * @param {string} [alert.category] - Optional alert category.
+ * @param {number} [count=1] - Number of times the alert was triggered.
+ * @returns {string} Human-readable alert message.
+ */
 export function formatAlertMessage({ msg, level, category }, count = 1) {
     const { emoji, label } = LEVEL_STYLES[level] ?? LEVEL_STYLES[ALERT_LEVELS.MEDIUM];
     const categoryLabel = category ? ALERT_CATEGORY_LABELS[category] : null;

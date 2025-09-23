@@ -1,6 +1,10 @@
 import os from 'os';
 import { CFG } from './config.js';
 
+/**
+ * Determines the maximum number of concurrent tasks the bot should run.
+ * @returns {number} Recommended concurrency level.
+ */
 export function calcConcurrency() {
     const max = Number(CFG.maxConcurrency);
     if (Number.isInteger(max) && max > 0) {
@@ -19,6 +23,11 @@ export function calcConcurrency() {
     return 1;
 }
 
+/**
+ * Creates a limiter that runs asynchronous functions with restricted concurrency.
+ * @param {number} concurrency - Maximum number of simultaneous executions.
+ * @returns {Function} Wrapper enforcing the limit.
+ */
 export default function pLimit(concurrency) {
     if (concurrency < 1) {
         throw new TypeError('Expected `concurrency` to be a number greater than 0');
