@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, watch } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { ASSETS } from './assets.js';
 import { logger, withContext } from './logger.js';
@@ -8,6 +8,9 @@ import { loadSettings, getSetting, setSetting } from './settings.js';
 
 const DEFAULT_CONFIG_PATH = new URL('../config/default.json', import.meta.url);
 const CUSTOM_CONFIG_PATH = new URL('../config/custom.json', import.meta.url);
+const CONFIG_DIR_PATH = new URL('../config/', import.meta.url);
+
+const WATCH_DEBOUNCE_MS = 250;
 
 const clone = (value) => JSON.parse(JSON.stringify(value ?? {}));
 
@@ -34,26 +37,19 @@ const deepMerge = (target, source) => {
     return target;
 };
 
-let DEFAULT_CONFIG = {};
-try {
-    DEFAULT_CONFIG = JSON.parse(readFileSync(DEFAULT_CONFIG_PATH, 'utf-8'));
-} catch (error) {
-    console.warn('Failed to load default configuration, falling back to empty object.', error);
-    DEFAULT_CONFIG = {};
-}
+let defaultConfig = {};
+let customConfig = {};
+let mergedConfig = {};
+let skipNextWatchReload = false;
+let watchTimeout;
+let customFileWatcher;
+let customDirWatcher;
 
-if (existsSync(CUSTOM_CONFIG_PATH)) {
-    try {
-        const customConfig = JSON.parse(readFileSync(CUSTOM_CONFIG_PATH, 'utf-8'));
-        deepMerge(DEFAULT_CONFIG, customConfig);
-    } catch (error) {
-        console.warn('Failed to load custom configuration, ignoring.', error);
-    }
-}
+const configListeners = new Set();
 
-export const CFG = clone(DEFAULT_CONFIG);
+export const CFG = {};
 
-const DEFAULT_BINANCE_CACHE_TTL_MINUTES = DEFAULT_CONFIG.binanceCacheTTL ?? 10;
+const DEFAULT_BINANCE_CACHE_TTL_MINUTES_FALLBACK = 10;
 
 const toNumber = (value, fallback) => {
     const parsed = Number.parseFloat(value ?? '');
@@ -219,87 +215,231 @@ const buildIndicatorConfig = (baseConfig = {}) => {
     };
 };
 
-CFG.webhook = process.env.DISCORD_WEBHOOK_URL ?? CFG.webhook ?? null;
-CFG.webhookAlerts = process.env.DISCORD_WEBHOOK_ALERTS_URL ?? CFG.webhookAlerts ?? null;
-CFG.webhookReports = process.env.DISCORD_WEBHOOK_REPORTS_URL ?? CFG.webhookReports ?? null;
-CFG.webhookDaily = process.env.DISCORD_WEBHOOK_DAILY ?? CFG.webhookDaily ?? null;
-CFG.webhookAnalysis = process.env.DISCORD_WEBHOOK_ANALYSIS_URL ?? CFG.webhookAnalysis ?? null;
-CFG.botToken = process.env.DISCORD_BOT_TOKEN ?? CFG.botToken ?? null;
-CFG.channelChartsId = process.env.DISCORD_CHANNEL_CHARTS_ID ?? CFG.channelChartsId ?? null;
+export const config = {};
 
-CFG.webhooks = isPlainObject(CFG.webhooks) ? CFG.webhooks : {};
-const defaultWebhookMap = isPlainObject(DEFAULT_CONFIG.webhooks) ? DEFAULT_CONFIG.webhooks : {};
-const webhookKeys = new Set([
-    ...Object.keys(defaultWebhookMap),
-    ...Object.keys(CFG.webhooks),
-]);
-for (const envKey of Object.keys(process.env)) {
-    if (envKey.startsWith('DISCORD_WEBHOOK_')) {
-        webhookKeys.add(envKey.substring('DISCORD_WEBHOOK_'.length));
+function loadDefaultConfig() {
+    try {
+        return JSON.parse(readFileSync(DEFAULT_CONFIG_PATH, 'utf-8'));
+    } catch (error) {
+        console.warn('Failed to load default configuration, falling back to empty object.', error);
+        return {};
     }
 }
-for (const key of webhookKeys) {
-    const envKey = `DISCORD_WEBHOOK_${key}`;
-    CFG.webhooks[key] = process.env[envKey] ?? CFG.webhooks[key] ?? defaultWebhookMap[key] ?? null;
+
+function loadCustomConfig() {
+    if (!existsSync(CUSTOM_CONFIG_PATH)) {
+        return {};
+    }
+
+    try {
+        return JSON.parse(readFileSync(CUSTOM_CONFIG_PATH, 'utf-8'));
+    } catch (error) {
+        const log = withContext(logger);
+        log.warn({ fn: 'loadCustomConfig', err: error }, 'Failed to load custom configuration, keeping previous values.');
+        return null;
+    }
 }
 
-CFG.tz = process.env.TZ ?? CFG.tz ?? 'Europe/Lisbon';
-CFG.dailyReportHour = process.env.DAILY_REPORT_HOUR ?? CFG.dailyReportHour ?? '8';
-CFG.analysisFrequency = process.env.ANALYSIS_FREQUENCY ?? CFG.analysisFrequency ?? 'hourly';
-CFG.openrouterApiKey = process.env.OPENROUTER_API_KEY ?? CFG.openrouterApiKey ?? null;
-CFG.openrouterModel = process.env.OPENROUTER_MODEL ?? CFG.openrouterModel ?? 'openrouter/sonoma-dusk-alpha';
-CFG.enableCharts = toBoolean(process.env.ENABLE_CHARTS, CFG.enableCharts ?? true);
-CFG.enableAlerts = toBoolean(process.env.ENABLE_ALERTS, CFG.enableAlerts ?? true);
-CFG.enableAnalysis = toBoolean(process.env.ENABLE_ANALYSIS, CFG.enableAnalysis ?? true);
-CFG.enableReports = toBoolean(process.env.ENABLE_REPORTS, CFG.enableReports ?? true);
-CFG.debug = toBoolean(process.env.DEBUG, CFG.debug ?? false);
-CFG.accountEquity = toNumber(process.env.ACCOUNT_EQUITY, CFG.accountEquity ?? 0);
-CFG.riskPerTrade = toNumber(process.env.RISK_PER_TRADE, CFG.riskPerTrade ?? 0.01);
-CFG.alertDedupMinutes = toNumber(process.env.ALERT_DEDUP_MINUTES, CFG.alertDedupMinutes ?? 60);
-const computedBinanceCacheTTL = toNumber(
-    process.env.BINANCE_CACHE_TTL_MINUTES,
-    CFG.binanceCacheTTL ?? DEFAULT_BINANCE_CACHE_TTL_MINUTES,
-);
-CFG.binanceCacheTTL = Number.isFinite(computedBinanceCacheTTL) && computedBinanceCacheTTL > 0
-    ? computedBinanceCacheTTL
-    : DEFAULT_BINANCE_CACHE_TTL_MINUTES;
-
-const defaultMaxConcurrency = Number.isFinite(CFG.maxConcurrency) ? CFG.maxConcurrency : undefined;
-const computedMaxConcurrency = process.env.MAX_CONCURRENCY !== undefined
-    ? toInt(process.env.MAX_CONCURRENCY, defaultMaxConcurrency)
-    : defaultMaxConcurrency;
-CFG.maxConcurrency = Number.isFinite(computedMaxConcurrency) ? computedMaxConcurrency : undefined;
-CFG.indicators = buildIndicatorConfig(DEFAULT_CONFIG.indicators ?? CFG.indicators ?? {});
-CFG.alerts = isPlainObject(CFG.alerts) ? CFG.alerts : {};
-CFG.alerts.modules = buildAlertModuleConfig(DEFAULT_CONFIG.alerts?.modules ?? CFG.alerts?.modules ?? {});
-CFG.alertThresholds = clone(DEFAULT_CONFIG.alertThresholds ?? CFG.alertThresholds ?? {});
-CFG.discordRateLimit = buildDiscordRateLimit(DEFAULT_CONFIG.discordRateLimit ?? CFG.discordRateLimit ?? {});
-
-loadSettings({
-    riskPerTrade: CFG.riskPerTrade,
-});
-
-const storedRisk = getSetting('riskPerTrade', CFG.riskPerTrade);
-if (typeof storedRisk === 'number' && Number.isFinite(storedRisk) && storedRisk >= 0 && storedRisk <= 0.05) {
-    CFG.riskPerTrade = storedRisk;
-} else if (storedRisk !== CFG.riskPerTrade) {
-    setSetting('riskPerTrade', CFG.riskPerTrade);
+function assignConfig(target, source) {
+    for (const key of Object.keys(target)) {
+        delete target[key];
+    }
+    Object.assign(target, source);
 }
 
-export const config = {
-    newsApiKey: process.env.NEWS_API_KEY ?? DEFAULT_CONFIG.newsApiKey ?? null,
-    serpapiApiKey: process.env.SERPAPI_API_KEY ?? DEFAULT_CONFIG.serpapiApiKey ?? null,
-};
+export function onConfigChange(listener) {
+    if (typeof listener !== 'function') {
+        throw new TypeError('onConfigChange expects a function listener.');
+    }
+
+    configListeners.add(listener);
+    return () => configListeners.delete(listener);
+}
+
+function notifyConfigChange() {
+    if (configListeners.size === 0) {
+        return;
+    }
+
+    for (const listener of configListeners) {
+        try {
+            listener(CFG);
+        } catch (error) {
+            const log = withContext(logger);
+            log.warn({ fn: 'notifyConfigChange', err: error }, 'Config change listener failed.');
+        }
+    }
+}
+
+function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
+    if (reloadFromDisk) {
+        defaultConfig = loadDefaultConfig();
+        const maybeCustom = loadCustomConfig();
+        if (maybeCustom !== null) {
+            customConfig = maybeCustom;
+        }
+    }
+
+    mergedConfig = clone(defaultConfig);
+    deepMerge(mergedConfig, customConfig);
+
+    const nextCFG = clone(mergedConfig);
+
+    nextCFG.webhook = process.env.DISCORD_WEBHOOK_URL ?? nextCFG.webhook ?? null;
+    nextCFG.webhookAlerts = process.env.DISCORD_WEBHOOK_ALERTS_URL ?? nextCFG.webhookAlerts ?? null;
+    nextCFG.webhookReports = process.env.DISCORD_WEBHOOK_REPORTS_URL ?? nextCFG.webhookReports ?? null;
+    nextCFG.webhookDaily = process.env.DISCORD_WEBHOOK_DAILY ?? nextCFG.webhookDaily ?? null;
+    nextCFG.webhookAnalysis = process.env.DISCORD_WEBHOOK_ANALYSIS_URL ?? nextCFG.webhookAnalysis ?? null;
+    nextCFG.botToken = process.env.DISCORD_BOT_TOKEN ?? nextCFG.botToken ?? null;
+    nextCFG.channelChartsId = process.env.DISCORD_CHANNEL_CHARTS_ID ?? nextCFG.channelChartsId ?? null;
+
+    nextCFG.webhooks = isPlainObject(nextCFG.webhooks) ? nextCFG.webhooks : {};
+    const defaultWebhookMap = isPlainObject(mergedConfig.webhooks) ? mergedConfig.webhooks : {};
+    const webhookKeys = new Set([
+        ...Object.keys(defaultWebhookMap),
+        ...Object.keys(nextCFG.webhooks),
+    ]);
+    for (const envKey of Object.keys(process.env)) {
+        if (envKey.startsWith('DISCORD_WEBHOOK_')) {
+            webhookKeys.add(envKey.substring('DISCORD_WEBHOOK_'.length));
+        }
+    }
+    for (const key of webhookKeys) {
+        const envKey = `DISCORD_WEBHOOK_${key}`;
+        nextCFG.webhooks[key] = process.env[envKey] ?? nextCFG.webhooks[key] ?? defaultWebhookMap[key] ?? null;
+    }
+
+    nextCFG.tz = process.env.TZ ?? nextCFG.tz ?? 'Europe/Lisbon';
+    nextCFG.dailyReportHour = process.env.DAILY_REPORT_HOUR ?? nextCFG.dailyReportHour ?? '8';
+    nextCFG.analysisFrequency = process.env.ANALYSIS_FREQUENCY ?? nextCFG.analysisFrequency ?? 'hourly';
+    nextCFG.openrouterApiKey = process.env.OPENROUTER_API_KEY ?? nextCFG.openrouterApiKey ?? null;
+    nextCFG.openrouterModel = process.env.OPENROUTER_MODEL ?? nextCFG.openrouterModel ?? 'openrouter/sonoma-dusk-alpha';
+    nextCFG.enableCharts = toBoolean(process.env.ENABLE_CHARTS, nextCFG.enableCharts ?? true);
+    nextCFG.enableAlerts = toBoolean(process.env.ENABLE_ALERTS, nextCFG.enableAlerts ?? true);
+    nextCFG.enableAnalysis = toBoolean(process.env.ENABLE_ANALYSIS, nextCFG.enableAnalysis ?? true);
+    nextCFG.enableReports = toBoolean(process.env.ENABLE_REPORTS, nextCFG.enableReports ?? true);
+    nextCFG.debug = toBoolean(process.env.DEBUG, nextCFG.debug ?? false);
+    nextCFG.accountEquity = toNumber(process.env.ACCOUNT_EQUITY, nextCFG.accountEquity ?? 0);
+    nextCFG.riskPerTrade = toNumber(process.env.RISK_PER_TRADE, nextCFG.riskPerTrade ?? 0.01);
+    nextCFG.alertDedupMinutes = toNumber(process.env.ALERT_DEDUP_MINUTES, nextCFG.alertDedupMinutes ?? 60);
+
+    const baseCacheTtl = mergedConfig.binanceCacheTTL ?? DEFAULT_BINANCE_CACHE_TTL_MINUTES_FALLBACK;
+    const computedBinanceCacheTTL = toNumber(
+        process.env.BINANCE_CACHE_TTL_MINUTES,
+        nextCFG.binanceCacheTTL ?? baseCacheTtl,
+    );
+    nextCFG.binanceCacheTTL = Number.isFinite(computedBinanceCacheTTL) && computedBinanceCacheTTL > 0
+        ? computedBinanceCacheTTL
+        : baseCacheTtl;
+
+    const defaultMaxConcurrency = Number.isFinite(nextCFG.maxConcurrency) ? nextCFG.maxConcurrency : undefined;
+    const computedMaxConcurrency = process.env.MAX_CONCURRENCY !== undefined
+        ? toInt(process.env.MAX_CONCURRENCY, defaultMaxConcurrency)
+        : defaultMaxConcurrency;
+    nextCFG.maxConcurrency = Number.isFinite(computedMaxConcurrency) ? computedMaxConcurrency : undefined;
+    nextCFG.indicators = buildIndicatorConfig(mergedConfig.indicators ?? nextCFG.indicators ?? {});
+    nextCFG.alerts = isPlainObject(nextCFG.alerts) ? nextCFG.alerts : {};
+    nextCFG.alerts.modules = buildAlertModuleConfig(mergedConfig.alerts?.modules ?? nextCFG.alerts?.modules ?? {});
+    nextCFG.alertThresholds = clone(mergedConfig.alertThresholds ?? nextCFG.alertThresholds ?? {});
+    nextCFG.discordRateLimit = buildDiscordRateLimit(mergedConfig.discordRateLimit ?? nextCFG.discordRateLimit ?? {});
+
+    loadSettings({
+        riskPerTrade: nextCFG.riskPerTrade,
+    });
+
+    const storedRisk = getSetting('riskPerTrade', nextCFG.riskPerTrade);
+    if (typeof storedRisk === 'number' && Number.isFinite(storedRisk) && storedRisk >= 0 && storedRisk <= 0.05) {
+        nextCFG.riskPerTrade = storedRisk;
+    } else if (storedRisk !== nextCFG.riskPerTrade) {
+        setSetting('riskPerTrade', nextCFG.riskPerTrade);
+    }
+
+    assignConfig(CFG, nextCFG);
+
+    const nextConfig = {
+        newsApiKey: process.env.NEWS_API_KEY ?? mergedConfig.newsApiKey ?? null,
+        serpapiApiKey: process.env.SERPAPI_API_KEY ?? mergedConfig.serpapiApiKey ?? null,
+    };
+    assignConfig(config, nextConfig);
+
+    validateConfig();
+    notifyConfigChange();
+
+    if (emitLog) {
+        const log = withContext(logger);
+        log.info({ fn: 'rebuildConfig' }, '♻️ Reloaded custom configuration.');
+    }
+}
+
+function ensureCustomConfigWatcher() {
+    if (customFileWatcher) {
+        return;
+    }
+
+    try {
+        customFileWatcher = watch(CUSTOM_CONFIG_PATH, (eventType) => {
+            if (eventType === 'rename') {
+                if (customFileWatcher) {
+                    customFileWatcher.close();
+                    customFileWatcher = null;
+                }
+                ensureCustomConfigWatcher();
+            }
+
+            if (skipNextWatchReload) {
+                skipNextWatchReload = false;
+                return;
+            }
+
+            if (eventType !== 'change' && eventType !== 'rename') {
+                return;
+            }
+
+            if (watchTimeout) {
+                clearTimeout(watchTimeout);
+            }
+            watchTimeout = setTimeout(() => {
+                watchTimeout = undefined;
+                try {
+                    rebuildConfig({ emitLog: true });
+                } catch (error) {
+                    const log = withContext(logger);
+                    log.warn({ fn: 'ensureCustomConfigWatcher', err: error }, 'Failed to reload custom configuration.');
+                }
+            }, WATCH_DEBOUNCE_MS);
+        });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            if (!customDirWatcher) {
+                customDirWatcher = watch(CONFIG_DIR_PATH, (_, filename) => {
+                    if (filename === 'custom.json') {
+                        if (customDirWatcher) {
+                            customDirWatcher.close();
+                            customDirWatcher = null;
+                        }
+                        ensureCustomConfigWatcher();
+                    }
+                });
+            }
+        } else {
+            const log = withContext(logger);
+            log.warn({ fn: 'ensureCustomConfigWatcher', err: error }, 'Failed to watch custom configuration file.');
+        }
+    }
+}
 
 export async function saveConfig(partialConfig) {
     if (!isPlainObject(partialConfig)) {
         throw new TypeError('saveConfig expects a plain object.');
     }
 
-    deepMerge(DEFAULT_CONFIG, partialConfig);
-    deepMerge(CFG, partialConfig);
-
-    await writeFile(CUSTOM_CONFIG_PATH, `${JSON.stringify(CFG, null, 4)}\n`);
+    deepMerge(customConfig, partialConfig);
+    skipNextWatchReload = true;
+    await writeFile(CUSTOM_CONFIG_PATH, `${JSON.stringify(customConfig, null, 4)}\n`);
+    rebuildConfig({ reloadFromDisk: false });
+    setTimeout(() => {
+        skipNextWatchReload = false;
+    }, WATCH_DEBOUNCE_MS);
 }
 
 export function validateConfig() {
@@ -337,4 +477,5 @@ export function validateConfig() {
     }
 }
 
-validateConfig();
+rebuildConfig();
+ensureCustomConfigWatcher();

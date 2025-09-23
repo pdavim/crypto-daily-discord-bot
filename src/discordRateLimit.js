@@ -1,4 +1,4 @@
-import { CFG } from './config.js';
+import { CFG, onConfigChange } from './config.js';
 
 const DEFAULT_LIMIT = {
     capacity: 5,
@@ -116,5 +116,8 @@ class DiscordRateLimit {
     }
 }
 
-export const limit = new DiscordRateLimit(CFG.discordRateLimit ?? {});
+export let limit = new DiscordRateLimit(CFG.discordRateLimit ?? {});
+onConfigChange((cfg) => {
+    limit = new DiscordRateLimit(cfg.discordRateLimit ?? {});
+});
 export { DiscordRateLimit };
