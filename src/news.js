@@ -5,6 +5,7 @@ import { config, CFG } from "./config.js";
 import { callOpenRouter } from "./ai.js";
 import { fetchWithRetry } from "./utils.js";
 import { logger, withContext } from "./logger.js";
+import { filterFreshNewsItems, markNewsItemsAsSeen } from "./newsCache.js";
 
 const NEWS_CACHE_PATH = new URL("../data/news-cache.json", import.meta.url);
 const NEWS_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -436,7 +437,15 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
         }
 
         filtered.sort(sortByRank);
-        filtered = dedupeByTrigram(filtered).slice(0, limit);
+        filtered = dedupeByTrigram(filtered);
+        filtered = await filterFreshNewsItems(filtered, now, log);
+        filtered = filtered.slice(0, limit);
+
+        if (!filtered.length) {
+            const emptyResult = { items: [], summary: "", avgSentiment: 0 };
+            await setCachedNews(cacheKey, emptyResult, now, log);
+            return emptyResult;
+        }
 
         const sentiments = await classifySentiments(filtered);
         const avgSentiment = sentiments.length ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length : 0;
@@ -459,6 +468,8 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
         if (!summary) {
             summary = filtered.slice(0, 3).map((item) => `${item.source}: ${item.title}`).join(" | ");
         }
+
+        await markNewsItemsAsSeen(filtered, now, log);
 
         const normalized = filtered.map((item) => ({
             ...item,
