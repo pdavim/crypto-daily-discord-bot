@@ -435,6 +435,12 @@ function sortByRank(a, b) {
     return bw - aw;
 }
 
+/**
+ * Computes a time-decayed sentiment average for a list of news items.
+ * @param {Array<Object>} items - News entries.
+ * @param {number} [now=Date.now()] - Reference timestamp in milliseconds.
+ * @returns {number} Weighted sentiment score between -1 and 1.
+ */
 export function computeWeightedSentiment(items, now = Date.now()) {
     let weightedSum = 0;
     let totalWeight = 0;
@@ -540,6 +546,14 @@ async function classifySentiments(items) {
     });
 }
 
+/**
+ * Retrieves curated news articles and sentiment analytics for a specific asset.
+ * @param {Object} params - Query parameters.
+ * @param {string} params.symbol - Asset symbol.
+ * @param {number} [params.lookbackHours] - Lookback window in hours.
+ * @param {number} [params.limit] - Maximum number of items to return.
+ * @returns {Promise} Structured news data including translations and sentiment scores.
+ */
 export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
     const log = withContext(logger, { asset: symbol });
     log.info({ fn: "getAssetNews" }, `Fetching news for ${symbol}`);

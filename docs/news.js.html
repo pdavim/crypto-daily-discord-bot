@@ -1,0 +1,660 @@
+<!DOCTYPE html><html lang="en" style="font-size:16px"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Source: news.js</title><!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]--><script src="scripts/third-party/hljs.js" defer="defer"></script><script src="scripts/third-party/hljs-line-num.js" defer="defer"></script><script src="scripts/third-party/popper.js" defer="defer"></script><script src="scripts/third-party/tippy.js" defer="defer"></script><script src="scripts/third-party/tocbot.min.js"></script><script>var baseURL="/",locationPathname="";baseURL=(locationPathname=document.location.pathname).substr(0,locationPathname.lastIndexOf("/")+1)</script><link rel="stylesheet" href="styles/clean-jsdoc-theme.min.css"><svg aria-hidden="true" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="display:none"><defs><symbol id="copy-icon" viewbox="0 0 488.3 488.3"><g><path d="M314.25,85.4h-227c-21.3,0-38.6,17.3-38.6,38.6v325.7c0,21.3,17.3,38.6,38.6,38.6h227c21.3,0,38.6-17.3,38.6-38.6V124    C352.75,102.7,335.45,85.4,314.25,85.4z M325.75,449.6c0,6.4-5.2,11.6-11.6,11.6h-227c-6.4,0-11.6-5.2-11.6-11.6V124    c0-6.4,5.2-11.6,11.6-11.6h227c6.4,0,11.6,5.2,11.6,11.6V449.6z"/><path d="M401.05,0h-227c-21.3,0-38.6,17.3-38.6,38.6c0,7.5,6,13.5,13.5,13.5s13.5-6,13.5-13.5c0-6.4,5.2-11.6,11.6-11.6h227    c6.4,0,11.6,5.2,11.6,11.6v325.7c0,6.4-5.2,11.6-11.6,11.6c-7.5,0-13.5,6-13.5,13.5s6,13.5,13.5,13.5c21.3,0,38.6-17.3,38.6-38.6    V38.6C439.65,17.3,422.35,0,401.05,0z"/></g></symbol><symbol id="search-icon" viewBox="0 0 512 512"><g><g><path d="M225.474,0C101.151,0,0,101.151,0,225.474c0,124.33,101.151,225.474,225.474,225.474    c124.33,0,225.474-101.144,225.474-225.474C450.948,101.151,349.804,0,225.474,0z M225.474,409.323    c-101.373,0-183.848-82.475-183.848-183.848S124.101,41.626,225.474,41.626s183.848,82.475,183.848,183.848    S326.847,409.323,225.474,409.323z"/></g></g><g><g><path d="M505.902,476.472L386.574,357.144c-8.131-8.131-21.299-8.131-29.43,0c-8.131,8.124-8.131,21.306,0,29.43l119.328,119.328    c4.065,4.065,9.387,6.098,14.715,6.098c5.321,0,10.649-2.033,14.715-6.098C514.033,497.778,514.033,484.596,505.902,476.472z"/></g></g></symbol><symbol id="font-size-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M11.246 15H4.754l-2 5H.6L7 4h2l6.4 16h-2.154l-2-5zm-.8-2L8 6.885 5.554 13h4.892zM21 12.535V12h2v8h-2v-.535a4 4 0 1 1 0-6.93zM19 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></symbol><symbol id="add-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2z"/></symbol><symbol id="minus-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M5 11h14v2H5z"/></symbol><symbol id="dark-theme-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M10 7a7 7 0 0 0 12 4.9v.1c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2h.1A6.979 6.979 0 0 0 10 7zm-6 5a8 8 0 0 0 15.062 3.762A9 9 0 0 1 8.238 4.938 7.999 7.999 0 0 0 4 12z"/></symbol><symbol id="light-theme-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 1h2v3h-2V1zm0 19h2v3h-2v-3zM3.515 4.929l1.414-1.414L7.05 5.636 5.636 7.05 3.515 4.93zM16.95 18.364l1.414-1.414 2.121 2.121-1.414 1.414-2.121-2.121zm2.121-14.85l1.414 1.415-2.121 2.121-1.414-1.414 2.121-2.121zM5.636 16.95l1.414 1.414-2.121 2.121-1.414-1.414 2.121-2.121zM23 11v2h-3v-2h3zM4 11v2H1v-2h3z"/></symbol><symbol id="reset-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M18.537 19.567A9.961 9.961 0 0 1 12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10c0 2.136-.67 4.116-1.81 5.74L17 12h3a8 8 0 1 0-2.46 5.772l.997 1.795z"/></symbol><symbol id="down-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7803 6.21967C13.0732 6.51256 13.0732 6.98744 12.7803 7.28033L8.53033 11.5303C8.23744 11.8232 7.76256 11.8232 7.46967 11.5303L3.21967 7.28033C2.92678 6.98744 2.92678 6.51256 3.21967 6.21967C3.51256 5.92678 3.98744 5.92678 4.28033 6.21967L8 9.93934L11.7197 6.21967C12.0126 5.92678 12.4874 5.92678 12.7803 6.21967Z"></path></symbol><symbol id="codepen-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M16.5 13.202L13 15.535v3.596L19.197 15 16.5 13.202zM14.697 12L12 10.202 9.303 12 12 13.798 14.697 12zM20 10.869L18.303 12 20 13.131V10.87zM19.197 9L13 4.869v3.596l3.5 2.333L19.197 9zM7.5 10.798L11 8.465V4.869L4.803 9 7.5 10.798zM4.803 15L11 19.131v-3.596l-3.5-2.333L4.803 15zM4 13.131L5.697 12 4 10.869v2.262zM2 9a1 1 0 0 1 .445-.832l9-6a1 1 0 0 1 1.11 0l9 6A1 1 0 0 1 22 9v6a1 1 0 0 1-.445.832l-9 6a1 1 0 0 1-1.11 0l-9-6A1 1 0 0 1 2 15V9z"/></symbol><symbol id="close-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z"/></symbol><symbol id="menu-icon" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"/></symbol></defs></svg></head><body data-theme="light"><div class="sidebar-container"><div class="sidebar" id="sidebar"><a href="/" class="sidebar-title sidebar-title-anchor">Crypto Daily Discord Bot API</a><div class="sidebar-items-container"><div class="sidebar-section-title with-arrow" data-isopen="false" id="sidebar-classes"><div>Classes</div><svg><use xlink:href="#down-icon"></use></svg></div><div class="sidebar-section-children-container"><div class="sidebar-section-children"><a href="DiscordRateLimit.html">DiscordRateLimit</a></div><div class="sidebar-section-children"><a href="TokenBucket.html">TokenBucket</a></div></div><div class="sidebar-section-title with-arrow" data-isopen="false" id="sidebar-global"><div>Global</div><svg><use xlink:href="#down-icon"></use></svg></div><div class="sidebar-section-children-container"><div class="sidebar-section-children"><a href="global.html#addAssetToWatch">addAssetToWatch</a></div><div class="sidebar-section-children"><a href="global.html#adx">adx</a></div><div class="sidebar-section-children"><a href="global.html#atr14">atr14</a></div><div class="sidebar-section-children"><a href="global.html#bollWidth">bollWidth</a></div><div class="sidebar-section-children"><a href="global.html#bollinger">bollinger</a></div><div class="sidebar-section-children"><a href="global.html#build45mCandles">build45mCandles</a></div><div class="sidebar-section-children"><a href="global.html#buildAlerts">buildAlerts</a></div><div class="sidebar-section-children"><a href="global.html#buildHash">buildHash</a></div><div class="sidebar-section-children"><a href="global.html#buildSnapshotForReport">buildSnapshotForReport</a></div><div class="sidebar-section-children"><a href="global.html#buildSummary">buildSummary</a></div><div class="sidebar-section-children"><a href="global.html#buildSummaryPdf">buildSummaryPdf</a></div><div class="sidebar-section-children"><a href="global.html#calcConcurrency">calcConcurrency</a></div><div class="sidebar-section-children"><a href="global.html#callOpenRouter">callOpenRouter</a></div><div class="sidebar-section-children"><a href="global.html#cci">cci</a></div><div class="sidebar-section-children"><a href="global.html#clampSentiment">clampSentiment</a></div><div class="sidebar-section-children"><a href="global.html#classifySentimentsLocal">classifySentimentsLocal</a></div><div class="sidebar-section-children"><a href="global.html#compileMonthlyPerformanceReport">compileMonthlyPerformanceReport</a></div><div class="sidebar-section-children"><a href="global.html#computeWeightedSentiment">computeWeightedSentiment</a></div><div class="sidebar-section-children"><a href="global.html#createContext">createContext</a></div><div class="sidebar-section-children"><a href="global.html#crossDown">crossDown</a></div><div class="sidebar-section-children"><a href="global.html#crossUp">crossUp</a></div><div class="sidebar-section-children"><a href="global.html#ema">ema</a></div><div class="sidebar-section-children"><a href="global.html#fetchWithRetry">fetchWithRetry</a></div><div class="sidebar-section-children"><a href="global.html#filterFreshNewsItems">filterFreshNewsItems</a></div><div class="sidebar-section-children"><a href="global.html#fmt">fmt</a></div><div class="sidebar-section-children"><a href="global.html#formatAlertMessage">formatAlertMessage</a></div><div class="sidebar-section-children"><a href="global.html#generateWeeklySnapshot">generateWeeklySnapshot</a></div><div class="sidebar-section-children"><a href="global.html#getAlertHash">getAlertHash</a></div><div class="sidebar-section-children"><a href="global.html#getAssetNews">getAssetNews</a></div><div class="sidebar-section-children"><a href="global.html#getSetting">getSetting</a></div><div class="sidebar-section-children"><a href="global.html#getSettings">getSettings</a></div><div class="sidebar-section-children"><a href="global.html#getSignature">getSignature</a></div><div class="sidebar-section-children"><a href="global.html#getWatchlist">getWatchlist</a></div><div class="sidebar-section-children"><a href="global.html#handleAnalysisSlashCommand">handleAnalysisSlashCommand</a></div><div class="sidebar-section-children"><a href="global.html#handleInteraction">handleInteraction</a></div><div class="sidebar-section-children"><a href="global.html#initBot">initBot</a></div><div class="sidebar-section-children"><a href="global.html#isBBSqueeze">isBBSqueeze</a></div><div class="sidebar-section-children"><a href="global.html#keltnerChannel">keltnerChannel</a></div><div class="sidebar-section-children"><a href="global.html#limit">limit</a></div><div class="sidebar-section-children"><a href="global.html#loadSettings">loadSettings</a></div><div class="sidebar-section-children"><a href="global.html#loadWeeklySnapshots">loadWeeklySnapshots</a></div><div class="sidebar-section-children"><a href="global.html#macd">macd</a></div><div class="sidebar-section-children"><a href="global.html#markNewsItemsAsSeen">markNewsItemsAsSeen</a></div><div class="sidebar-section-children"><a href="global.html#monthKeyFromIso">monthKeyFromIso</a></div><div class="sidebar-section-children"><a href="global.html#normalizeSentiment">normalizeSentiment</a></div><div class="sidebar-section-children"><a href="global.html#notifyOps">notifyOps</a></div><div class="sidebar-section-children"><a href="global.html#num">num</a></div><div class="sidebar-section-children"><a href="global.html#obv">obv</a></div><div class="sidebar-section-children"><a href="global.html#parabolicSAR">parabolicSAR</a></div><div class="sidebar-section-children"><a href="global.html#pct">pct</a></div><div class="sidebar-section-children"><a href="global.html#postAnalysis">postAnalysis</a></div><div class="sidebar-section-children"><a href="global.html#postCharts">postCharts</a></div><div class="sidebar-section-children"><a href="global.html#postMonthlyReport">postMonthlyReport</a></div><div class="sidebar-section-children"><a href="global.html#previousMonthKey">previousMonthKey</a></div><div class="sidebar-section-children"><a href="global.html#pruneOlderThan">pruneOlderThan</a></div><div class="sidebar-section-children"><a href="global.html#recordPerf">recordPerf</a></div><div class="sidebar-section-children"><a href="global.html#removeAssetFromWatch">removeAssetFromWatch</a></div><div class="sidebar-section-children"><a href="global.html#renderChartPNG">renderChartPNG</a></div><div class="sidebar-section-children"><a href="global.html#renderMonthlyPerformanceChart">renderMonthlyPerformanceChart</a></div><div class="sidebar-section-children"><a href="global.html#reportWeeklyPerf">reportWeeklyPerf</a></div><div class="sidebar-section-children"><a href="global.html#resetAlertHashes">resetAlertHashes</a></div><div class="sidebar-section-children"><a href="global.html#resetSettings">resetSettings</a></div><div class="sidebar-section-children"><a href="global.html#roundThreshold">roundThreshold</a></div><div class="sidebar-section-children"><a href="global.html#rsi">rsi</a></div><div class="sidebar-section-children"><a href="global.html#runAgent">runAgent</a></div><div class="sidebar-section-children"><a href="global.html#runAll">runAll</a></div><div class="sidebar-section-children"><a href="global.html#runDailyAnalysis">runDailyAnalysis</a></div><div class="sidebar-section-children"><a href="global.html#runOnceForAsset">runOnceForAsset</a></div><div class="sidebar-section-children"><a href="global.html#saveStore">saveStore</a></div><div class="sidebar-section-children"><a href="global.html#saveWeeklySnapshot">saveWeeklySnapshot</a></div><div class="sidebar-section-children"><a href="global.html#scheduleRun">scheduleRun</a></div><div class="sidebar-section-children"><a href="global.html#scoreHeuristic">scoreHeuristic</a></div><div class="sidebar-section-children"><a href="global.html#searchWeb">searchWeb</a></div><div class="sidebar-section-children"><a href="global.html#semaforo">semaforo</a></div><div class="sidebar-section-children"><a href="global.html#sendDiscordAlert">sendDiscordAlert</a></div><div class="sidebar-section-children"><a href="global.html#setSetting">setSetting</a></div><div class="sidebar-section-children"><a href="global.html#shouldSend">shouldSend</a></div><div class="sidebar-section-children"><a href="global.html#sma">sma</a></div><div class="sidebar-section-children"><a href="global.html#sparkline">sparkline</a></div><div class="sidebar-section-children"><a href="global.html#stochastic">stochastic</a></div><div class="sidebar-section-children"><a href="global.html#streamKlines">streamKlines</a></div><div class="sidebar-section-children"><a href="global.html#tfToInterval">tfToInterval</a></div><div class="sidebar-section-children"><a href="global.html#toMonthKey">toMonthKey</a></div><div class="sidebar-section-children"><a href="global.html#trendFromMAs">trendFromMAs</a></div><div class="sidebar-section-children"><a href="global.html#updateAlertHash">updateAlertHash</a></div><div class="sidebar-section-children"><a href="global.html#updateSignature">updateSignature</a></div><div class="sidebar-section-children"><a href="global.html#volumeDivergence">volumeDivergence</a></div><div class="sidebar-section-children"><a href="global.html#vwap">vwap</a></div><div class="sidebar-section-children"><a href="global.html#williamsR">williamsR</a></div><div class="sidebar-section-children"><a href="global.html#withContext">withContext</a></div></div></div></div></div><div class="navbar-container" id="VuAckcnZhf"><nav class="navbar"><div class="navbar-left-items"></div><div class="navbar-right-items"><div class="navbar-right-item"><button class="icon-button search-button" aria-label="open-search"><svg><use xlink:href="#search-icon"></use></svg></button></div><div class="navbar-right-item"><button class="icon-button theme-toggle" aria-label="toggle-theme"><svg><use class="theme-svg-use" xlink:href="#dark-theme-icon"></use></svg></button></div><div class="navbar-right-item"><button class="icon-button font-size" aria-label="change-font-size"><svg><use xlink:href="#font-size-icon"></use></svg></button></div></div><nav></nav></nav></div><div class="toc-container"><div class="toc-content"><span class="bold">On this page</span><div id="eed4d2a0bfd64539bb9df78095dec881"></div></div></div><div class="body-wrapper"><div class="main-content"><div class="main-wrapper"><section id="source-page" class="source-page"><header><h1 id="title" class="has-anchor">news.js</h1></header><article><pre class="prettyprint source lang-js"><code>import axios from "axios";
+import Parser from "rss-parser";
+import translate from "@vitalets/google-translate-api";
+import { readFile, writeFile } from "node:fs/promises";
+import { config, CFG } from "./config.js";
+import { callOpenRouter } from "./ai.js";
+import { fetchWithRetry } from "./utils.js";
+import { logger, withContext } from "./logger.js";
+import { filterFreshNewsItems, markNewsItemsAsSeen } from "./newsCache.js";
+import { classifySentimentsLocal, normalizeSentiment, clampSentiment } from "./sentiment.js";
+
+const NEWS_CACHE_PATH = new URL("../data/news-cache.json", import.meta.url);
+const NEWS_CACHE_TTL_MS = 60 * 60 * 1000;
+const rssParser = new Parser({ timeout: 15000 });
+
+let newsCache = {};
+let cacheLoaded = false;
+let cacheLoadPromise;
+
+const REPUTABLE_DOMAINS = [
+    "coindesk.com",
+    "cointelegraph.com",
+    "decrypt.co",
+    "theblock.co",
+    "bloomberg.com",
+    "reuters.com",
+    "cnbc.com",
+    "forbes.com",
+];
+
+function getDomain(url) {
+    try {
+        return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+        return "";
+    }
+}
+
+function parseDate(dateStr) {
+    if (!dateStr) return null;
+    const direct = new Date(dateStr);
+    if (!isNaN(direct)) return direct;
+    const now = new Date();
+    const m = dateStr.match(/(\d+)\s*(min|hour|day)/i);
+    if (m) {
+        const val = parseInt(m[1], 10);
+        if (m[2].startsWith("min")) return new Date(now - val * 60 * 1000);
+        if (m[2].startsWith("hour")) return new Date(now - val * 60 * 60 * 1000);
+        if (m[2].startsWith("day")) return new Date(now - val * 24 * 60 * 60 * 1000);
+    }
+    return null;
+}
+
+function dedupeByTrigram(items) {
+    const seen = new Set();
+    return items.filter(item => {
+        const trigram = item.title.toLowerCase().split(/\s+/).slice(0, 3).join(" ");
+        if (seen.has(trigram)) return false;
+        seen.add(trigram);
+        return true;
+    });
+}
+
+function isPlainObject(value) {
+    return value !== null &amp;&amp; typeof value === "object" &amp;&amp; !Array.isArray(value);
+}
+
+async function ensureNewsCacheLoaded(log = withContext(logger)) {
+    if (cacheLoaded) {
+        return;
+    }
+    if (!cacheLoadPromise) {
+        cacheLoadPromise = (async () => {
+            try {
+                const raw = await readFile(NEWS_CACHE_PATH, "utf8");
+                const parsed = JSON.parse(raw);
+                newsCache = isPlainObject(parsed) ? parsed : {};
+            } catch (err) {
+                if (err?.code !== "ENOENT") {
+                    log.warn({ fn: "ensureNewsCacheLoaded", err }, "Failed to load news cache; starting with empty cache");
+                }
+                newsCache = {};
+            }
+            cacheLoaded = true;
+        })();
+    }
+    await cacheLoadPromise;
+}
+
+async function persistNewsCache(log = withContext(logger)) {
+    try {
+        await writeFile(NEWS_CACHE_PATH, JSON.stringify(newsCache, null, 2));
+    } catch (err) {
+        log.error({ fn: "persistNewsCache", err }, "Failed to persist news cache");
+    }
+}
+
+function cloneResult(data) {
+    return JSON.parse(JSON.stringify(data));
+}
+
+async function getCachedNews(cacheKey, now, log) {
+    await ensureNewsCacheLoaded(log);
+    const entry = newsCache?.[cacheKey];
+    if (!entry) {
+        return null;
+    }
+    if (typeof entry.timestamp !== "number" || now - entry.timestamp > NEWS_CACHE_TTL_MS) {
+        delete newsCache[cacheKey];
+        await persistNewsCache(log);
+        return null;
+    }
+    return cloneResult(entry.data);
+}
+
+async function setCachedNews(cacheKey, data, now, log) {
+    await ensureNewsCacheLoaded(log);
+    newsCache[cacheKey] = {
+        timestamp: now,
+        data: cloneResult(data),
+    };
+    await persistNewsCache(log);
+}
+
+function getCacheKey(symbol, lookbackHours, limit) {
+    return `${(symbol || "").toLowerCase()}:${lookbackHours}:${limit}`;
+}
+
+function normalizeList(value, transform = (v) => v) {
+    if (!value &amp;&amp; value !== 0) return null;
+    const list = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [value];
+    const normalized = list
+        .map((item) => transform(String(item).trim()))
+        .filter(Boolean);
+    if (!normalized.length) {
+        return null;
+    }
+    normalized.sort((a, b) => a.localeCompare(b));
+    return normalized;
+}
+
+function normalizeSymbolList(value) {
+    const symbols = normalizeList(value, (v) => v.toUpperCase());
+    return symbols;
+}
+
+function normalizeKeywordList(value) {
+    const keywords = normalizeList(value, (v) => v.toLowerCase());
+    return keywords;
+}
+
+async function translateNewsItems(items, log = withContext(logger)) {
+    if (!Array.isArray(items) || !items.length) {
+        return items;
+    }
+
+    const cache = new Map();
+
+    const translateText = async (text, to) => {
+        if (!text || typeof text !== "string") {
+            return { text: "" };
+        }
+        const normalized = text.trim();
+        if (!normalized) {
+            return { text: "" };
+        }
+        const key = `${to}:${normalized}`;
+        if (cache.has(key)) {
+            return cache.get(key);
+        }
+        try {
+            const result = await translate(normalized, { to });
+            cache.set(key, result);
+            return result;
+        } catch (err) {
+            log.warn({ fn: "translateNewsItems", to, err }, "Failed to translate text");
+            const fallback = { text: normalized };
+            cache.set(key, fallback);
+            return fallback;
+        }
+    };
+
+    const translated = [];
+    for (const item of items) {
+        const title = typeof item?.title === "string" ? item.title : "";
+        const snippet = typeof item?.snippet === "string" ? item.snippet : "";
+
+        const titleEnResult = title ? await translateText(title, "en") : { text: "" };
+        const titlePtResult = title ? await translateText(title, "pt") : { text: "" };
+        const snippetEnResult = snippet ? await translateText(snippet, "en") : { text: "" };
+        const snippetPtResult = snippet ? await translateText(snippet, "pt") : { text: "" };
+
+        let originalLanguage = titleEnResult?.from?.language?.iso
+            || snippetEnResult?.from?.language?.iso
+            || "unknown";
+        if (!originalLanguage || originalLanguage === "auto") {
+            originalLanguage = "unknown";
+        }
+
+        translated.push({
+            ...item,
+            originalLanguage,
+            translations: {
+                title: {
+                    en: titleEnResult?.text ?? title,
+                    pt: titlePtResult?.text ?? title,
+                },
+                snippet: {
+                    en: snippetEnResult?.text ?? snippet,
+                    pt: snippetPtResult?.text ?? snippet,
+                },
+            },
+        });
+    }
+
+    return translated;
+}
+
+function getRssSourceEntries(symbol) {
+    const sources = CFG.rssSources;
+    if (!sources) {
+        return [];
+    }
+    const symbolUpper = symbol ? symbol.toUpperCase() : "";
+    const results = [];
+
+    const pushEntry = (entry) => {
+        if (!entry &amp;&amp; entry !== 0) {
+            return;
+        }
+        if (Array.isArray(entry)) {
+            for (const value of entry) {
+                pushEntry(value);
+            }
+            return;
+        }
+        if (typeof entry === "string") {
+            const trimmed = entry.trim();
+            if (trimmed) {
+                results.push({ url: trimmed });
+            }
+            return;
+        }
+        if (!isPlainObject(entry)) {
+            return;
+        }
+
+        const url = entry.url || entry.href || entry.link;
+        if (!url) {
+            return;
+        }
+
+        const includeSymbols = normalizeSymbolList(entry.symbols ?? entry.includeSymbols);
+        if (includeSymbols &amp;&amp; includeSymbols.length &amp;&amp; symbolUpper) {
+            if (!includeSymbols.includes(symbolUpper) &amp;&amp; !includeSymbols.includes("*")) {
+                return;
+            }
+        }
+
+        const excludeSymbols = normalizeSymbolList(entry.excludeSymbols);
+        if (excludeSymbols &amp;&amp; excludeSymbols.length &amp;&amp; symbolUpper &amp;&amp; excludeSymbols.includes(symbolUpper)) {
+            return;
+        }
+
+        const includeKeywords = normalizeKeywordList(entry.keywords ?? entry.includeKeywords);
+        const excludeKeywords = normalizeKeywordList(entry.excludeKeywords);
+
+        results.push({
+            url,
+            includeKeywords,
+            excludeKeywords,
+            name: entry.name,
+        });
+    };
+
+    if (Array.isArray(sources) || typeof sources === "string") {
+        pushEntry(sources);
+    } else if (isPlainObject(sources)) {
+        const candidates = [];
+        if (symbolUpper &amp;&amp; sources[symbolUpper]) {
+            candidates.push(sources[symbolUpper]);
+        }
+        if (symbol &amp;&amp; sources[symbol]) {
+            candidates.push(sources[symbol]);
+        }
+        if (sources["*"]) {
+            candidates.push(sources["*"]);
+        }
+        if (sources.default) {
+            candidates.push(sources.default);
+        }
+        if (!candidates.length) {
+            for (const value of Object.values(sources)) {
+                pushEntry(value);
+            }
+        } else {
+            for (const value of candidates) {
+                pushEntry(value);
+            }
+        }
+    }
+
+    const seen = new Set();
+    return results.filter((entry) => {
+        const key = JSON.stringify([
+            entry.url,
+            entry.name,
+            entry.includeKeywords ?? [],
+            entry.excludeKeywords ?? [],
+        ]);
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+
+async function fetchSerpApiNews({ symbol, lookbackHours, limit, log }) {
+    if (!config.serpapiApiKey) {
+        return [];
+    }
+    try {
+        const params = {
+            engine: "google_news",
+            q: symbol,
+            tbs: "qdr:d",
+            api_key: config.serpapiApiKey,
+            num: limit * 2,
+        };
+        const resp = await fetchWithRetry(() => axios.get("https://serpapi.com/search", { params }));
+        const now = Date.now();
+        const cutoff = now - lookbackHours * 60 * 60 * 1000;
+        return (resp.data.news_results || [])
+            .map((n) => {
+                let date = parseDate(n.date);
+                if (!date || Number.isNaN(date.getTime())) {
+                    date = new Date();
+                }
+                return {
+                    title: n.title,
+                    source: n.source || getDomain(n.link),
+                    publishedAt: date,
+                    url: n.link,
+                    snippet: n.snippet || "",
+                };
+            })
+            .filter((item) => item &amp;&amp; item.publishedAt.getTime() >= cutoff);
+    } catch (err) {
+        log.error({ fn: "fetchSerpApiNews", err }, "Failed to fetch SerpAPI news");
+        return [];
+    }
+}
+
+function keywordsMatch(text, includeKeywords, excludeKeywords) {
+    if (!text) {
+        return !includeKeywords || includeKeywords.length === 0;
+    }
+    const normalized = text.toLowerCase();
+    if (includeKeywords &amp;&amp; includeKeywords.length &amp;&amp; !includeKeywords.some((keyword) => normalized.includes(keyword))) {
+        return false;
+    }
+    if (excludeKeywords &amp;&amp; excludeKeywords.some((keyword) => normalized.includes(keyword))) {
+        return false;
+    }
+    return true;
+}
+
+async function fetchRssNews({ symbol, lookbackHours, limit, log }) {
+    const sources = getRssSourceEntries(symbol);
+    if (!sources.length) {
+        return [];
+    }
+    const cutoff = Date.now() - lookbackHours * 60 * 60 * 1000;
+    const items = [];
+    const seenUrls = new Set();
+
+    for (const source of sources) {
+        const { url } = source;
+        if (!url) {
+            continue;
+        }
+        try {
+            const feed = await fetchWithRetry(() => rssParser.parseURL(url));
+            const sourceName = source.name || feed?.title || getDomain(url);
+            for (const item of feed?.items ?? []) {
+                const title = item?.title?.trim();
+                if (!title) {
+                    continue;
+                }
+                const link = item?.link || item?.guid || item?.id;
+                if (!link || seenUrls.has(link)) {
+                    continue;
+                }
+                const dateStr = item?.isoDate || item?.pubDate || item?.pubdate || item?.date || item?.updated;
+                const publishedAt = parseDate(dateStr);
+                if (!publishedAt || Number.isNaN(publishedAt.getTime())) {
+                    continue;
+                }
+                if (publishedAt.getTime() &lt; cutoff) {
+                    continue;
+                }
+                const snippetSource = item?.contentSnippet || item?.summary || (typeof item?.content === "string" ? item.content : "");
+                const snippet = typeof snippetSource === "string" ? snippetSource.replace(/&lt;[^>]*>/g, " ").replace(/\s+/g, " ").trim() : "";
+                const keywordText = `${title} ${snippet}`.trim();
+                if (!keywordsMatch(keywordText, source.includeKeywords, source.excludeKeywords)) {
+                    continue;
+                }
+                seenUrls.add(link);
+                items.push({
+                    title,
+                    source: sourceName || getDomain(link),
+                    publishedAt,
+                    url: link,
+                    snippet,
+                });
+            }
+        } catch (err) {
+            log.error({ fn: "fetchRssNews", url, err }, "Failed to fetch RSS feed");
+        }
+    }
+
+    items.sort((a, b) => b.publishedAt - a.publishedAt);
+    const numericLimit = Number(limit);
+    const effectiveLimit = Number.isFinite(numericLimit) &amp;&amp; numericLimit > 0 ? numericLimit : 6;
+    const maxItems = Math.max(effectiveLimit * 4, effectiveLimit);
+    return items.slice(0, maxItems);
+}
+
+function sortByRank(a, b) {
+    const diff = b.publishedAt - a.publishedAt;
+    if (diff !== 0) return diff;
+    const aw = REPUTABLE_DOMAINS.indexOf(getDomain(a.url));
+    const bw = REPUTABLE_DOMAINS.indexOf(getDomain(b.url));
+    return bw - aw;
+}
+
+/**
+ * Computes a time-decayed sentiment average for a list of news items.
+ * @param {Array&lt;Object>} items - News entries.
+ * @param {number} [now=Date.now()] - Reference timestamp in milliseconds.
+ * @returns {number} Weighted sentiment score between -1 and 1.
+ */
+export function computeWeightedSentiment(items, now = Date.now()) {
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    for (const item of items) {
+        if (!item) {
+            continue;
+        }
+        const sentiment = clampSentiment(typeof item.sentiment === "number" ? item.sentiment : Number(item.sentiment));
+        if (!Number.isFinite(sentiment)) {
+            continue;
+        }
+        const publishedAt = item.publishedAt instanceof Date ? item.publishedAt : new Date(item.publishedAt);
+        if (!(publishedAt instanceof Date) || Number.isNaN(publishedAt.getTime())) {
+            continue;
+        }
+        const ageHours = Math.max(0, (now - publishedAt.getTime()) / (60 * 60 * 1000));
+        const recencyWeight = Math.exp(-ageHours / 24);
+        const domain = getDomain(item.url);
+        const domainWeight = REPUTABLE_DOMAINS.includes(domain) ? 1.2 : 1;
+        const weight = recencyWeight * domainWeight;
+        if (!Number.isFinite(weight) || weight &lt;= 0) {
+            continue;
+        }
+        weightedSum += sentiment * weight;
+        totalWeight += weight;
+    }
+
+    if (totalWeight &lt;= 0) {
+        return 0;
+    }
+    const avg = weightedSum / totalWeight;
+    return clampSentiment(avg);
+}
+
+async function classifySentiments(items) {
+    const titles = items.map(i => i.title);
+    if (!titles.length) return [];
+    const provider = (CFG.sentimentProvider || "tfjs").toLowerCase();
+    const log = withContext(logger);
+
+    if (provider === "api" &amp;&amp; CFG.sentimentApiUrl) {
+        try {
+            const headers = { "content-type": "application/json" };
+            if (CFG.sentimentApiKey) {
+                headers.authorization = `Bearer ${CFG.sentimentApiKey}`;
+            }
+            const response = await axios.post(CFG.sentimentApiUrl, { inputs: titles }, { headers, timeout: 15000 });
+            const data = response?.data;
+            const arr = Array.isArray(data?.sentiments)
+                ? data.sentiments
+                : Array.isArray(data)
+                    ? data
+                    : Array.isArray(data?.scores)
+                        ? data.scores
+                        : null;
+            if (Array.isArray(arr)) {
+                const normalized = arr.map((value) => normalizeSentiment(value));
+                if (normalized.some((value) => Number.isFinite(value))) {
+                    return normalized.map(clampSentiment);
+                }
+            }
+        } catch (err) {
+            log.error({ fn: "classifySentiments", err }, "Sentiment classification via API failed");
+        }
+    }
+
+    if (provider === "openrouter" &amp;&amp; CFG.openrouterApiKey) {
+        try {
+            const prompt = `Classify the sentiment of each headline as -1 for negative, 0 for neutral, and 1 for positive. Return a JSON array of numbers in the same order.\n` +
+                titles.map(t => `- ${t}`).join("\n");
+            const messages = [
+                { role: "system", content: "You are a sentiment analysis assistant." },
+                { role: "user", content: [{ type: "text", text: prompt }] }
+            ];
+            const resp = await callOpenRouter(messages);
+            const arr = JSON.parse(resp);
+            if (Array.isArray(arr)) {
+                return arr.map((n) => clampSentiment(Number(n)));
+            }
+        } catch (err) {
+            log.error({ fn: "classifySentiments", err }, "Sentiment classification via OpenRouter failed");
+        }
+    }
+
+    try {
+        const localScores = await classifySentimentsLocal(titles);
+        if (Array.isArray(localScores) &amp;&amp; localScores.length === titles.length) {
+            return localScores.map((score) => clampSentiment(score));
+        }
+    } catch (err) {
+        log.error({ fn: "classifySentiments", err }, "Local sentiment classification failed");
+    }
+
+    const positive = ["up", "surge", "rally", "gain", "bull", "rise", "soar", "profit", "positive"];
+    const negative = ["down", "drop", "fall", "crash", "bear", "decline", "plunge", "loss", "negative"];
+    return titles.map(t => {
+        const lc = t.toLowerCase();
+        let score = 0;
+        for (const w of positive) if (lc.includes(w)) score++;
+        for (const w of negative) if (lc.includes(w)) score--;
+        return score > 0 ? 1 : score &lt; 0 ? -1 : 0;
+    });
+}
+
+/**
+ * Retrieves curated news articles and sentiment analytics for a specific asset.
+ * @param {Object} params - Query parameters.
+ * @param {string} params.symbol - Asset symbol.
+ * @param {number} [params.lookbackHours] - Lookback window in hours.
+ * @param {number} [params.limit] - Maximum number of items to return.
+ * @returns {Promise} Structured news data including translations and sentiment scores.
+ */
+export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
+    const log = withContext(logger, { asset: symbol });
+    log.info({ fn: "getAssetNews" }, `Fetching news for ${symbol}`);
+    if (!symbol) {
+        return { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };
+    }
+
+    const now = Date.now();
+    const cacheKey = getCacheKey(symbol, lookbackHours, limit);
+
+    try {
+        const cached = await getCachedNews(cacheKey, now, log);
+        if (cached) {
+            if (Array.isArray(cached.items) &amp;&amp; cached.items.length &amp;&amp; typeof cached.weightedSentiment !== "number") {
+                const reconstructed = cached.items.map((item) => ({
+                    ...item,
+                    publishedAt: new Date(item.publishedAt),
+                }));
+                const computedWeighted = computeWeightedSentiment(reconstructed);
+                if (Number.isFinite(computedWeighted)) {
+                    cached.weightedSentiment = computedWeighted;
+                }
+            }
+            return cached;
+        }
+    } catch (err) {
+        log.warn({ fn: "getAssetNews", err }, "Failed to read news cache; continuing without cache");
+    }
+
+    try {
+        const [serpItems, rssItems] = await Promise.all([
+            fetchSerpApiNews({ symbol, lookbackHours, limit, log }),
+            fetchRssNews({ symbol, lookbackHours, limit, log }),
+        ]);
+
+        let combined = [...serpItems, ...rssItems].filter((item) => item &amp;&amp; item.title &amp;&amp; item.url);
+
+        if (!combined.length) {
+            const emptyResult = { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };
+            await setCachedNews(cacheKey, emptyResult, now, log);
+            return emptyResult;
+        }
+
+        let filtered = combined.filter((item) => REPUTABLE_DOMAINS.includes(getDomain(item.url)));
+        if (filtered.length &lt; 2) {
+            filtered = combined;
+        }
+
+        filtered.sort(sortByRank);
+        filtered = dedupeByTrigram(filtered);
+        filtered = await filterFreshNewsItems(filtered, now, log);
+        filtered = filtered.slice(0, limit);
+
+        if (!filtered.length) {
+            const emptyResult = { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };
+            await setCachedNews(cacheKey, emptyResult, now, log);
+            return emptyResult;
+        }
+
+        const sentiments = await classifySentiments(filtered);
+        const normalizedSentiments = filtered.map((_, idx) => clampSentiment(sentiments[idx] ?? 0));
+        const avgSentiment = normalizedSentiments.length
+            ? normalizedSentiments.reduce((a, b) => a + b, 0) / normalizedSentiments.length
+            : 0;
+        filtered = filtered.map((item, idx) => ({ ...item, sentiment: normalizedSentiments[idx] ?? 0 }));
+        filtered = await translateNewsItems(filtered, log);
+        const weightedSentiment = computeWeightedSentiment(filtered, now);
+
+        let summary = "";
+        if (CFG.openrouterApiKey &amp;&amp; filtered.length) {
+            try {
+                const prompt = `Summarize in a couple sentences the following news about ${symbol}:\n` +
+                    filtered.map((item) => `- ${item.title} (${item.source})`).join("\n");
+                const messages = [
+                    { role: "system", content: "You are a concise financial news assistant." },
+                    { role: "user", content: [{ type: "text", text: prompt }] },
+                ];
+                summary = await callOpenRouter(messages);
+            } catch (err) {
+                log.warn({ fn: "getAssetNews", err }, "Failed to summarize news via OpenRouter");
+            }
+        }
+        if (!summary) {
+            summary = filtered.slice(0, 3).map((item) => `${item.source}: ${item.title}`).join(" | ");
+        }
+
+        await markNewsItemsAsSeen(filtered, now, log);
+
+        const normalized = filtered.map((item) => ({
+            ...item,
+            publishedAt: item.publishedAt.toISOString(),
+        }));
+
+        const result = { items: normalized, summary: summary.trim(), avgSentiment: clampSentiment(avgSentiment), weightedSentiment };
+        await setCachedNews(cacheKey, result, now, log);
+        return result;
+    } catch (error) {
+        log.error({ fn: "getAssetNews", err: error }, "Error fetching asset news");
+        return { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };
+    }
+}
+</code></pre></article></section></div></div></div><div class="search-container" id="PkfLWpAbet" style="display:none"><div class="wrapper" id="iCxFxjkHbP"><button class="icon-button search-close-button" id="VjLlGakifb" aria-label="close search"><svg><use xlink:href="#close-icon"></use></svg></button><div class="search-box-c"><svg><use xlink:href="#search-icon"></use></svg> <input type="text" id="vpcKVYIppa" class="search-input" placeholder="Search..." autofocus></div><div class="search-result-c" id="fWwVHRuDuN"><span class="search-result-c-text">Type anything to view search result</span></div></div></div><div class="mobile-menu-icon-container"><button class="icon-button" id="mobile-menu" data-isopen="false" aria-label="menu"><svg><use xlink:href="#menu-icon"></use></svg></button></div><div id="mobile-sidebar" class="mobile-sidebar-container"><div class="mobile-sidebar-wrapper"><a href="/" class="sidebar-title sidebar-title-anchor">Crypto Daily Discord Bot API</a><div class="mobile-nav-links"></div><div class="mobile-sidebar-items-c"><div class="sidebar-section-title with-arrow" data-isopen="false" id="sidebar-classes"><div>Classes</div><svg><use xlink:href="#down-icon"></use></svg></div><div class="sidebar-section-children-container"><div class="sidebar-section-children"><a href="DiscordRateLimit.html">DiscordRateLimit</a></div><div class="sidebar-section-children"><a href="TokenBucket.html">TokenBucket</a></div></div><div class="sidebar-section-title with-arrow" data-isopen="false" id="sidebar-global"><div>Global</div><svg><use xlink:href="#down-icon"></use></svg></div><div class="sidebar-section-children-container"><div class="sidebar-section-children"><a href="global.html#addAssetToWatch">addAssetToWatch</a></div><div class="sidebar-section-children"><a href="global.html#adx">adx</a></div><div class="sidebar-section-children"><a href="global.html#atr14">atr14</a></div><div class="sidebar-section-children"><a href="global.html#bollWidth">bollWidth</a></div><div class="sidebar-section-children"><a href="global.html#bollinger">bollinger</a></div><div class="sidebar-section-children"><a href="global.html#build45mCandles">build45mCandles</a></div><div class="sidebar-section-children"><a href="global.html#buildAlerts">buildAlerts</a></div><div class="sidebar-section-children"><a href="global.html#buildHash">buildHash</a></div><div class="sidebar-section-children"><a href="global.html#buildSnapshotForReport">buildSnapshotForReport</a></div><div class="sidebar-section-children"><a href="global.html#buildSummary">buildSummary</a></div><div class="sidebar-section-children"><a href="global.html#buildSummaryPdf">buildSummaryPdf</a></div><div class="sidebar-section-children"><a href="global.html#calcConcurrency">calcConcurrency</a></div><div class="sidebar-section-children"><a href="global.html#callOpenRouter">callOpenRouter</a></div><div class="sidebar-section-children"><a href="global.html#cci">cci</a></div><div class="sidebar-section-children"><a href="global.html#clampSentiment">clampSentiment</a></div><div class="sidebar-section-children"><a href="global.html#classifySentimentsLocal">classifySentimentsLocal</a></div><div class="sidebar-section-children"><a href="global.html#compileMonthlyPerformanceReport">compileMonthlyPerformanceReport</a></div><div class="sidebar-section-children"><a href="global.html#computeWeightedSentiment">computeWeightedSentiment</a></div><div class="sidebar-section-children"><a href="global.html#createContext">createContext</a></div><div class="sidebar-section-children"><a href="global.html#crossDown">crossDown</a></div><div class="sidebar-section-children"><a href="global.html#crossUp">crossUp</a></div><div class="sidebar-section-children"><a href="global.html#ema">ema</a></div><div class="sidebar-section-children"><a href="global.html#fetchWithRetry">fetchWithRetry</a></div><div class="sidebar-section-children"><a href="global.html#filterFreshNewsItems">filterFreshNewsItems</a></div><div class="sidebar-section-children"><a href="global.html#fmt">fmt</a></div><div class="sidebar-section-children"><a href="global.html#formatAlertMessage">formatAlertMessage</a></div><div class="sidebar-section-children"><a href="global.html#generateWeeklySnapshot">generateWeeklySnapshot</a></div><div class="sidebar-section-children"><a href="global.html#getAlertHash">getAlertHash</a></div><div class="sidebar-section-children"><a href="global.html#getAssetNews">getAssetNews</a></div><div class="sidebar-section-children"><a href="global.html#getSetting">getSetting</a></div><div class="sidebar-section-children"><a href="global.html#getSettings">getSettings</a></div><div class="sidebar-section-children"><a href="global.html#getSignature">getSignature</a></div><div class="sidebar-section-children"><a href="global.html#getWatchlist">getWatchlist</a></div><div class="sidebar-section-children"><a href="global.html#handleAnalysisSlashCommand">handleAnalysisSlashCommand</a></div><div class="sidebar-section-children"><a href="global.html#handleInteraction">handleInteraction</a></div><div class="sidebar-section-children"><a href="global.html#initBot">initBot</a></div><div class="sidebar-section-children"><a href="global.html#isBBSqueeze">isBBSqueeze</a></div><div class="sidebar-section-children"><a href="global.html#keltnerChannel">keltnerChannel</a></div><div class="sidebar-section-children"><a href="global.html#limit">limit</a></div><div class="sidebar-section-children"><a href="global.html#loadSettings">loadSettings</a></div><div class="sidebar-section-children"><a href="global.html#loadWeeklySnapshots">loadWeeklySnapshots</a></div><div class="sidebar-section-children"><a href="global.html#macd">macd</a></div><div class="sidebar-section-children"><a href="global.html#markNewsItemsAsSeen">markNewsItemsAsSeen</a></div><div class="sidebar-section-children"><a href="global.html#monthKeyFromIso">monthKeyFromIso</a></div><div class="sidebar-section-children"><a href="global.html#normalizeSentiment">normalizeSentiment</a></div><div class="sidebar-section-children"><a href="global.html#notifyOps">notifyOps</a></div><div class="sidebar-section-children"><a href="global.html#num">num</a></div><div class="sidebar-section-children"><a href="global.html#obv">obv</a></div><div class="sidebar-section-children"><a href="global.html#parabolicSAR">parabolicSAR</a></div><div class="sidebar-section-children"><a href="global.html#pct">pct</a></div><div class="sidebar-section-children"><a href="global.html#postAnalysis">postAnalysis</a></div><div class="sidebar-section-children"><a href="global.html#postCharts">postCharts</a></div><div class="sidebar-section-children"><a href="global.html#postMonthlyReport">postMonthlyReport</a></div><div class="sidebar-section-children"><a href="global.html#previousMonthKey">previousMonthKey</a></div><div class="sidebar-section-children"><a href="global.html#pruneOlderThan">pruneOlderThan</a></div><div class="sidebar-section-children"><a href="global.html#recordPerf">recordPerf</a></div><div class="sidebar-section-children"><a href="global.html#removeAssetFromWatch">removeAssetFromWatch</a></div><div class="sidebar-section-children"><a href="global.html#renderChartPNG">renderChartPNG</a></div><div class="sidebar-section-children"><a href="global.html#renderMonthlyPerformanceChart">renderMonthlyPerformanceChart</a></div><div class="sidebar-section-children"><a href="global.html#reportWeeklyPerf">reportWeeklyPerf</a></div><div class="sidebar-section-children"><a href="global.html#resetAlertHashes">resetAlertHashes</a></div><div class="sidebar-section-children"><a href="global.html#resetSettings">resetSettings</a></div><div class="sidebar-section-children"><a href="global.html#roundThreshold">roundThreshold</a></div><div class="sidebar-section-children"><a href="global.html#rsi">rsi</a></div><div class="sidebar-section-children"><a href="global.html#runAgent">runAgent</a></div><div class="sidebar-section-children"><a href="global.html#runAll">runAll</a></div><div class="sidebar-section-children"><a href="global.html#runDailyAnalysis">runDailyAnalysis</a></div><div class="sidebar-section-children"><a href="global.html#runOnceForAsset">runOnceForAsset</a></div><div class="sidebar-section-children"><a href="global.html#saveStore">saveStore</a></div><div class="sidebar-section-children"><a href="global.html#saveWeeklySnapshot">saveWeeklySnapshot</a></div><div class="sidebar-section-children"><a href="global.html#scheduleRun">scheduleRun</a></div><div class="sidebar-section-children"><a href="global.html#scoreHeuristic">scoreHeuristic</a></div><div class="sidebar-section-children"><a href="global.html#searchWeb">searchWeb</a></div><div class="sidebar-section-children"><a href="global.html#semaforo">semaforo</a></div><div class="sidebar-section-children"><a href="global.html#sendDiscordAlert">sendDiscordAlert</a></div><div class="sidebar-section-children"><a href="global.html#setSetting">setSetting</a></div><div class="sidebar-section-children"><a href="global.html#shouldSend">shouldSend</a></div><div class="sidebar-section-children"><a href="global.html#sma">sma</a></div><div class="sidebar-section-children"><a href="global.html#sparkline">sparkline</a></div><div class="sidebar-section-children"><a href="global.html#stochastic">stochastic</a></div><div class="sidebar-section-children"><a href="global.html#streamKlines">streamKlines</a></div><div class="sidebar-section-children"><a href="global.html#tfToInterval">tfToInterval</a></div><div class="sidebar-section-children"><a href="global.html#toMonthKey">toMonthKey</a></div><div class="sidebar-section-children"><a href="global.html#trendFromMAs">trendFromMAs</a></div><div class="sidebar-section-children"><a href="global.html#updateAlertHash">updateAlertHash</a></div><div class="sidebar-section-children"><a href="global.html#updateSignature">updateSignature</a></div><div class="sidebar-section-children"><a href="global.html#volumeDivergence">volumeDivergence</a></div><div class="sidebar-section-children"><a href="global.html#vwap">vwap</a></div><div class="sidebar-section-children"><a href="global.html#williamsR">williamsR</a></div><div class="sidebar-section-children"><a href="global.html#withContext">withContext</a></div></div></div><div class="mobile-navbar-actions"><div class="navbar-right-item"><button class="icon-button search-button" aria-label="open-search"><svg><use xlink:href="#search-icon"></use></svg></button></div><div class="navbar-right-item"><button class="icon-button theme-toggle" aria-label="toggle-theme"><svg><use class="theme-svg-use" xlink:href="#dark-theme-icon"></use></svg></button></div><div class="navbar-right-item"><button class="icon-button font-size" aria-label="change-font-size"><svg><use xlink:href="#font-size-icon"></use></svg></button></div></div></div></div><script type="text/javascript" src="scripts/core.min.js"></script><script src="scripts/search.min.js" defer="defer"></script><script src="scripts/third-party/fuse.js" defer="defer"></script><script type="text/javascript">var tocbotInstance=tocbot.init({tocSelector:"#eed4d2a0bfd64539bb9df78095dec881",contentSelector:".main-content",headingSelector:"h1, h2, h3",hasInnerContainers:!0,scrollContainer:".main-content",headingsOffset:130,onClick:bringLinkToView})</script></body></html>

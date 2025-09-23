@@ -1,6 +1,15 @@
 import { logger, withContext } from './logger.js';
 import { fetchWithRetryCounter, fetchWithRetryHistogram } from './metrics.js';
 
+/**
+ * Executes an asynchronous function with exponential backoff retries.
+ * @param {Function} fn - Asynchronous function to invoke.
+ * @param {Object} [options] - Retry configuration.
+ * @param {number} [options.retries=3] - Number of retry attempts.
+ * @param {number} [options.baseDelay=500] - Initial delay in milliseconds for the backoff.
+ * @returns {Promise} Resolves with the function result when successful.
+ * @throws {Error} Rethrows the last error when the retry budget is exhausted.
+ */
 export async function fetchWithRetry(fn, { retries = 3, baseDelay = 500 } = {}) {
     const log = withContext(logger);
     fetchWithRetryCounter.inc();
@@ -27,6 +36,11 @@ export async function fetchWithRetry(fn, { retries = 3, baseDelay = 500 } = {}) 
     }
 }
 
+/**
+ * Determines a rounding threshold based on the magnitude of the price.
+ * @param {number} price - Price used to determine the threshold.
+ * @returns {number} Rounded threshold step.
+ */
 export function roundThreshold(price) {
     if (price == null || isNaN(price)) return 1;
     if (price >= 1000) return 1000;

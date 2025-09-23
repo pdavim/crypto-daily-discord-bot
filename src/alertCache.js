@@ -29,10 +29,21 @@ function persist() {
     fs.writeFileSync(ALERTS_FILE, JSON.stringify(cache, null, 2));
 }
 
+/**
+ * Generates a stable SHA-256 hash for alert content.
+ * @param {string} text - Alert payload to hash.
+ * @returns {string} Hex encoded hash string.
+ */
 export function buildHash(text) {
     return crypto.createHash('sha256').update(text).digest('hex');
 }
 
+/**
+ * Determines whether a new alert should be sent or suppressed due to duplication.
+ * @param {{asset: string, tf: string, hash: string}} params - Alert identity parameters.
+ * @param {number} windowMs - Duration in milliseconds for deduplication.
+ * @returns {boolean} True when the alert should be dispatched.
+ */
 export function shouldSend({ asset, tf, hash }, windowMs) {
     const now = Date.now();
     cache = cache.filter(entry => now - entry.time <= windowMs);
@@ -44,6 +55,11 @@ export function shouldSend({ asset, tf, hash }, windowMs) {
     return true;
 }
 
+/**
+ * Removes cached alerts older than the provided time window.
+ * @param {number} ms - Milliseconds defining the retention window.
+ * @returns {void}
+ */
 export function pruneOlderThan(ms) {
     const cutoff = Date.now() - ms;
     const before = cache.length;

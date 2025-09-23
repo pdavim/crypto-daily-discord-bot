@@ -76,6 +76,11 @@ function ensureUser(userId) {
   }
 }
 
+/**
+ * Retrieves the watchlist for a given user or the aggregated watchlist.
+ * @param {string} [userId] - User identifier; when omitted returns the merged list.
+ * @returns {Array} Array of tracked asset tickers.
+ */
 export function getWatchlist(userId) {
   if (userId) {
     return list[userId] ? list[userId].slice() : [];
@@ -87,6 +92,12 @@ export function getWatchlist(userId) {
   return Array.from(combined);
 }
 
+/**
+ * Adds an asset to a user's watchlist if it is not already present.
+ * @param {string} userId - User identifier.
+ * @param {string} asset - Asset ticker to add.
+ * @returns {boolean} True when the asset was inserted.
+ */
 export function addAssetToWatch(userId, asset) {
   if (!userId || typeof asset !== 'string') return false;
   ensureUser(userId);
@@ -99,6 +110,12 @@ export function addAssetToWatch(userId, asset) {
   return false;
 }
 
+/**
+ * Removes an asset from a user's watchlist.
+ * @param {string} userId - User identifier.
+ * @param {string} asset - Asset ticker to remove.
+ * @returns {boolean} True when the asset was removed.
+ */
 export function removeAssetFromWatch(userId, asset) {
   if (!userId || !list[userId]) return false;
   const assets = list[userId];

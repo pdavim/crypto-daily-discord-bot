@@ -6,9 +6,9 @@ const BASE_URL = 'wss://stream.binance.com:9443/stream?streams=';
 
 /**
  * Start a Binance kline WebSocket stream for multiple symbol/interval pairs.
- * @param {Array<{symbol:string, interval:string}>} pairs Array of pairs to subscribe.
- * @param {(symbol:string, interval:string)=>void} onCandleClose Callback when a candle closes.
- * @returns {WebSocket}
+ * @param {Array<Object>} pairs Array of pairs to subscribe.
+ * @param {Function} onCandleClose Callback when a candle closes.
+ * @returns {WebSocket} Connected WebSocket instance.
  */
 export function streamKlines(pairs, onCandleClose) {
     if (!pairs || pairs.length === 0) {

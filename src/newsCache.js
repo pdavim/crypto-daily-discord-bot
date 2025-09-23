@@ -60,6 +60,13 @@ function pruneExpiredEntries(now) {
     return changed;
 }
 
+/**
+ * Filters out news items that were recently processed.
+ * @param {Array<Object>} items - Candidate news items.
+ * @param {number} [now=Date.now()] - Timestamp used as reference for cache TTL.
+ * @param {*} [log=withContext(logger)] - Logger instance for diagnostics.
+ * @returns {Promise} Items that have not been seen recently.
+ */
 export async function filterFreshNewsItems(items, now = Date.now(), log = withContext(logger)) {
     await ensureCacheLoaded(log);
     const effectiveNow = Number.isFinite(now) ? now : Date.now();
@@ -89,6 +96,13 @@ export async function filterFreshNewsItems(items, now = Date.now(), log = withCo
     return freshItems;
 }
 
+/**
+ * Records news items in the cache so they are not processed again within the TTL.
+ * @param {Array<Object>} items - News items to mark as seen.
+ * @param {number} [now=Date.now()] - Timestamp used for the cache entries.
+ * @param {*} [log=withContext(logger)] - Logger instance for diagnostics.
+ * @returns {Promise} Resolves when the cache has been updated.
+ */
 export async function markNewsItemsAsSeen(items, now = Date.now(), log = withContext(logger)) {
     await ensureCacheLoaded(log);
     const effectiveNow = Number.isFinite(now) ? now : Date.now();

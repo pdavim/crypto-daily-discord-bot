@@ -120,6 +120,11 @@ function scoreFromFeatures(features) {
     });
 }
 
+/**
+ * Estimates sentiment locally using a lightweight heuristic model.
+ * @param {Array<string>} [texts=[]] - Text snippets to analyse.
+ * @returns {Promise} Sentiment scores between -1 and 1.
+ */
 export async function classifySentimentsLocal(texts = []) {
     if (!Array.isArray(texts) || !texts.length) {
         return [];
@@ -132,6 +137,11 @@ export async function classifySentimentsLocal(texts = []) {
     });
 }
 
+/**
+ * Normalizes sentiment values from multiple provider formats to the [-1, 1] range.
+ * @param {*} value - Raw sentiment value or object.
+ * @returns {number} Normalized sentiment score.
+ */
 export function normalizeSentiment(value) {
     if (typeof value === "number" && Number.isFinite(value)) {
         return Math.max(-1, Math.min(1, value));
@@ -182,6 +192,11 @@ export function normalizeSentiment(value) {
     return 0;
 }
 
+/**
+ * Restricts a sentiment score to the valid range.
+ * @param {number} value - Sentiment score to clamp.
+ * @returns {number} Clamped value between -1 and 1.
+ */
 export function clampSentiment(value) {
     return Math.max(-1, Math.min(1, Number.isFinite(value) ? value : 0));
 }

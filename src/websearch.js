@@ -38,6 +38,11 @@ async function fetchOfficialBlog(asset) {
     return null;
 }
 
+/**
+ * Retrieves recent web snippets and official blog updates for an asset.
+ * @param {string} asset - Asset symbol to search for.
+ * @returns {Promise} Snippets describing recent events.
+ */
 export async function searchWeb(asset) {
     const log = withContext(logger, { asset });
     log.info({ fn: 'searchWeb' }, `Fetching web results for ${asset}`);
