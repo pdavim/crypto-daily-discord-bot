@@ -82,6 +82,39 @@ const toStringList = (value) => {
         : [];
 };
 
+const toDailyReportHours = (value, fallback = ['8']) => {
+    const parts = Array.isArray(value)
+        ? value
+        : typeof value === 'string'
+            ? value.split(',')
+            : value != null
+                ? [value]
+                : [];
+    const normalized = parts
+        .map((part) => {
+            if (typeof part === 'number' && Number.isFinite(part)) {
+                return Math.trunc(part);
+            }
+            if (typeof part === 'string') {
+                const trimmed = part.trim();
+                if (trimmed === '') {
+                    return null;
+                }
+                const parsed = Number.parseInt(trimmed, 10);
+                return Number.isFinite(parsed) ? parsed : null;
+            }
+            return null;
+        })
+        .filter((hour) => Number.isInteger(hour) && hour >= 0 && hour <= 23);
+
+    const unique = Array.from(new Set(normalized));
+    if (unique.length === 0) {
+        return fallback.slice();
+    }
+    unique.sort((a, b) => a - b);
+    return unique.map((hour) => String(hour));
+};
+
 const toBoolean = (value, fallback) => {
     if (value === undefined) {
         return fallback;
@@ -309,8 +342,20 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
         nextCFG.webhooks[key] = process.env[envKey] ?? nextCFG.webhooks[key] ?? defaultWebhookMap[key] ?? null;
     }
 
+    for (const { key } of ASSETS) {
+        const cfgKey = `webhookReports_${key}`;
+        const envKey = `DISCORD_WEBHOOK_REPORTS_${key}`;
+        const defaultValue = mergedConfig[cfgKey];
+        nextCFG[cfgKey] = process.env[envKey] ?? nextCFG[cfgKey] ?? defaultValue ?? null;
+    }
+
     nextCFG.tz = process.env.TZ ?? nextCFG.tz ?? 'Europe/Lisbon';
-    nextCFG.dailyReportHour = process.env.DAILY_REPORT_HOUR ?? nextCFG.dailyReportHour ?? '8';
+    const rawDailyReportHour = process.env.DAILY_REPORT_HOUR ?? nextCFG.dailyReportHour ?? '8';
+    const parsedDailyReportHours = toDailyReportHours(rawDailyReportHour);
+    nextCFG.dailyReportHours = parsedDailyReportHours;
+    nextCFG.dailyReportHour = parsedDailyReportHours.length === 1
+        ? parsedDailyReportHours[0]
+        : parsedDailyReportHours.slice();
     nextCFG.analysisFrequency = process.env.ANALYSIS_FREQUENCY ?? nextCFG.analysisFrequency ?? 'hourly';
     nextCFG.openrouterApiKey = process.env.OPENROUTER_API_KEY ?? nextCFG.openrouterApiKey ?? null;
     nextCFG.openrouterModel = process.env.OPENROUTER_MODEL ?? nextCFG.openrouterModel ?? 'openrouter/sonoma-dusk-alpha';
