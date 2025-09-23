@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { ASSETS } from './assets.js';
 import { logger, withContext } from './logger.js';
@@ -7,8 +7,32 @@ import { DEFAULT_ALERT_MODULES } from './alerts/registry.js';
 import { loadSettings, getSetting, setSetting } from './settings.js';
 
 const DEFAULT_CONFIG_PATH = new URL('../config/default.json', import.meta.url);
+const CUSTOM_CONFIG_PATH = new URL('../config/custom.json', import.meta.url);
 
 const clone = (value) => JSON.parse(JSON.stringify(value ?? {}));
+
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const deepMerge = (target, source) => {
+    if (!isPlainObject(source)) {
+        return target;
+    }
+
+    for (const [key, value] of Object.entries(source)) {
+        if (Array.isArray(value)) {
+            target[key] = value.slice();
+        } else if (isPlainObject(value)) {
+            if (!isPlainObject(target[key])) {
+                target[key] = {};
+            }
+            deepMerge(target[key], value);
+        } else {
+            target[key] = value;
+        }
+    }
+
+    return target;
+};
 
 let DEFAULT_CONFIG = {};
 try {
@@ -16,6 +40,15 @@ try {
 } catch (error) {
     console.warn('Failed to load default configuration, falling back to empty object.', error);
     DEFAULT_CONFIG = {};
+}
+
+if (existsSync(CUSTOM_CONFIG_PATH)) {
+    try {
+        const customConfig = JSON.parse(readFileSync(CUSTOM_CONFIG_PATH, 'utf-8'));
+        deepMerge(DEFAULT_CONFIG, customConfig);
+    } catch (error) {
+        console.warn('Failed to load custom configuration, ignoring.', error);
+    }
 }
 
 export const CFG = clone(DEFAULT_CONFIG);
@@ -69,29 +102,6 @@ const toBoolean = (value, fallback) => {
     }
 
     return fallback;
-};
-
-const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-
-const deepMerge = (target, source) => {
-    if (!isPlainObject(source)) {
-        return target;
-    }
-
-    for (const [key, value] of Object.entries(source)) {
-        if (Array.isArray(value)) {
-            target[key] = value.slice();
-        } else if (isPlainObject(value)) {
-            if (!isPlainObject(target[key])) {
-                target[key] = {};
-            }
-            deepMerge(target[key], value);
-        } else {
-            target[key] = value;
-        }
-    }
-
-    return target;
 };
 
 const buildDiscordRateLimit = (baseConfig = {}) => {
@@ -289,7 +299,7 @@ export async function saveConfig(partialConfig) {
     deepMerge(DEFAULT_CONFIG, partialConfig);
     deepMerge(CFG, partialConfig);
 
-    await writeFile(DEFAULT_CONFIG_PATH, `${JSON.stringify(CFG, null, 4)}\n`);
+    await writeFile(CUSTOM_CONFIG_PATH, `${JSON.stringify(CFG, null, 4)}\n`);
 }
 
 export function validateConfig() {

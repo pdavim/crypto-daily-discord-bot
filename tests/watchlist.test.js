@@ -3,6 +3,13 @@ import os from 'os';
 import path from 'path';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+vi.mock('../src/config.js', () => ({
+  CFG: {},
+  config: {},
+  saveConfig: vi.fn(),
+  validateConfig: vi.fn(),
+}));
+
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'watchlist-'));
 const file = path.join(tmpDir, 'watch.json');
 process.env.WATCHLIST_FILE = file;
