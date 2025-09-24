@@ -12,6 +12,8 @@ const createBaseData = () => ({
   ma50: [100, 100],
   ma200: [100, 100],
   lastClose: 100,
+  timeframe: '4h',
+  timeframeVariation: 0,
   closes: Array(21).fill(100),
   highs: Array(21).fill(101),
   lows: Array(21).fill(99),

@@ -1,3 +1,8 @@
+/**
+ * Discord bot command layer que registra slash commands, formata respostas e integra
+ * recursos recentes como o resumo `/binance`, configurações de lucro mínimo e
+ * gráficos com previsões/alertas enriquecidos.
+ */
 import { Client, GatewayIntentBits, ApplicationCommandOptionType } from 'discord.js';
 import { CFG } from './config.js';
 import { logger, withContext } from './logger.js';
@@ -5,7 +10,8 @@ import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from './assets.js';
 import { fetchOHLCV } from './data/binance.js';
 import { renderChartPNG } from './chart.js';
 import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from './watchlist.js';
-import { setSetting } from './settings.js';
+import { setSetting, getSetting } from './settings.js';
+import { getAccountOverview } from './trading/binance.js';
 
 const startTime = Date.now();
 
@@ -25,6 +31,151 @@ function formatUptime(ms) {
     if (minutes || parts.length) parts.push(`${minutes}m`);
     parts.push(`${seconds}s`);
     return parts.join(' ');
+}
+
+const amountFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+const quantityFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 8 });
+const priceFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const MIN_PROFIT_PERCENT_MIN = 0;
+const MIN_PROFIT_PERCENT_MAX = 100;
+
+function isPlainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function formatAmount(value, formatter = amountFormatter) {
+    return Number.isFinite(value) ? formatter.format(value) : '0,00';
+}
+
+function readMinimumProfitSettings() {
+    const fallback = isPlainObject(CFG.minimumProfitThreshold) ? CFG.minimumProfitThreshold : { default: 0, users: {} };
+    const stored = getSetting('minimumProfitThreshold', fallback);
+    if (!isPlainObject(stored)) {
+        return {
+            default: Number.isFinite(fallback.default) ? fallback.default : 0,
+            users: { ...isPlainObject(fallback.users) ? fallback.users : {} },
+        };
+    }
+    const baseDefault = Number.isFinite(stored.default)
+        ? stored.default
+        : Number.isFinite(fallback.default)
+            ? fallback.default
+            : 0;
+    const baseUsers = isPlainObject(stored.users)
+        ? stored.users
+        : isPlainObject(fallback.users)
+            ? fallback.users
+            : {};
+    const users = {};
+    for (const [userId, value] of Object.entries(baseUsers)) {
+        if (Number.isFinite(value) && value >= 0 && value <= 1) {
+            users[userId] = value;
+        }
+    }
+    return {
+        default: baseDefault >= 0 && baseDefault <= 1 ? baseDefault : 0,
+        users,
+    };
+}
+
+function formatPercentDisplay(value) {
+    return value % 1 === 0 ? value.toFixed(0) : value.toFixed(2);
+}
+
+function applyMinimumProfitUpdate(nextValue) {
+    if (isPlainObject(CFG.minimumProfitThreshold)) {
+        CFG.minimumProfitThreshold.default = nextValue.default;
+        CFG.minimumProfitThreshold.users = nextValue.users;
+    } else {
+        CFG.minimumProfitThreshold = nextValue;
+    }
+}
+
+function formatAccountAssets(assets = []) {
+    if (!Array.isArray(assets) || assets.length === 0) {
+        return 'Sem dados de ativos configurados.';
+    }
+    const lines = assets.slice(0, 5).map(asset => {
+        const name = asset.coin ?? asset.asset ?? asset.symbol ?? '—';
+        const deposit = asset.depositAllEnable === false ? '❌' : '✅';
+        const withdraw = asset.withdrawAllEnable === false ? '❌' : '✅';
+        return `• ${name}: Depósito ${deposit} | Saque ${withdraw}`;
+    });
+    if (assets.length > 5) {
+        lines.push(`• ... e mais ${assets.length - 5} ativos`);
+    }
+    return lines.join('\n');
+}
+
+function formatSpotBalances(balances = []) {
+    if (!Array.isArray(balances) || balances.length === 0) {
+        return 'Sem saldos spot disponíveis.';
+    }
+    return balances.map(balance => {
+        const total = formatAmount(balance.total);
+        const free = formatAmount(balance.free);
+        const locked = formatAmount(balance.locked);
+        return `• ${balance.asset}: ${total} (Livre ${free} | Travado ${locked})`;
+    }).join('\n');
+}
+
+function formatMarginAccount(account) {
+    if (!account) {
+        return 'Sem dados da conta de margem.';
+    }
+    const parts = [];
+    if (Number.isFinite(account.totalNetAssetOfBtc)) {
+        parts.push(`• Patrimônio líquido: ${formatAmount(account.totalNetAssetOfBtc, quantityFormatter)} BTC`);
+    }
+    if (Number.isFinite(account.totalAssetOfBtc) || Number.isFinite(account.totalLiabilityOfBtc)) {
+        const assets = formatAmount(account.totalAssetOfBtc, quantityFormatter);
+        const liabilities = formatAmount(account.totalLiabilityOfBtc, quantityFormatter);
+        parts.push(`• Ativos: ${assets} BTC | Passivos: ${liabilities} BTC`);
+    }
+    if (Number.isFinite(account.marginLevel) && account.marginLevel > 0) {
+        const marginLevel = formatAmount(account.marginLevel, amountFormatter);
+        parts.push(`• Nível de margem: ${marginLevel}x`);
+    }
+    return parts.length ? parts.join('\n') : 'Sem dados da conta de margem.';
+}
+
+function formatMarginAssets(userAssets = []) {
+    if (!Array.isArray(userAssets) || userAssets.length === 0) {
+        return 'Sem ativos na conta de margem.';
+    }
+    return userAssets.map(asset => {
+        const free = formatAmount(asset.free);
+        const borrowed = formatAmount(asset.borrowed);
+        const interest = formatAmount(asset.interest);
+        const net = formatAmount(asset.netAsset);
+        return `• ${asset.asset}: Livre ${free} | Empréstimo ${borrowed} | Juros ${interest} | Líquido ${net}`;
+    }).join('\n');
+}
+
+function formatMarginPositions(positions = []) {
+    if (!Array.isArray(positions) || positions.length === 0) {
+        return 'Sem posições de margem abertas.';
+    }
+    return positions.map(position => {
+        const qty = formatAmount(position.positionAmt, quantityFormatter);
+        const entry = formatAmount(position.entryPrice, priceFormatter);
+        const mark = formatAmount(position.markPrice, priceFormatter);
+        const pnl = formatAmount(position.unrealizedProfit, priceFormatter);
+        const liq = Number.isFinite(position.liquidationPrice) ? ` | Liq.: ${formatAmount(position.liquidationPrice, priceFormatter)}` : '';
+        return `• ${position.symbol} (${position.marginType})\n  Qtde: ${qty} | Entrada: ${entry} | Marca: ${mark} | PnL: ${pnl}${liq}`;
+    }).join('\n');
+}
+
+function buildAccountOverviewMessage(overview) {
+    const sections = [
+        { title: '**Ativos Configurados**', body: formatAccountAssets(overview?.assets) },
+        { title: '**Saldos Spot**', body: formatSpotBalances(overview?.spotBalances) },
+        { title: '**Conta de Margem**', body: formatMarginAccount(overview?.marginAccount) },
+        { title: '**Ativos na Margem**', body: formatMarginAssets(overview?.marginAccount?.userAssets) },
+        { title: '**Posições de Margem**', body: formatMarginPositions(overview?.marginPositions) }
+    ];
+    return sections.map(section => `${section.title}\n${section.body}`).join('\n\n');
 }
 
 let clientPromise;
@@ -126,6 +277,20 @@ export async function handleInteraction(interaction) {
             log.error({ fn: 'handleInteraction', err }, 'Failed to run manual analysis');
             await interaction.editReply('Erro ao executar análise. Tente novamente mais tarde.');
         }
+    } else if (interaction.commandName === 'binance') {
+        await interaction.deferReply({ ephemeral: true });
+        const log = withContext(logger, { command: 'binance' });
+        try {
+            const overview = await getAccountOverview();
+            const content = buildAccountOverviewMessage(overview);
+            await interaction.editReply(content);
+        } catch (err) {
+            log.error({ fn: 'handleInteraction', err }, 'Failed to load Binance account data');
+            const message = err?.message?.includes('Missing Binance API credentials')
+                ? 'Credenciais da Binance não configuradas.'
+                : 'Não foi possível carregar dados da Binance no momento.';
+            await interaction.editReply(message);
+        }
     } else if (interaction.commandName === 'settings') {
         const group = interaction.options.getSubcommandGroup(false);
         const sub = interaction.options.getSubcommand(false);
@@ -145,6 +310,56 @@ export async function handleInteraction(interaction) {
             } catch (err) {
                 log.error({ fn: 'handleInteraction', err }, 'Failed to update risk settings');
                 await interaction.reply({ content: 'Não foi possível atualizar o risco no momento.', ephemeral: true });
+            }
+        } else if (group === 'profit') {
+            if (sub !== 'default' && sub !== 'personal') {
+                await interaction.reply({ content: 'Configuração não suportada.', ephemeral: true });
+                return;
+            }
+            const percent = interaction.options.getNumber('value', true);
+            if (!Number.isFinite(percent) || percent < MIN_PROFIT_PERCENT_MIN || percent > MIN_PROFIT_PERCENT_MAX) {
+                await interaction.reply({
+                    content: `Informe um percentual entre ${MIN_PROFIT_PERCENT_MIN} e ${MIN_PROFIT_PERCENT_MAX}.`,
+                    ephemeral: true,
+                });
+                return;
+            }
+            const decimal = percent / 100;
+            const formatted = formatPercentDisplay(percent);
+            const log = withContext(logger, { command: 'settings', group, sub });
+            const current = readMinimumProfitSettings();
+            try {
+                if (sub === 'default') {
+                    const nextValue = {
+                        default: decimal,
+                        users: { ...current.users },
+                    };
+                    setSetting('minimumProfitThreshold', nextValue);
+                    applyMinimumProfitUpdate(nextValue);
+                    await interaction.reply({
+                        content: `Lucro mínimo padrão atualizado para ${formatted}%`,
+                        ephemeral: true,
+                    });
+                } else {
+                    const userId = interaction.user?.id;
+                    if (!userId) {
+                        await interaction.reply({ content: 'Não foi possível identificar o usuário.', ephemeral: true });
+                        return;
+                    }
+                    const nextValue = {
+                        default: current.default,
+                        users: { ...current.users, [userId]: decimal },
+                    };
+                    setSetting('minimumProfitThreshold', nextValue);
+                    applyMinimumProfitUpdate(nextValue);
+                    await interaction.reply({
+                        content: `Lucro mínimo pessoal atualizado para ${formatted}%`,
+                        ephemeral: true,
+                    });
+                }
+            } catch (err) {
+                log.error({ fn: 'handleInteraction', err }, 'Failed to update profit settings');
+                await interaction.reply({ content: 'Não foi possível atualizar o lucro mínimo no momento.', ephemeral: true });
             }
         } else {
             await interaction.reply({ content: 'Configuração não suportada.', ephemeral: true });
@@ -241,6 +456,10 @@ function getClient() {
                     ]
                 },
                 {
+                    name: 'binance',
+                    description: 'Mostra saldos, posições e margem da conta Binance'
+                },
+                {
                     name: 'settings',
                     description: 'Atualiza configurações do bot',
                     options: [
@@ -257,6 +476,39 @@ function getClient() {
                                         {
                                             name: 'value',
                                             description: 'Percentual de risco permitido (0 a 5)',
+                                            type: ApplicationCommandOptionType.Number,
+                                            required: true
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            name: 'profit',
+                            description: 'Configurações de lucro mínimo',
+                            type: ApplicationCommandOptionType.SubcommandGroup,
+                            options: [
+                                {
+                                    name: 'default',
+                                    description: 'Define o lucro mínimo padrão (0 a 100%)',
+                                    type: ApplicationCommandOptionType.Subcommand,
+                                    options: [
+                                        {
+                                            name: 'value',
+                                            description: 'Percentual de lucro mínimo global (0 a 100)',
+                                            type: ApplicationCommandOptionType.Number,
+                                            required: true
+                                        }
+                                    ]
+                                },
+                                {
+                                    name: 'personal',
+                                    description: 'Define o seu lucro mínimo pessoal (0 a 100%)',
+                                    type: ApplicationCommandOptionType.Subcommand,
+                                    options: [
+                                        {
+                                            name: 'value',
+                                            description: 'Percentual de lucro mínimo pessoal (0 a 100)',
                                             type: ApplicationCommandOptionType.Number,
                                             required: true
                                         }

@@ -33,9 +33,97 @@
   "debug": false,
   "accountEquity": 0,
   "riskPerTrade": 0.01,
+  "minimumProfitThreshold": {
+    "default": 0.02,
+    "users": {}
+  },
   "alertDedupMinutes": 60,
   "binanceCacheTTL": 10,
   "maxConcurrency": null,
+  "trading": {
+    "enabled": false,
+    "minNotional": 10,
+    "maxPositionPct": 0.1,
+    "maxLeverage": 3,
+    "maxSlippagePct": 0.005,
+    "strategy": {
+      "minimumConfidence": 0.35
+    },
+    "margin": {
+      "asset": "USDT",
+      "minFree": 50,
+      "transferAmount": 25
+    }
+  },
+  "marketPosture": {
+    "bullishMaRatio": 1.01,
+    "bearishMaRatio": 0.99,
+    "neutralBuffer": 0.003,
+    "minSlope": 0.0005,
+    "lookback": 5,
+    "minTrendStrength": 18,
+    "rsiBullish": 55,
+    "rsiBearish": 45
+  },
+  "forecasting": {
+    "enabled": true,
+    "lookback": 48,
+    "minHistory": 72,
+    "historyLimit": 240,
+    "outputDir": "reports/forecasts",
+    "charts": {
+      "enabled": true,
+      "historyPoints": 120,
+      "directory": "charts/forecasts",
+      "appendToUploads": false
+    }
+  },
+  "portfolioGrowth": {
+    "enabled": false,
+    "initialCapital": 100,
+    "targetCapital": 10000000,
+    "simulation": {
+      "historyDays": 1095,
+      "riskFreeRate": 0.02,
+      "contribution": {
+        "amount": 100,
+        "intervalDays": 30
+      },
+      "slippagePct": 0.001
+    },
+    "rebalance": {
+      "intervalDays": 30,
+      "tolerancePct": 0.05
+    },
+    "risk": {
+      "maxDrawdownPct": 0.35,
+      "stopLossPct": 0.12,
+      "takeProfitPct": 0.25,
+      "maxPositionPct": 0.4,
+      "volatilityLookback": 30,
+      "volatilityTargetPct": 0.15
+    },
+    "reporting": {
+      "enabled": true,
+      "directory": "reports/growth",
+      "chartDirectory": "charts/growth",
+      "appendToUploads": false
+    },
+    "strategies": {
+      "default": {
+        "name": "Base Rebalance",
+        "allocation": {
+          "BTC": 0.45,
+          "ETH": 0.3,
+          "SOL": 0.15,
+          "POL": 0.05,
+          "SUI": 0.05
+        },
+        "minAllocationPct": 0,
+        "maxAllocationPct": 0.6
+      }
+    }
+  },
   "indicators": {
     "smaPeriods": {
       "ma20": 20,
