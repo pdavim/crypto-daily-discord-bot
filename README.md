@@ -59,6 +59,12 @@ npm install
 | Cobertura de testes | `npm run test:coverage` | Gera relatório de cobertura V8 (salvo em `coverage/`). |
 | Renderização de gráfico isolado | `npm run test:chart` | Gera um gráfico localmente para debug dos assets/timeframes. |
 
+### Logs e compatibilidade
+
+- Em ambientes Windows ou com Node.js 22+, o bot força o modo de escrita síncrona dos logs para evitar falhas no worker do transporte rotativo.
+- Defina `LOG_SYNC=false` caso queira reativar o transporte assíncrono manualmente (por exemplo, em servidores Linux). Use `LOG_SYNC=true` ou o comando `npm run once` para garantir flush imediato em execuções únicas.
+- Se o transporte rotativo não puder ser inicializado, o bot faz fallback automático para o `stdout`, garantindo que as mensagens continuem disponíveis no console.
+
 ## CLI de configuração
 
 Gerencie `config/custom.json` sem editar arquivos manualmente utilizando o helper disponível no diretório `bin/`:
