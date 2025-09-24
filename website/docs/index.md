@@ -32,3 +32,17 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 
 - Abra uma [issue no GitHub](https://github.com/OWNER/crypto-daily-discord-bot/issues) ou participe das discussões para compartilhar ideias e feedbacks.
 - Customize o cartão social com SVG próprio ou siga o [roteiro de geração de arte com IA](./guide/identidade-visual.md).
+
+## FAQ
+
+### O que torna este crypto trading bot essencial para a comunidade?
+
+Ele automatiza a coleta de dados, o cálculo de indicadores e a curadoria de insights relevantes para decisões rápidas. O crypto trading bot entrega um panorama diário consistente, evitando que os analistas precisem alternar entre múltiplas telas.
+
+### Como os Discord alerts são enviados?
+
+Os módulos de alerta monitoram preço, volume, sentimento e indicadores compostos. Assim que uma condição configurada acontece, o bot envia Discord alerts com gráficos, resumos e links de apoio diretamente para os canais definidos.
+
+### Posso adaptar as notificações para diferentes times?
+
+Sim. Ajuste configurações, webhooks e cadência de cada módulo para adequar o fluxo a scalpers, swing traders ou gestores que desejam relatórios diários e semanais agregados.
