@@ -40,6 +40,7 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 - [Estratégia de crescimento do portfólio](./guide/portfolio-growth.md)
 - [Credenciais e integrações Binance](./guide/binance-credenciais.md)
 
+
 ## Precisa de ajuda?
 
 - Abra uma [issue no GitHub](https://github.com/OWNER/crypto-daily-discord-bot/issues) ou participe das discussões para compartilhar ideias e feedbacks.
