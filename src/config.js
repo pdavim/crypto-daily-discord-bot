@@ -227,6 +227,7 @@ const DEFAULT_FORECAST_CONFIG = {
     charts: DEFAULT_FORECAST_CHART_CONFIG,
 };
 
+
 const clampNumber = (value, fallback, { min, max } = {}) => {
     if (!Number.isFinite(value)) {
         return fallback;
@@ -387,6 +388,7 @@ const buildForecastConfig = (baseConfig = {}) => {
 
     return config;
 };
+
 
 const buildDiscordRateLimit = (baseConfig = {}) => {
     const baseDefault = isPlainObject(baseConfig.default) ? baseConfig.default : {};
@@ -653,6 +655,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.trading = buildTradingConfig(nextCFG.trading);
     nextCFG.marketPosture = buildMarketPostureConfig(nextCFG.marketPosture);
     nextCFG.forecasting = buildForecastConfig(nextCFG.forecasting);
+
     nextCFG.indicators = buildIndicatorConfig(mergedConfig.indicators ?? nextCFG.indicators ?? {});
     nextCFG.alerts = isPlainObject(nextCFG.alerts) ? nextCFG.alerts : {};
     nextCFG.alerts.modules = buildAlertModuleConfig(mergedConfig.alerts?.modules ?? nextCFG.alerts?.modules ?? {});

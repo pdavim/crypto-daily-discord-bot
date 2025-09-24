@@ -9,6 +9,7 @@ import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert, postMonthlyReport } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";
 import { renderChartPNG, renderForecastChart } from "./chart.js";
+
 import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore, getAlertHash, updateAlertHash, resetAlertHashes } from "./store.js";
@@ -26,6 +27,7 @@ import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
+
 
 const ONCE = process.argv.includes("--once");
 
@@ -110,6 +112,7 @@ async function runOnceForAsset(asset, options = {}) {
     const snapshots = {};
     const chartPaths = [];
     const forecastChartPaths = [];
+
     const timeframeMeta = new Map();
 
     const intervalPromises = new Map();
@@ -256,6 +259,7 @@ async function runOnceForAsset(asset, options = {}) {
             };
             timeframeMeta.set(tf, meta);
 
+
             if (enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
                     ma20: indicators.ma20,
@@ -391,6 +395,7 @@ async function runOnceForAsset(asset, options = {}) {
                     ...meta,
                     consolidated,
                     actionable,
+
                 });
             }
         } catch (e) {
