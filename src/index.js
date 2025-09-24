@@ -26,6 +26,7 @@ import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
 
+
 const ONCE = process.argv.includes("--once");
 
 process.on('unhandledRejection', (err) => {
@@ -254,6 +255,7 @@ async function runOnceForAsset(asset, options = {}) {
             };
             timeframeMeta.set(tf, meta);
 
+
             if (enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
                     ma20: indicators.ma20,
@@ -317,6 +319,7 @@ async function runOnceForAsset(asset, options = {}) {
                     ...meta,
                     consolidated,
                     actionable,
+
                 });
             }
         } catch (e) {

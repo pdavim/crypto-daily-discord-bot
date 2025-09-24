@@ -48,6 +48,7 @@ async function privateRequest(method, path, params = {}, { context } = {}) {
 function toNumber(value) {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
+
 }
 
 function mapBalances(balances = [], { includeZero = false } = {}) {
