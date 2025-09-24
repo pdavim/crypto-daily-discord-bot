@@ -1,3 +1,11 @@
+/**
+ * Binance adapter consolidando requisições autenticadas, consulta de contas e utilidades
+ * de stream utilizadas pelo executor automático e pelos relatórios de carteira.
+ *
+ * Além de assinar requests privadas com HMAC, o módulo formata saldos spot/margin,
+ * calcula preço médio de fills e exporta helpers consumidos pelo comando `/binance`
+ * e pelo simulador de crescimento de portfólio.
+ */
 import axios from "axios";
 import crypto from "crypto";
 import WebSocket from "ws";
@@ -223,7 +231,6 @@ export async function getAccountOverview(options = {}) {
 export async function placeMarketOrder(symbol, side, quantity, params = {}) {
     return submitOrder({ symbol, side, type: "MARKET", quantity, params });
 }
-
 
 export async function placeLimitOrder(symbol, side, quantity, price, params = {}) {
     return submitOrder({

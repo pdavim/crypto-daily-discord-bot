@@ -1,3 +1,8 @@
+/**
+ * Discord bot command layer que registra slash commands, formata respostas e integra
+ * recursos recentes como o resumo `/binance`, configurações de lucro mínimo e
+ * gráficos com previsões/alertas enriquecidos.
+ */
 import { Client, GatewayIntentBits, ApplicationCommandOptionType } from 'discord.js';
 import { CFG } from './config.js';
 import { logger, withContext } from './logger.js';

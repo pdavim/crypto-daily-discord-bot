@@ -280,7 +280,6 @@ const DEFAULT_PORTFOLIO_GROWTH_CONFIG = {
     },
 };
 
-
 const clampNumber = (value, fallback, { min, max } = {}) => {
     if (!Number.isFinite(value)) {
         return fallback;
@@ -334,7 +333,6 @@ const normalizeAllocation = (allocation) => {
     }
     return normalized;
 };
-
 
 const buildTradingConfig = (baseConfig = {}) => {
     const base = isPlainObject(baseConfig) ? baseConfig : {};
@@ -649,7 +647,6 @@ const buildPortfolioGrowthConfig = (baseConfig = {}) => {
     return config;
 };
 
-
 const buildDiscordRateLimit = (baseConfig = {}) => {
     const baseDefault = isPlainObject(baseConfig.default) ? baseConfig.default : {};
     const baseWebhooks = isPlainObject(baseConfig.webhooks) ? baseConfig.webhooks : {};
@@ -916,7 +913,6 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.marketPosture = buildMarketPostureConfig(nextCFG.marketPosture);
     nextCFG.forecasting = buildForecastConfig(nextCFG.forecasting);
     nextCFG.portfolioGrowth = buildPortfolioGrowthConfig(nextCFG.portfolioGrowth);
-
     nextCFG.indicators = buildIndicatorConfig(mergedConfig.indicators ?? nextCFG.indicators ?? {});
     nextCFG.alerts = isPlainObject(nextCFG.alerts) ? nextCFG.alerts : {};
     nextCFG.alerts.modules = buildAlertModuleConfig(mergedConfig.alerts?.modules ?? nextCFG.alerts?.modules ?? {});

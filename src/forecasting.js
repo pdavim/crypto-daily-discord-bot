@@ -1,3 +1,11 @@
+/**
+ * Forecasting module responsável por gerar previsões de fechamento para o próximo timeframe,
+ * persistir o histórico em disco e alimentar a renderização de gráficos comparativos.
+ *
+ * As previsões são utilizadas pelos relatórios (`reports/forecasts/`) e pelos alertas
+ * que precisam antecipar movimento de preço respeitando configurações de risco.
+ */
+
 import fs from "node:fs";
 import path from "node:path";
 import { logger, withContext } from "./logger.js";

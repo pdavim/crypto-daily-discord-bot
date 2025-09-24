@@ -15,6 +15,16 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 - **Alertas configuráveis** para price action, indicadores técnicos e eventos on-chain.
 - **Dashboards visuais** com gráficos renderizados e enviados como anexos para cada ativo monitorado.
 - **Integrações prontas** com webhooks, comandos slash e pipelines de publicação.
+- **Trading automático com salvaguardas** ligado aos sinais de postura de mercado.
+- **Forecasting e simulação de portfólio** para projetar retornos e validar estratégias de longo prazo.
+
+## Novidades recentes
+
+- **Comando `/binance`** consolidando saldos spot/margin e posições com base nas credenciais fornecidas.
+- **Thresholds de lucro configuráveis** por usuário ou globalmente via `/settings profit`.
+- **Alertas com orientação de buy/sell/hold** e métricas por timeframe.
+- **Simulador 100€ → 10M€** com relatórios armazenados em `reports/portfolio/`.
+- **Módulo de forecasting** que persiste previsões e gráficos comparativos de tendência.
 
 ## Como começar
 
@@ -28,6 +38,8 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 - [Deploy no Discord](./guide/deploy-discord.md)
 - [Hospedagem da documentação na GitHub Pages](./guide/github-pages.md)
 - [Estratégia de crescimento do portfólio](./guide/portfolio-growth.md)
+- [Credenciais e integrações Binance](./guide/binance-credenciais.md)
+
 
 ## Precisa de ajuda?
 

@@ -1,3 +1,11 @@
+/**
+ * Simulador de crescimento de portfólio focado na meta 100€ → 10M€.
+ *
+ * O módulo roda backtests longos com rebalanceamento periódico, controles de risco e
+ * geração de dashboards (`reports/portfolio/`), permitindo comparar estratégias com
+ * os mesmos parâmetros expostos via configuração e comandos Discord.
+ */
+
 import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";

@@ -12,6 +12,17 @@ Bot Discord que entrega análises técnicas, gráficos e alertas diários sobre 
 - Renderiza gráficos de velas com sobreposições (MAs, bandas, VWAP) e publica imagens diretamente em canais do Discord.
 - Agrega notícias, sentimento, métricas on-chain e gera relatórios semanais/mensais via webhook.
 - Expõe comandos slash para que qualquer usuário consulte gráficos, análises e configurações on-demand.
+- Automatiza execução de trades com salvaguardas, detecção de postura de mercado e logs auditáveis.
+- Simula crescimento de portfólio com rebalanceamento, controle de risco e relatórios históricos.
+- Prevê fechamentos do próximo timeframe e gera gráficos comparando históricos e projeções.
+
+## O que há de novo
+
+- **Integração Binance de ponta a ponta**: coleta spot/margin, executa ordens e apresenta resumos com o comando `/binance`.
+- **Estratégia automática dinâmica**: postura bull/bear altera módulos ativos e o executor respeita limites de drawdown configurados.
+- **Previsões e gráficos de tendência**: o módulo de forecasting salva históricos em `reports/forecasts/` e publica visualizações para cada ativo monitorado.
+- **Simulação de crescimento 100€ → 10M€**: experimentos longos rodam em background e produzem dashboards com suposições documentadas.
+- **Alertas enriquecidos**: payloads ordenados por ativo exibem variação por timeframe e linhas claras de buy/sell/hold.
 
 ## Documentação online
 
@@ -45,6 +56,14 @@ npm install
 4. Revise os IDs dos canais/servidores onde os conteúdos serão publicados (`DISCORD_GUILD_ID`, `DISCORD_CHANNEL_CHARTS_ID`, `DISCORD_WEBHOOK_ALERTS`, ...).
 
 > 📌 Consulte `.env.example` para descrições completas e exemplos de cada variável disponível.
+
+## Boas práticas para credenciais da Binance
+
+- Gere chaves **apenas com permissões necessárias**: leitura para alertas e dashboards; ativar "Enable Spot & Margin Trading" somente quando o executor automático for utilizado.
+- Restrinja o acesso por **IP allowlist** sempre que possível e mantenha as chaves fora de repositórios, tickets ou screenshots.
+- Armazene `BINANCE_API_KEY` e `BINANCE_SECRET` apenas em `.env` locais ou nos segredos do provedor de deploy (GitHub Actions, Railway, etc.).
+- Utilize `npm exec config-cli secrets check` (ou pipelines equivalentes) para validar se as variáveis estão presentes antes do deploy.
+- Rotacione as chaves periodicamente e monitore os logs de `src/trading/executor.js` para detectar tentativas de uso indevido.
 
 ## Execução
 
@@ -89,6 +108,8 @@ Comandos comuns:
 | `/status` | — | Mostra uptime do bot e a watchlist do solicitante. |
 | `/analysis ativo:<ticker> tf:<timeframe>` | — | Executa a mesma análise automática usada nos alertas, retornando um resumo textual. |
 | `/settings risk percent value:<0-5>` | `value` (percentual) | Atualiza o risco por trade aplicado na estratégia automática. |
+| `/settings profit percent value:<0-20>` | `value` (percentual) | Define o lucro mínimo global ou pessoal antes que sinais de venda sejam destacados. |
+| `/binance` | — | Exibe saldo spot, métricas de margem e posições agregadas com base nas credenciais configuradas. |
 
 Todos os comandos são registrados automaticamente quando o bot inicia e exigem permissões de aplicação no servidor configurado.
 
