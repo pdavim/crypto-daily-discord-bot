@@ -1,1 +1,156 @@
-{}
+{
+  "crypto market:24:6": {
+    "timestamp": 1758665630207,
+    "data": {
+      "items": [
+        {
+          "title": "US senator says market structure bill could address crypto ATM scams",
+          "source": {
+            "name": "Cointelegraph",
+            "icon": "https://encrypted-tbn1.gstatic.com/faviconV2?url=https://cointelegraph.com&client=NEWS_360&size=96&type=FAVICON&fallback_opts=TYPE,SIZE,URL",
+            "authors": [
+              "Turner Wright"
+            ]
+          },
+          "publishedAt": "2025-09-23T20:28:00.000Z",
+          "url": "https://cointelegraph.com/news/senator-lummis-market-structure-crypto-atm-scams",
+          "snippet": "",
+          "sentiment": 0.0897577777504921,
+          "originalLanguage": "unknown",
+          "translations": {
+            "title": {
+              "en": "US senator says market structure bill could address crypto ATM scams",
+              "pt": "US senator says market structure bill could address crypto ATM scams"
+            },
+            "snippet": {
+              "en": "",
+              "pt": ""
+            }
+          }
+        },
+        {
+          "title": "Bitcoin dips entice buyers, but charts warn of BTC price purge to $106K",
+          "source": {
+            "name": "Cointelegraph",
+            "icon": "https://encrypted-tbn1.gstatic.com/faviconV2?url=https://cointelegraph.com&client=NEWS_360&size=96&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
+          },
+          "publishedAt": "2025-09-23T19:33:00.000Z",
+          "url": "https://cointelegraph.com/news/bitcoin-dips-entice-buyers-as-charts-warn-of-btc-drop-to-dollar106k",
+          "snippet": "",
+          "sentiment": 0.0897577777504921,
+          "originalLanguage": "unknown",
+          "translations": {
+            "title": {
+              "en": "Bitcoin dips entice buyers, but charts warn of BTC price purge to $106K",
+              "pt": "Bitcoin dips entice buyers, but charts warn of BTC price purge to $106K"
+            },
+            "snippet": {
+              "en": "",
+              "pt": ""
+            }
+          }
+        },
+        {
+          "title": "What the $1.25 Billion Bitcoin Futures Flush Means for Markets",
+          "source": {
+            "name": "Decrypt",
+            "icon": "https://encrypted-tbn1.gstatic.com/faviconV2?url=https://decrypt.co&client=NEWS_360&size=96&type=FAVICON&fallback_opts=TYPE,SIZE,URL"
+          },
+          "publishedAt": "2025-09-23T19:26:00.000Z",
+          "url": "https://decrypt.co/340961/what-1-25-billion-bitcoin-futures-flush-means-markets",
+          "snippet": "",
+          "sentiment": 0,
+          "originalLanguage": "unknown",
+          "translations": {
+            "title": {
+              "en": "What the $1.25 Billion Bitcoin Futures Flush Means for Markets",
+              "pt": "What the $1.25 Billion Bitcoin Futures Flush Means for Markets"
+            },
+            "snippet": {
+              "en": "",
+              "pt": ""
+            }
+          }
+        },
+        {
+          "title": "The Daily: Trump-backed World Liberty Financial to launch debit card, White House targets year-end passage of crypto market structure bill, and more",
+          "source": {
+            "name": "theblock.co",
+            "icon": "https://encrypted-tbn0.gstatic.com/faviconV2?url=https://www.theblock.co&client=NEWS_360&size=96&type=FAVICON&fallback_opts=TYPE,SIZE,URL",
+            "authors": [
+              "James Hunt"
+            ]
+          },
+          "publishedAt": "2025-09-23T17:26:00.000Z",
+          "url": "https://www.theblock.co/post/371985/the-daily-trump-backed-world-liberty-financial-to-launch-debit-card-white-house-targets-year-end-passage-of-crypto-market-structure-bill-and-more",
+          "snippet": "",
+          "sentiment": 0,
+          "originalLanguage": "unknown",
+          "translations": {
+            "title": {
+              "en": "The Daily: Trump-backed World Liberty Financial to launch debit card, White House targets year-end passage of crypto market structure bill, and more",
+              "pt": "The Daily: Trump-backed World Liberty Financial to launch debit card, White House targets year-end passage of crypto market structure bill, and more"
+            },
+            "snippet": {
+              "en": "",
+              "pt": ""
+            }
+          }
+        },
+        {
+          "title": "Bitcoin bull cycle enters ‘late phase’ as profit-taking metrics spike",
+          "source": {
+            "name": "Cointelegraph",
+            "icon": "https://encrypted-tbn1.gstatic.com/faviconV2?url=https://cointelegraph.com&client=NEWS_360&size=96&type=FAVICON&fallback_opts=TYPE,SIZE,URL",
+            "authors": [
+              "Biraajmaan Tamuly"
+            ]
+          },
+          "publishedAt": "2025-09-23T17:11:00.000Z",
+          "url": "https://cointelegraph.com/news/bitcoin-bull-cycle-enters-late-phase-as-profit-taking-metrics-spike",
+          "snippet": "",
+          "sentiment": 0.29131263494491577,
+          "originalLanguage": "unknown",
+          "translations": {
+            "title": {
+              "en": "Bitcoin bull cycle enters ‘late phase’ as profit-taking metrics spike",
+              "pt": "Bitcoin bull cycle enters ‘late phase’ as profit-taking metrics spike"
+            },
+            "snippet": {
+              "en": "",
+              "pt": ""
+            }
+          }
+        },
+        {
+          "title": "Avalanche avoids crypto market drop with a 10% AVAX price pump: Here’s why",
+          "source": {
+            "name": "Cointelegraph",
+            "icon": "https://encrypted-tbn1.gstatic.com/faviconV2?url=https://cointelegraph.com&client=NEWS_360&size=96&type=FAVICON&fallback_opts=TYPE,SIZE,URL",
+            "authors": [
+              "Nancy Lubale"
+            ]
+          },
+          "publishedAt": "2025-09-23T15:14:00.000Z",
+          "url": "https://cointelegraph.com/news/avalanche-bucks-crypto-market-drop-10-avax-price-pump",
+          "snippet": "",
+          "sentiment": -0.18072037398815155,
+          "originalLanguage": "unknown",
+          "translations": {
+            "title": {
+              "en": "Avalanche avoids crypto market drop with a 10% AVAX price pump: Here’s why",
+              "pt": "Avalanche avoids crypto market drop with a 10% AVAX price pump: Here’s why"
+            },
+            "snippet": {
+              "en": "",
+              "pt": ""
+            }
+          }
+        }
+      ],
+      "summary": "1. **Regulatory Developments**: US Senator Elizabeth Warren proposed a market structure bill aimed at addressing crypto ATM scams, while the White House targets passing a crypto market structure bill by year-end.\n\n2. **Bitcoin Trends**: Bitcoin (BTC) saw a dip, attracting buyers, but charts suggest a potential price purge to $106K. Meanwhile, profit-taking metrics indicate the Bitcoin bull cycle may be entering its late phase.\n\n3. **Market Movements**: A $1.25 billion Bitcoin futures flush raised questions about market implications. Despite a broader crypto market drop, Avalanche (AVAX) surged by 10%, bucking the trend.\n\n4. **Industry Updates**: Trump-backed World Liberty Financial plans to launch a debit card, adding to the growing crypto payment solutions.",
+      "avgSentiment": 0.04835130274295807,
+      "weightedSentiment": 0.052009845736018454
+    }
+  }
+}

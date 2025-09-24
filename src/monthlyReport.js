@@ -1,5 +1,5 @@
 import { ChartJSNodeCanvas } from "chartjs-node-canvas";
-import { promises as fs } from "node:fs/promises";
+import * as fs  from "node:fs/promises";
 import path from "node:path";
 
 const WIDTH = 1280;

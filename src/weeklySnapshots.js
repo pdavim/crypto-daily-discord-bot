@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs/promises";
+import * as fs  from "node:fs/promises";
 import path from "node:path";
 
 const WEEKLY_SNAPSHOT_FILE = path.resolve("reports/weekly.json");
