@@ -11,6 +11,9 @@ describe('buildAlerts', () => {
       ma50: [2, 2],
       ma200: [5, 5],
       lastClose: 100,
+      timeframe: '4h',
+      timeframeVariation: 0.02,
+      var24h: 0.045,
       closes: Array(20).fill(90).concat(100),
       highs: Array(21).fill(100),
       lows: Array(21).fill(80),
@@ -26,7 +29,9 @@ describe('buildAlerts', () => {
       expect.objectContaining({ msg: '📈 Golden cross 20/50', level: ALERT_LEVELS.HIGH }),
       expect.objectContaining({ msg: '📈 KC breakout above', level: ALERT_LEVELS.HIGH }),
       expect.objectContaining({ msg: '💪 ADX>25 (tendência forte)', level: ALERT_LEVELS.HIGH }),
-      expect.objectContaining({ msg: '💰 Preço: 100.0000', level: ALERT_LEVELS.LOW })
+      expect.objectContaining({ msg: '💰 Preço: 100.0000', level: ALERT_LEVELS.LOW }),
+      expect.objectContaining({ msg: '📊 Var4h: +2.00%', level: ALERT_LEVELS.LOW }),
+      expect.objectContaining({ msg: '📊 Var24h: +4.50%', level: ALERT_LEVELS.LOW })
     ]));
 
     const levels = alerts.map(alert => alert.level);
@@ -45,6 +50,9 @@ describe('buildAlerts', () => {
       ma50: [1, 1],
       ma200: [1, 1],
       lastClose: 70,
+      timeframe: '4h',
+      timeframeVariation: -0.05,
+      var24h: -0.08,
       closes,
       highs: Array(21).fill(85),
       lows: Array(21).fill(65),
@@ -68,6 +76,9 @@ describe('buildAlerts', () => {
       ma50: [1, 1],
       ma200: [1, 1],
       lastClose,
+      timeframe: '4h',
+      timeframeVariation: 0,
+      var24h: 0,
       closes: Array(20).fill(lastClose).concat(lastClose),
       highs: Array(21).fill(lastClose + 1),
       lows: Array(21).fill(lastClose - 1),
@@ -91,6 +102,9 @@ describe('buildAlerts', () => {
       ma50: [1, 1],
       ma200: [1, 1],
       lastClose,
+      timeframe: '4h',
+      timeframeVariation: 0,
+      var24h: 0,
       closes: Array(20).fill(lastClose).concat(lastClose),
       highs: Array(21).fill(lastClose + 10),
       lows: Array(21).fill(lastClose - 10),

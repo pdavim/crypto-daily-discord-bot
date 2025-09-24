@@ -9,7 +9,7 @@ import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert, postMonthlyReport } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";
 import { renderChartPNG } from "./chart.js";
-import { buildAlerts, formatAlertMessage } from "./alerts.js";
+import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore, getAlertHash, updateAlertHash, resetAlertHashes } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
@@ -22,6 +22,9 @@ import { reportWeeklyPerf } from "./perf.js";
 import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
 import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
+import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
+import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
+import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
 
 const ONCE = process.argv.includes("--once");
 
@@ -105,6 +108,7 @@ async function runOnceForAsset(asset, options = {}) {
     });
     const snapshots = {};
     const chartPaths = [];
+    const timeframeMeta = new Map();
 
     const intervalPromises = new Map();
     for (const tf of TIMEFRAMES) {
@@ -221,6 +225,34 @@ async function runOnceForAsset(asset, options = {}) {
                 volSeries: vol
             });
             snapshots[tf] = snapshot;
+            const timeframeVariation = snapshot?.kpis?.var ?? null;
+            const guidance = snapshot?.kpis?.reco ?? null;
+
+            const posture = evaluateMarketPosture({
+                closes: close,
+                maFastSeries: indicators.ma50,
+                maSlowSeries: indicators.ma200,
+                rsiSeries: indicators.rsiSeries,
+                adxSeries: indicators.adxSeries,
+                config: CFG.marketPosture,
+            });
+            const strategyPlan = deriveStrategyFromPosture(posture, CFG.trading?.strategy);
+            log.info({
+                fn: 'runOnceForAsset',
+                posture: posture.posture,
+                confidence: posture.confidence,
+                strategy: strategyPlan.action,
+            }, 'Evaluated market posture');
+
+            const meta = {
+                consolidated: [],
+                actionable: [],
+                guidance,
+                variation: timeframeVariation,
+                posture,
+                strategy: strategyPlan,
+            };
+            timeframeMeta.set(tf, meta);
 
             if (enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
@@ -243,6 +275,8 @@ async function runOnceForAsset(asset, options = {}) {
                     ma200: indicators.ma200,
                     lastClose: snapshot.kpis.price,
                     var24h: snapshot.kpis.var24h,
+                    timeframe: tf,
+                    timeframeVariation,
                     closes: close,
                     highs: high,
                     lows: low,
@@ -277,20 +311,13 @@ async function runOnceForAsset(asset, options = {}) {
                         consolidated.push(withCount);
                     }
                 }
-                const hasSignals = consolidated.some(a =>
-                    !a.msg.startsWith('💰 Preço') && !a.msg.startsWith('📊 Var24h'));
-                if (hasSignals) {
-                    const mention = "@here";
-                    const alertMsg = [
-                        `**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`,
-                        ...consolidated.map(alert => `• ${formatAlertMessage(alert, alert.count)}`)
-                    ].join("\n");
-                    const hash = buildHash(alertMsg);
-                    const windowMs = CFG.alertDedupMinutes * 60 * 1000;
-                    if (shouldSend({ asset: asset.key, tf, hash }, windowMs)) {
-                        await sendDiscordAlert(alertMsg);
-                    }
-                }
+                const actionable = consolidated.filter(a =>
+                    !a.msg.startsWith('💰 Preço') && !a.msg.startsWith('📊 Var'));
+                timeframeMeta.set(tf, {
+                    ...meta,
+                    consolidated,
+                    actionable,
+                });
             }
         } catch (e) {
             log.error({ fn: 'runOnceForAsset', err: e }, 'Processing error');
@@ -299,6 +326,47 @@ async function runOnceForAsset(asset, options = {}) {
     });
 
     await Promise.all(timeframeTasks);
+
+    if (enableAlerts) {
+        const variationByTimeframe = {};
+        for (const tf of TIMEFRAMES) {
+            const variation = snapshots[tf]?.kpis?.var;
+            if (Number.isFinite(variation)) {
+                variationByTimeframe[tf] = variation;
+            }
+        }
+
+        const timeframeSummaries = TIMEFRAMES.map(tf => {
+            const meta = timeframeMeta.get(tf);
+            if (!meta || meta.actionable.length === 0) {
+                return null;
+            }
+            return {
+                timeframe: tf,
+                guidance: meta.guidance,
+                alerts: meta.consolidated
+            };
+        }).filter(Boolean);
+
+        if (timeframeSummaries.length > 0) {
+            const alertMsg = buildAssetAlertMessage({
+                assetKey: asset.key,
+                mention: "@here",
+                timeframeSummaries,
+                variationByTimeframe,
+                timeframeOrder: TIMEFRAMES
+            });
+            if (alertMsg) {
+                const hash = buildHash(alertMsg);
+                const windowMs = CFG.alertDedupMinutes * 60 * 1000;
+                const scope = "aggregate";
+                if (shouldSend({ asset: asset.key, tf: scope, hash }, windowMs)) {
+                    enqueueAlertPayload({ asset: asset.key, timeframe: scope, message: alertMsg });
+                }
+            }
+        }
+    }
+
     saveStore();
     let summary = null;
     if (snapshots["4h"]) {
@@ -331,6 +399,12 @@ async function runAll() {
         limitFactory: () => pLimit(calcConcurrency()),
         runAsset: runOnceForAsset,
         logger,
+    });
+    await flushAlertQueue({
+        sender: async ({ message, options }) => {
+            await sendDiscordAlert(message, options);
+        },
+        timeframeOrder: TIMEFRAMES
     });
 }
 
