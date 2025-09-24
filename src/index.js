@@ -24,6 +24,8 @@ import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
+import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
+
 
 const ONCE = process.argv.includes("--once");
 
@@ -227,6 +229,33 @@ async function runOnceForAsset(asset, options = {}) {
             const timeframeVariation = snapshot?.kpis?.var ?? null;
             const guidance = snapshot?.kpis?.reco ?? null;
 
+            const posture = evaluateMarketPosture({
+                closes: close,
+                maFastSeries: indicators.ma50,
+                maSlowSeries: indicators.ma200,
+                rsiSeries: indicators.rsiSeries,
+                adxSeries: indicators.adxSeries,
+                config: CFG.marketPosture,
+            });
+            const strategyPlan = deriveStrategyFromPosture(posture, CFG.trading?.strategy);
+            log.info({
+                fn: 'runOnceForAsset',
+                posture: posture.posture,
+                confidence: posture.confidence,
+                strategy: strategyPlan.action,
+            }, 'Evaluated market posture');
+
+            const meta = {
+                consolidated: [],
+                actionable: [],
+                guidance,
+                variation: timeframeVariation,
+                posture,
+                strategy: strategyPlan,
+            };
+            timeframeMeta.set(tf, meta);
+
+
             if (enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
                     ma20: indicators.ma20,
@@ -287,10 +316,10 @@ async function runOnceForAsset(asset, options = {}) {
                 const actionable = consolidated.filter(a =>
                     !a.msg.startsWith('💰 Preço') && !a.msg.startsWith('📊 Var'));
                 timeframeMeta.set(tf, {
+                    ...meta,
                     consolidated,
                     actionable,
-                    guidance,
-                    variation: timeframeVariation
+
                 });
             }
         } catch (e) {

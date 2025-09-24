@@ -180,6 +180,149 @@ const normalizeMinimumProfitThreshold = (raw, fallback = DEFAULT_MIN_PROFIT_CONF
     return normalized;
 };
 
+const DEFAULT_TRADING_MARGIN_CONFIG = {
+    asset: "USDT",
+    minFree: 0,
+    transferAmount: 0,
+};
+
+const DEFAULT_TRADING_STRATEGY_CONFIG = {
+    minimumConfidence: 0.35,
+};
+
+const DEFAULT_TRADING_CONFIG = {
+    enabled: false,
+    minNotional: 0,
+    maxPositionPct: 0.1,
+    maxLeverage: 1,
+    maxSlippagePct: 0.005,
+    margin: DEFAULT_TRADING_MARGIN_CONFIG,
+    strategy: DEFAULT_TRADING_STRATEGY_CONFIG,
+};
+
+const DEFAULT_MARKET_POSTURE_CONFIG = {
+    bullishMaRatio: 1.01,
+    bearishMaRatio: 0.99,
+    neutralBuffer: 0.003,
+    minSlope: 0.0005,
+    lookback: 5,
+    minTrendStrength: 18,
+    rsiBullish: 55,
+    rsiBearish: 45,
+};
+
+const clampNumber = (value, fallback, { min, max } = {}) => {
+    if (!Number.isFinite(value)) {
+        return fallback;
+    }
+    if (min !== undefined && value < min) {
+        return fallback;
+    }
+    if (max !== undefined && value > max) {
+        return fallback;
+    }
+    return value;
+};
+
+const buildTradingConfig = (baseConfig = {}) => {
+    const base = isPlainObject(baseConfig) ? baseConfig : {};
+    const config = {
+        ...DEFAULT_TRADING_CONFIG,
+        ...base,
+        margin: {
+            ...DEFAULT_TRADING_MARGIN_CONFIG,
+            ...(isPlainObject(base.margin) ? base.margin : {}),
+        },
+        strategy: {
+            ...DEFAULT_TRADING_STRATEGY_CONFIG,
+            ...(isPlainObject(base.strategy) ? base.strategy : {}),
+        },
+    };
+
+    config.enabled = toBoolean(process.env.TRADING_ENABLED, config.enabled);
+
+    const minNotional = toNumber(process.env.TRADING_MIN_NOTIONAL, config.minNotional);
+    config.minNotional = clampNumber(minNotional, DEFAULT_TRADING_CONFIG.minNotional, { min: 0 });
+
+    const maxPositionPct = toNumber(process.env.TRADING_MAX_POSITION_PCT, config.maxPositionPct);
+    config.maxPositionPct = clampNumber(maxPositionPct, DEFAULT_TRADING_CONFIG.maxPositionPct, { min: 0.001, max: 1 });
+
+    const maxLeverage = toNumber(process.env.TRADING_MAX_LEVERAGE, config.maxLeverage);
+    config.maxLeverage = clampNumber(maxLeverage, DEFAULT_TRADING_CONFIG.maxLeverage, { min: 1, max: 125 });
+
+    const maxSlippagePct = toNumber(process.env.TRADING_MAX_SLIPPAGE_PCT, config.maxSlippagePct);
+    config.maxSlippagePct = clampNumber(maxSlippagePct, DEFAULT_TRADING_CONFIG.maxSlippagePct, { min: 0, max: 0.5 });
+
+    const strategyConfidence = toNumber(
+        process.env.TRADING_STRATEGY_MIN_CONFIDENCE,
+        config.strategy.minimumConfidence,
+    );
+    config.strategy.minimumConfidence = clampNumber(
+        strategyConfidence,
+        DEFAULT_TRADING_STRATEGY_CONFIG.minimumConfidence,
+        { min: 0, max: 1 },
+    );
+
+    const marginMinFree = toNumber(process.env.TRADING_MARGIN_MIN_FREE, config.margin.minFree);
+    config.margin.minFree = clampNumber(marginMinFree, DEFAULT_TRADING_MARGIN_CONFIG.minFree, { min: 0 });
+
+    const transferAmount = toNumber(process.env.TRADING_MARGIN_TRANSFER_AMOUNT, config.margin.transferAmount);
+    config.margin.transferAmount = clampNumber(
+        transferAmount,
+        DEFAULT_TRADING_MARGIN_CONFIG.transferAmount,
+        { min: 0 },
+    );
+
+    const marginAsset = process.env.TRADING_MARGIN_ASSET ?? config.margin.asset ?? DEFAULT_TRADING_MARGIN_CONFIG.asset;
+    config.margin.asset = typeof marginAsset === "string" && marginAsset.trim() !== ""
+        ? marginAsset.trim().toUpperCase()
+        : DEFAULT_TRADING_MARGIN_CONFIG.asset;
+
+    return config;
+};
+
+const buildMarketPostureConfig = (baseConfig = {}) => {
+    const base = isPlainObject(baseConfig) ? baseConfig : {};
+    const config = { ...DEFAULT_MARKET_POSTURE_CONFIG, ...base };
+
+    const bullishRatio = toNumber(process.env.MARKET_POSTURE_BULLISH_RATIO, config.bullishMaRatio);
+    config.bullishMaRatio = clampNumber(bullishRatio, DEFAULT_MARKET_POSTURE_CONFIG.bullishMaRatio, { min: 1 });
+
+    const bearishRatio = toNumber(process.env.MARKET_POSTURE_BEARISH_RATIO, config.bearishMaRatio);
+    config.bearishMaRatio = clampNumber(bearishRatio, DEFAULT_MARKET_POSTURE_CONFIG.bearishMaRatio, { min: 0, max: 1 });
+
+    if (config.bullishMaRatio <= config.bearishMaRatio) {
+        config.bullishMaRatio = DEFAULT_MARKET_POSTURE_CONFIG.bullishMaRatio;
+        config.bearishMaRatio = DEFAULT_MARKET_POSTURE_CONFIG.bearishMaRatio;
+    }
+
+    const neutralBuffer = toNumber(process.env.MARKET_POSTURE_NEUTRAL_BUFFER, config.neutralBuffer);
+    config.neutralBuffer = clampNumber(neutralBuffer, DEFAULT_MARKET_POSTURE_CONFIG.neutralBuffer, { min: 0 });
+
+    const minSlope = toNumber(process.env.MARKET_POSTURE_MIN_SLOPE, config.minSlope);
+    config.minSlope = clampNumber(minSlope, DEFAULT_MARKET_POSTURE_CONFIG.minSlope, { min: 0 });
+
+    const lookback = toInt(process.env.MARKET_POSTURE_LOOKBACK, config.lookback);
+    config.lookback = clampNumber(lookback, DEFAULT_MARKET_POSTURE_CONFIG.lookback, { min: 1, max: 500 });
+
+    const minTrend = toNumber(process.env.MARKET_POSTURE_MIN_TREND, config.minTrendStrength);
+    config.minTrendStrength = clampNumber(minTrend, DEFAULT_MARKET_POSTURE_CONFIG.minTrendStrength, { min: 0 });
+
+    const rsiBullish = toNumber(process.env.MARKET_POSTURE_RSI_BULLISH, config.rsiBullish);
+    config.rsiBullish = clampNumber(rsiBullish, DEFAULT_MARKET_POSTURE_CONFIG.rsiBullish, { min: 0, max: 100 });
+
+    const rsiBearish = toNumber(process.env.MARKET_POSTURE_RSI_BEARISH, config.rsiBearish);
+    config.rsiBearish = clampNumber(rsiBearish, DEFAULT_MARKET_POSTURE_CONFIG.rsiBearish, { min: 0, max: 100 });
+
+    if (config.rsiBullish <= config.rsiBearish) {
+        config.rsiBullish = DEFAULT_MARKET_POSTURE_CONFIG.rsiBullish;
+        config.rsiBearish = DEFAULT_MARKET_POSTURE_CONFIG.rsiBearish;
+    }
+
+    return config;
+};
+
+
 const buildDiscordRateLimit = (baseConfig = {}) => {
     const baseDefault = isPlainObject(baseConfig.default) ? baseConfig.default : {};
     const baseWebhooks = isPlainObject(baseConfig.webhooks) ? baseConfig.webhooks : {};
@@ -442,6 +585,8 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
         ? toInt(process.env.MAX_CONCURRENCY, defaultMaxConcurrency)
         : defaultMaxConcurrency;
     nextCFG.maxConcurrency = Number.isFinite(computedMaxConcurrency) ? computedMaxConcurrency : undefined;
+    nextCFG.trading = buildTradingConfig(nextCFG.trading);
+    nextCFG.marketPosture = buildMarketPostureConfig(nextCFG.marketPosture);
     nextCFG.indicators = buildIndicatorConfig(mergedConfig.indicators ?? nextCFG.indicators ?? {});
     nextCFG.alerts = isPlainObject(nextCFG.alerts) ? nextCFG.alerts : {};
     nextCFG.alerts.modules = buildAlertModuleConfig(mergedConfig.alerts?.modules ?? nextCFG.alerts?.modules ?? {});

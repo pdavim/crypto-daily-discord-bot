@@ -40,6 +40,31 @@
   "alertDedupMinutes": 60,
   "binanceCacheTTL": 10,
   "maxConcurrency": null,
+  "trading": {
+    "enabled": false,
+    "minNotional": 10,
+    "maxPositionPct": 0.1,
+    "maxLeverage": 3,
+    "maxSlippagePct": 0.005,
+    "strategy": {
+      "minimumConfidence": 0.35
+    },
+    "margin": {
+      "asset": "USDT",
+      "minFree": 50,
+      "transferAmount": 25
+    }
+  },
+  "marketPosture": {
+    "bullishMaRatio": 1.01,
+    "bearishMaRatio": 0.99,
+    "neutralBuffer": 0.003,
+    "minSlope": 0.0005,
+    "lookback": 5,
+    "minTrendStrength": 18,
+    "rsiBullish": 55,
+    "rsiBearish": 45
+  },
   "indicators": {
     "smaPeriods": {
       "ma20": 20,

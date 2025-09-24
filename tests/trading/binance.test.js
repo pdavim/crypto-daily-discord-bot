@@ -6,6 +6,13 @@ vi.mock("axios", () => {
     return { default: mock };
 });
 
+const logTradeMock = vi.fn();
+
+vi.mock("../../src/trading/tradeLog.js", () => ({
+    logTrade: logTradeMock,
+}));
+
+
 const originalEnv = { ...process.env };
 const axios = (await import("axios")).default;
 
@@ -21,6 +28,8 @@ describe("Binance trading integration", () => {
         vi.setSystemTime(new Date("2024-01-01T00:00:00Z"));
         process.env = { ...originalEnv, BINANCE_API_KEY: "test-key", BINANCE_SECRET: "test-secret" };
         axios.mockReset();
+        logTradeMock.mockReset();
+
     });
 
     afterEach(() => {
@@ -152,4 +161,80 @@ describe("Binance trading integration", () => {
         });
         expect(axios).toHaveBeenCalledTimes(4);
     });
+
+    it("submits generic order and records fill price", async () => {
+        axios.mockResolvedValueOnce({
+            data: {
+                orderId: 123,
+                fills: [
+                    { price: "100", qty: "0.4" },
+                    { price: "102", qty: "0.6" }
+                ]
+            }
+        });
+
+        const { submitOrder } = await import("../../src/trading/binance.js");
+        const response = await submitOrder({
+            symbol: "BTCUSDT",
+            side: "BUY",
+            type: "LIMIT",
+            quantity: 1,
+            price: 101,
+            params: { timeInForce: "GTC" }
+        });
+
+        expect(response.fillPrice).toBeCloseTo(101.2);
+        expect(logTradeMock).toHaveBeenCalledTimes(1);
+        const payload = logTradeMock.mock.calls[0][0];
+        expect(payload).toMatchObject({
+            id: 123,
+            symbol: "BTCUSDT",
+            side: "BUY",
+            quantity: 1,
+            type: "LIMIT"
+        });
+        expect(payload.entry).toBeCloseTo(101.2);
+    });
+
+    it("transfers margin between accounts", async () => {
+        axios.mockResolvedValueOnce({ data: { tranId: 321 } });
+
+        const { transferMargin } = await import("../../src/trading/binance.js");
+        await transferMargin({ asset: "USDT", amount: 25, direction: "toSpot" });
+
+        const call = axios.mock.calls[0][0];
+        const url = new URL(call.url);
+        expect(url.pathname).toBe("/sapi/v1/margin/transfer");
+        expect(url.searchParams.get("type")).toBe("2");
+        expect(url.searchParams.get("asset")).toBe("USDT");
+        expect(url.searchParams.get("amount")).toBe("25");
+    });
+
+    it("borrows and repays margin assets", async () => {
+        axios
+            .mockResolvedValueOnce({ data: { tranId: 1 } })
+            .mockResolvedValueOnce({ data: { tranId: 2 } });
+
+        const { borrowMargin, repayMargin } = await import("../../src/trading/binance.js");
+        await borrowMargin({ asset: "BTC", amount: 0.1 });
+        await repayMargin({ asset: "BTC", amount: 0.05 });
+
+        const borrowCall = axios.mock.calls[0][0];
+        const borrowUrl = new URL(borrowCall.url);
+        expect(borrowUrl.pathname).toBe("/sapi/v1/margin/loan");
+        expect(borrowUrl.searchParams.get("asset")).toBe("BTC");
+        expect(borrowUrl.searchParams.get("amount")).toBe("0.1");
+
+        const repayCall = axios.mock.calls[1][0];
+        const repayUrl = new URL(repayCall.url);
+        expect(repayUrl.pathname).toBe("/sapi/v1/margin/repay");
+        expect(repayUrl.searchParams.get("asset")).toBe("BTC");
+        expect(repayUrl.searchParams.get("amount")).toBe("0.05");
+    });
+
+    it("validates margin amounts", async () => {
+        const { transferMargin } = await import("../../src/trading/binance.js");
+        await expect(transferMargin({ asset: "USDT", amount: 0 })).rejects.toThrow("Invalid margin amount");
+    });
+
 });

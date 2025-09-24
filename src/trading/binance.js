@@ -48,6 +48,7 @@ async function privateRequest(method, path, params = {}, { context } = {}) {
 function toNumber(value) {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
+
 }
 
 function mapBalances(balances = [], { includeZero = false } = {}) {
@@ -82,6 +83,85 @@ function mapMarginAssets(userAssets = [], { includeZero = false } = {}) {
             };
         })
         .filter(entry => includeZero || entry.netAsset !== 0 || entry.free !== 0 || entry.borrowed !== 0 || entry.interest !== 0);
+}
+
+function computeAverageFillPrice(fills = []) {
+    if (!Array.isArray(fills) || fills.length === 0) {
+        return null;
+    }
+
+    let totalQty = 0;
+    let totalQuote = 0;
+    for (const fill of fills) {
+        const qty = toNumber(fill.qty);
+        const price = toNumber(fill.price);
+        if (qty <= 0 || price <= 0) {
+            continue;
+        }
+        totalQty += qty;
+        totalQuote += qty * price;
+    }
+
+    if (totalQty <= 0) {
+        return null;
+    }
+
+    return totalQuote / totalQty;
+}
+
+function extractFillPrice(data, fallbackPrice) {
+    const price = computeAverageFillPrice(data?.fills);
+    if (price !== null) {
+        return price;
+    }
+
+    const responsePrice = toNumber(data?.price);
+    if (Number.isFinite(responsePrice) && responsePrice > 0) {
+        return responsePrice;
+    }
+
+    return Number.isFinite(fallbackPrice) && fallbackPrice > 0 ? fallbackPrice : null;
+}
+
+export async function submitOrder({
+    symbol,
+    side,
+    type = "MARKET",
+    quantity,
+    price,
+    params = {},
+} = {}, { context } = {}) {
+    if (!symbol || !side) {
+        throw new Error("Missing required order parameters");
+    }
+
+    const payload = {
+        symbol,
+        side,
+        type,
+        ...params,
+    };
+
+    if (quantity !== undefined) {
+        payload.quantity = quantity;
+    }
+
+    if (price !== undefined && type !== "MARKET") {
+        payload.price = price;
+    }
+
+    const orderContext = {
+        scope: "order",
+        symbol,
+        side,
+        type,
+        ...context,
+    };
+
+    const data = await privateRequest("POST", "/api/v3/order", payload, { context: orderContext });
+    const fillPrice = extractFillPrice(data, price);
+    logTrade({ id: data.orderId, symbol, side, quantity, entry: fillPrice, type });
+    return { ...data, fillPrice };
 }
 
 export async function getSpotBalances(options = {}) {
@@ -141,29 +221,19 @@ export async function getAccountOverview(options = {}) {
     };
 }
 
-export async function placeMarketOrder(symbol, side, quantity) {
-    const data = await privateRequest("POST", "/api/v3/order", {
-        symbol,
-        side,
-        type: "MARKET",
-        quantity
-    });
-    const price = parseFloat(data?.fills?.[0]?.price);
-    logTrade({ id: data.orderId, symbol, side, quantity, entry: price, type: "MARKET" });
-    return data;
+export async function placeMarketOrder(symbol, side, quantity, params = {}) {
+    return submitOrder({ symbol, side, type: "MARKET", quantity, params });
 }
 
-export async function placeLimitOrder(symbol, side, quantity, price) {
-    const data = await privateRequest("POST", "/api/v3/order", {
+export async function placeLimitOrder(symbol, side, quantity, price, params = {}) {
+    return submitOrder({
         symbol,
         side,
         type: "LIMIT",
-        timeInForce: "GTC",
         quantity,
-        price
+        price,
+        params: { timeInForce: "GTC", ...params },
     });
-    logTrade({ id: data.orderId, symbol, side, quantity, entry: price, type: "LIMIT" });
-    return data;
 }
 
 export function subscribeTicker(symbol, onMessage) {
@@ -178,4 +248,47 @@ export function subscribeTicker(symbol, onMessage) {
         }
     });
     return ws;
+}
+
+function ensurePositiveAmount(amount) {
+    const parsed = Number.parseFloat(amount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        throw new Error("Invalid margin amount");
+    }
+    return parsed.toString();
+}
+
+export async function transferMargin({ asset, amount, direction = "toMargin" } = {}) {
+    if (!asset) {
+        throw new Error("Missing asset for margin transfer");
+    }
+    const normalizedAmount = ensurePositiveAmount(amount);
+    const type = direction === "toSpot" ? 2 : 1;
+    return privateRequest("POST", "/sapi/v1/margin/transfer", {
+        asset,
+        amount: normalizedAmount,
+        type,
+    }, { context: { scope: "marginTransfer", asset, direction } });
+}
+
+export async function borrowMargin({ asset, amount } = {}) {
+    if (!asset) {
+        throw new Error("Missing asset for margin borrow");
+    }
+    const normalizedAmount = ensurePositiveAmount(amount);
+    return privateRequest("POST", "/sapi/v1/margin/loan", {
+        asset,
+        amount: normalizedAmount,
+    }, { context: { scope: "marginBorrow", asset } });
+}
+
+export async function repayMargin({ asset, amount } = {}) {
+    if (!asset) {
+        throw new Error("Missing asset for margin repay");
+    }
+    const normalizedAmount = ensurePositiveAmount(amount);
+    return privateRequest("POST", "/sapi/v1/margin/repay", {
+        asset,
+        amount: normalizedAmount,
+    }, { context: { scope: "marginRepay", asset } });
 }
