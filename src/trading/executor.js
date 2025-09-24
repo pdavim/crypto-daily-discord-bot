@@ -1,5 +1,7 @@
 import { CFG } from "../config.js";
 import { logger, withContext } from "../logger.js";
+import { tradingExecutionCounter, tradingNotionalHistogram } from "../metrics.js";
+
 import { submitOrder, transferMargin, borrowMargin, repayMargin } from "./binance.js";
 
 function isPlainObject(value) {
@@ -26,7 +28,24 @@ function computeMaxNotionalLimit(tradingCfg) {
     return equity * maxPct * lev;
 }
 
+function recordTradeOutcome(action, result, { notional } = {}) {
+    try {
+        tradingExecutionCounter.labels(action, result).inc();
+    } catch (err) {
+        logger.debug({ fn: action, err }, 'Failed to record trading metric');
+    }
+    if (result === 'success' && Number.isFinite(notional) && notional > 0) {
+        try {
+            tradingNotionalHistogram.observe(notional);
+        } catch (err) {
+            logger.debug({ fn: action, err }, 'Failed to record trading notional metric');
+        }
+    }
+}
+
 function abortTrade(log, fn, reason, details = {}) {
+    recordTradeOutcome(fn, 'skipped');
+
     log.warn({ fn, reason, ...details }, 'Skipped automated trade');
     return { executed: false, reason, details };
 }
@@ -112,16 +131,20 @@ export async function openPosition({
             price: type === 'MARKET' ? undefined : referencePrice,
             params: orderParams,
         }, { context: { asset: assetKey ?? symbol, direction: side } });
-        log.info({
+        const payload = {
             fn: 'openPosition',
             orderId: order.orderId,
             side,
             quantity: qty,
             fillPrice: order.fillPrice,
-        }, 'Opened automated trade');
+            notional,
+        };
+        log.info(payload, 'Opened automated trade');
+        recordTradeOutcome('openPosition', 'success', { notional });
         return { executed: true, order };
     } catch (err) {
         log.error({ fn: 'openPosition', err }, 'Failed to open position');
+        recordTradeOutcome('openPosition', 'error');
         throw err;
     }
 }
@@ -180,16 +203,20 @@ export async function closePosition({
             price: type === 'MARKET' ? undefined : referencePrice,
             params: orderParams,
         }, { context: { asset: assetKey ?? symbol, direction: side, intent: 'close' } });
-        log.info({
+        const payload = {
             fn: 'closePosition',
             orderId: order.orderId,
             side,
             quantity: qty,
             fillPrice: order.fillPrice,
-        }, 'Closed automated trade');
+            notional,
+        };
+        log.info(payload, 'Closed automated trade');
+        recordTradeOutcome('closePosition', 'success', { notional });
         return { executed: true, order };
     } catch (err) {
         log.error({ fn: 'closePosition', err }, 'Failed to close position');
+        recordTradeOutcome('closePosition', 'error');
         throw err;
     }
 }
@@ -207,16 +234,19 @@ export async function adjustMargin({
     const log = withContext(logger, { asset: resolvedAsset, action: 'adjustMargin' });
 
     if (!tradingCfg.enabled) {
+        recordTradeOutcome('adjustMargin', 'skipped');
         return { adjusted: false, reason: 'disabled' };
     }
 
     if (fallbackAmount === null || fallbackAmount <= 0) {
         log.warn({ fn: 'adjustMargin', amount }, 'Skipped margin adjustment due to invalid amount');
+        recordTradeOutcome('adjustMargin', 'skipped');
         return { adjusted: false, reason: 'invalidAmount' };
     }
 
     if (operation === 'transferOut' && Number.isFinite(marginCfg.minFree) && fallbackAmount > marginCfg.minFree) {
         log.warn({ fn: 'adjustMargin', amount: fallbackAmount, minFree: marginCfg.minFree }, 'Skipped margin adjustment to preserve buffer');
+        recordTradeOutcome('adjustMargin', 'skipped');
         return { adjusted: false, reason: 'exceedsBuffer' };
     }
 
@@ -224,29 +254,35 @@ export async function adjustMargin({
         if (operation === 'transferIn') {
             const response = await transferMargin({ asset: resolvedAsset, amount: fallbackAmount, direction: 'toMargin' });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Transferred funds to margin');
+            recordTradeOutcome('adjustMargin', 'success');
             return { adjusted: true, response };
         }
         if (operation === 'transferOut') {
             const response = await transferMargin({ asset: resolvedAsset, amount: fallbackAmount, direction: 'toSpot' });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Transferred funds to spot');
+            recordTradeOutcome('adjustMargin', 'success');
             return { adjusted: true, response };
         }
         if (operation === 'borrow') {
             const response = await borrowMargin({ asset: resolvedAsset, amount: fallbackAmount });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Borrowed margin asset');
+            recordTradeOutcome('adjustMargin', 'success');
             return { adjusted: true, response };
         }
         if (operation === 'repay') {
             const response = await repayMargin({ asset: resolvedAsset, amount: fallbackAmount });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Repaid margin loan');
+            recordTradeOutcome('adjustMargin', 'success');
             return { adjusted: true, response };
         }
     } catch (err) {
         log.error({ fn: 'adjustMargin', err, operation }, 'Margin adjustment failed');
+        recordTradeOutcome('adjustMargin', 'error');
         throw err;
     }
 
     log.warn({ fn: 'adjustMargin', operation }, 'Skipped margin adjustment due to unsupported operation');
+    recordTradeOutcome('adjustMargin', 'skipped');
     return { adjusted: false, reason: 'unsupportedOperation' };
 }
 

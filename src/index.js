@@ -16,7 +16,7 @@ import { fetchEconomicEvents } from "./data/economic.js";
 import { logger, withContext } from "./logger.js";
 import pLimit, { calcConcurrency } from "./limit.js";
 import { buildHash, shouldSend, pruneOlderThan } from "./alertCache.js";
-import { register } from "./metrics.js";
+import { register, forecastConfidenceHistogram, forecastDirectionCounter, forecastErrorHistogram } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
 import { reportWeeklyPerf } from "./perf.js";
 import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
@@ -286,7 +286,8 @@ async function runOnceForAsset(asset, options = {}) {
                         const lastCloseIso = Number.isFinite(forecastResult.lastTime)
                             ? new Date(forecastResult.lastTime).toISOString()
                             : null;
-                        persistForecastEntry({
+                        const persistence = persistForecastEntry({
+
                             assetKey: asset.key,
                             timeframe: tf,
                             entry: {
@@ -309,6 +310,10 @@ async function runOnceForAsset(asset, options = {}) {
                             historyLimit: CFG.forecasting.historyLimit,
                         });
 
+                        if (Number.isFinite(forecastResult.confidence)) {
+                            forecastConfidenceHistogram.observe(forecastResult.confidence);
+                        }
+
                         if (CFG.forecasting.charts?.enabled) {
                             const forecastChartPath = await renderForecastChart({
                                 assetKey: asset.key,
@@ -328,12 +333,38 @@ async function runOnceForAsset(asset, options = {}) {
                             }
                         }
 
-                        forecastLog.debug({
+                        const evaluation = persistence?.evaluation ?? null;
+                        if (evaluation && Number.isFinite(evaluation.pctError)) {
+                            forecastErrorHistogram.observe(evaluation.pctError);
+                        }
+                        if (evaluation && typeof evaluation.directionHit === 'boolean') {
+                            forecastDirectionCounter.labels(evaluation.directionHit ? 'hit' : 'miss').inc();
+                        }
+
+                        const logPayload = {
                             fn: 'runOnceForAsset',
                             forecast: forecastResult.forecast,
                             confidence: forecastResult.confidence,
                             delta: forecastResult.delta,
-                        }, 'Generated forecast');
+                            mae: forecastResult.mae,
+                            rmse: forecastResult.rmse,
+                            historyPath: persistence?.filePath ?? null,
+                        };
+
+                        if (evaluation) {
+                            logPayload.accuracy = {
+                                absError: evaluation.absError,
+                                pctError: evaluation.pctError,
+                                directionHit: evaluation.directionHit,
+                            };
+                            logPayload.actual = evaluation.actual;
+                            logPayload.predictedAt = evaluation.predictedAt;
+                            logPayload.actualAt = evaluation.actualAt;
+                            forecastLog.info(logPayload, 'Generated forecast');
+                        } else {
+                            forecastLog.debug(logPayload, 'Generated forecast');
+                        }
+
                     }
                 } catch (err) {
                     forecastLog.error({ fn: 'runOnceForAsset', err }, 'Forecast generation failed');

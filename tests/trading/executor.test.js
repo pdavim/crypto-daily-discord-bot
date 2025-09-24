@@ -14,6 +14,8 @@ vi.mock("../../src/trading/binance.js", () => ({
 
 const { CFG } = await import("../../src/config.js");
 const { openPosition, closePosition, adjustMargin } = await import("../../src/trading/executor.js");
+const { register } = await import("../../src/metrics.js");
+
 
 describe("trading executor", () => {
     beforeEach(() => {
@@ -21,6 +23,8 @@ describe("trading executor", () => {
         transferMarginMock.mockReset();
         borrowMarginMock.mockReset();
         repayMarginMock.mockReset();
+        register.resetMetrics();
+
         CFG.trading = {
             enabled: true,
             minNotional: 20,
@@ -50,6 +54,10 @@ describe("trading executor", () => {
         const result = await openPosition({ symbol: "BTCUSDT", quantity: 0.1, price: 30000 });
         expect(result).toEqual({ executed: false, reason: 'disabled', details: {} });
         expect(submitOrderMock).not.toHaveBeenCalled();
+        const metrics = await register.getMetricsAsJSON();
+        const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
+        const skipped = tradeMetric?.values.find(v => v.labels.action === 'openPosition' && v.labels.result === 'skipped');
+        expect(skipped?.value).toBe(1);
     });
 
     it("rejects orders below minimum notional", async () => {
@@ -75,11 +83,22 @@ describe("trading executor", () => {
             price: undefined,
             params: {},
         }, expect.any(Object));
+        const metrics = await register.getMetricsAsJSON();
+        const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
+        const success = tradeMetric?.values.find(v => v.labels.action === 'openPosition' && v.labels.result === 'success');
+        expect(success?.value).toBe(1);
+        const notionalMetric = metrics.find(m => m.name === 'app_trading_notional_size');
+        const sumEntry = notionalMetric?.values.find(v => v.metricName === 'app_trading_notional_size_sum');
+        expect(sumEntry?.value).toBeCloseTo(0.005 * 30500, 6);
     });
 
     it("propagates submission failures", async () => {
         submitOrderMock.mockRejectedValueOnce(new Error("rejected"));
         await expect(openPosition({ symbol: "BTCUSDT", quantity: 0.005, price: 30000 })).rejects.toThrow("rejected");
+        const metrics = await register.getMetricsAsJSON();
+        const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
+        const errors = tradeMetric?.values.find(v => v.labels.action === 'openPosition' && v.labels.result === 'error');
+        expect(errors?.value).toBe(1);
     });
 
     it("closes positions using reduce only orders", async () => {
@@ -94,6 +113,10 @@ describe("trading executor", () => {
             price: undefined,
             params: { reduceOnly: true },
         }, expect.any(Object));
+        const metrics = await register.getMetricsAsJSON();
+        const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
+        const success = tradeMetric?.values.find(v => v.labels.action === 'closePosition' && v.labels.result === 'success');
+        expect(success?.value).toBe(1);
     });
 
     it("avoids removing too much margin", async () => {
@@ -119,11 +142,20 @@ describe("trading executor", () => {
         expect(transferOut.adjusted).toBe(true);
         expect(borrow.adjusted).toBe(true);
         expect(repay.adjusted).toBe(true);
+        const metrics = await register.getMetricsAsJSON();
+        const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
+        const marginSuccess = tradeMetric?.values.filter(v => v.labels.action === 'adjustMargin' && v.labels.result === 'success');
+        const totalSuccess = marginSuccess?.reduce((sum, entry) => sum + entry.value, 0);
+        expect(totalSuccess).toBe(4);
     });
 
     it("handles unsupported margin actions", async () => {
         const result = await adjustMargin({ operation: "unsupported" });
         expect(result.adjusted).toBe(false);
         expect(result.reason).toBe("unsupportedOperation");
+        const metrics = await register.getMetricsAsJSON();
+        const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
+        const skipped = tradeMetric?.values.find(v => v.labels.action === 'adjustMargin' && v.labels.result === 'skipped');
+        expect(skipped?.value).toBe(1);
     });
 });

@@ -55,7 +55,7 @@ describe('forecasting', () => {
             horizonMs: 60_000,
         };
 
-        const firstPath = persistForecastEntry({
+        const firstPersist = persistForecastEntry({
             assetKey: 'BTC',
             timeframe: '1h',
             entry: baseEntry,
@@ -63,9 +63,9 @@ describe('forecasting', () => {
             historyLimit: 2,
         });
 
-        expect(firstPath).toBeTruthy();
-        expect(fs.existsSync(firstPath ?? '')).toBe(true);
-        const firstRead = JSON.parse(fs.readFileSync(firstPath, 'utf-8'));
+        expect(firstPersist?.filePath).toBeTruthy();
+        expect(fs.existsSync(firstPersist?.filePath ?? '')).toBe(true);
+        const firstRead = JSON.parse(fs.readFileSync(firstPersist?.filePath ?? '', 'utf-8'));
         expect(firstRead).toHaveLength(1);
 
         persistForecastEntry({
@@ -75,7 +75,7 @@ describe('forecasting', () => {
             directory: tmpRoot,
             historyLimit: 2,
         });
-        persistForecastEntry({
+        const finalPersist = persistForecastEntry({
             assetKey: 'BTC',
             timeframe: '1h',
             entry: { ...baseEntry, forecastClose: 104, runAt: new Date('2024-01-01T02:05:00Z').toISOString() },
@@ -83,10 +83,73 @@ describe('forecasting', () => {
             historyLimit: 2,
         });
 
-        const finalRead = JSON.parse(fs.readFileSync(firstPath, 'utf-8'));
+        expect(finalPersist?.filePath).toBe(firstPersist?.filePath);
+        const finalRead = JSON.parse(fs.readFileSync(finalPersist?.filePath ?? '', 'utf-8'));
         expect(finalRead).toHaveLength(2);
         expect(finalRead[0].forecastClose).toBe(103);
         expect(finalRead[1].forecastClose).toBe(104);
     });
+
+    it('evaluates previous forecast accuracy when persisting a new entry', () => {
+        const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'forecast-accuracy-'));
+        const baseEntry = {
+            runAt: new Date('2024-01-01T00:00:00Z').toISOString(),
+            predictedAt: new Date('2024-01-01T01:00:00Z').toISOString(),
+            lastCloseAt: new Date('2024-01-01T00:45:00Z').toISOString(),
+            lastClose: 100,
+            forecastClose: 102,
+            delta: 2,
+            confidence: 0.9,
+            method: 'linear-regression',
+            samples: 10,
+            mae: 0.5,
+            rmse: 0.6,
+            slope: 0.01,
+            intercept: 100,
+            horizonMs: 60_000,
+        };
+
+        persistForecastEntry({
+            assetKey: 'ETH',
+            timeframe: '4h',
+            entry: baseEntry,
+            directory: tmpRoot,
+            historyLimit: 10,
+        });
+
+        const nextEntry = {
+            ...baseEntry,
+            runAt: new Date('2024-01-01T04:00:00Z').toISOString(),
+            lastCloseAt: new Date('2024-01-01T03:45:00Z').toISOString(),
+            lastClose: 98,
+            forecastClose: 101,
+        };
+
+        const result = persistForecastEntry({
+            assetKey: 'ETH',
+            timeframe: '4h',
+            entry: nextEntry,
+            directory: tmpRoot,
+            historyLimit: 10,
+        });
+
+        expect(result?.evaluation).toMatchObject({
+            actual: 98,
+            predicted: 102,
+            directionHit: false,
+            horizonMs: 60_000,
+        });
+        expect(result?.evaluation?.absError).toBeCloseTo(4, 6);
+        expect(result?.evaluation?.pctError ?? 0).toBeCloseTo(4 / 98, 6);
+        expect(result?.evaluation?.predictedAt).toBe(baseEntry.predictedAt);
+        expect(result?.evaluation?.actualAt).toBe(nextEntry.lastCloseAt);
+    });
+
+    it('ensures forecast artifacts directories are ignored by git', () => {
+        const gitignore = fs.readFileSync(path.resolve('.gitignore'), 'utf-8');
+        expect(gitignore).toContain('reports/forecasts/');
+        expect(gitignore).toContain('charts/');
+    });
+
 });
 

@@ -43,6 +43,18 @@ const ensureDirectory = (dirPath) => {
     }
 };
 
+const toFiniteNumber = (value) => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === "string") {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+};
+
+
 const regressionFromSeries = (xs, ys) => {
     const n = Math.min(xs.length, ys.length);
     if (n < 2) {
@@ -170,7 +182,7 @@ export function forecastNextClose({ closes, timestamps = [], lookback = 48, minH
  * @param {object} params.entry - Forecast payload to persist.
  * @param {string} params.directory - Directory to store forecast files.
  * @param {number} [params.historyLimit=240] - Maximum number of entries to retain.
- * @returns {string|null} Absolute path to the written file or null when skipped.
+ * @returns {{filePath: string, evaluation: object|null}|null} Summary of the persistence operation.
  */
 export function persistForecastEntry({
     assetKey,
@@ -189,12 +201,44 @@ export function persistForecastEntry({
         ensureDirectory(assetDir);
         const filePath = path.join(assetDir, `${timeframe}.json`);
         let history = [];
+        let evaluation = null;
+
         if (fs.existsSync(filePath)) {
             try {
                 const raw = fs.readFileSync(filePath, "utf-8");
                 const parsed = JSON.parse(raw);
                 if (Array.isArray(parsed)) {
                     history = parsed;
+                    const previousEntry = history.at(-1);
+                    const actualClose = toFiniteNumber(entry.lastClose);
+                    const predictedClose = toFiniteNumber(previousEntry?.forecastClose);
+                    if (previousEntry && actualClose !== null && predictedClose !== null) {
+                        const baselineClose = toFiniteNumber(previousEntry.lastClose);
+                        const absError = Math.abs(actualClose - predictedClose);
+                        const pctError = Math.abs(actualClose) > 1e-8
+                            ? Math.abs(absError / actualClose)
+                            : null;
+                        let directionHit = null;
+                        if (baselineClose !== null) {
+                            const forecastDelta = predictedClose - baselineClose;
+                            const actualDelta = actualClose - baselineClose;
+                            const forecastSign = Math.sign(forecastDelta);
+                            const actualSign = Math.sign(actualDelta);
+                            directionHit = forecastSign === 0
+                                ? actualSign === 0
+                                : forecastSign === actualSign;
+                        }
+                        evaluation = {
+                            actual: actualClose,
+                            predicted: predictedClose,
+                            absError,
+                            pctError,
+                            directionHit,
+                            predictedAt: previousEntry.predictedAt ?? null,
+                            actualAt: entry.lastCloseAt ?? null,
+                            horizonMs: previousEntry.horizonMs ?? null,
+                        };
+                    }
                 }
             } catch (err) {
                 log.warn({ err }, "Failed to read existing forecast history; resetting file.");
@@ -206,7 +250,8 @@ export function persistForecastEntry({
             history = history.slice(-historyLimit);
         }
         fs.writeFileSync(filePath, `${JSON.stringify(history, null, 2)}\n`);
-        return filePath;
+        return { filePath, evaluation };
+
     } catch (err) {
         log.error({ err }, "Failed to persist forecast");
         return null;
