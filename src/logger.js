@@ -40,6 +40,8 @@ function pruneOldLogs() {
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) { ensureLogsDir(); pruneOldLogs(); }
 
+const useSyncTransport = process.env.LOG_SYNC === 'true' || process.argv.includes('--once');
+
 const transport = isTestEnv ? undefined : pino.transport({
   target: '@jvddavid/pino-rotating-file',
   options: {
@@ -48,7 +50,7 @@ const transport = isTestEnv ? undefined : pino.transport({
     maxSize: MAX_LOG_SIZE_BYTES,
     mkdir: true,
     append: true,
-    sync: false,
+    sync: useSyncTransport,
     fsync: false,
   },
 });
