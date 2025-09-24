@@ -125,3 +125,17 @@ Todos os módulos utilizam `alertCache` para evitar duplicidade e respeitam conf
 - [Guia da API Spot Binance](https://binance-docs.github.io/apidocs/spot/en/)
 
 O bot registra avisos quando webhooks obrigatórios não estão configurados e interrompe execuções críticas, garantindo falhas rápidas em ambientes de produção.
+
+## FAQ
+
+### O que é este crypto trading bot?
+
+É uma automação que coleta dados de exchanges, calcula indicadores técnicos e envia decisões recomendadas diretamente para o seu servidor. Apesar de não executar ordens por você, o crypto trading bot concentra insights prontos para orientar entradas, saídas e estratégias diárias.
+
+### Como funcionam os Discord alerts do projeto?
+
+Os módulos de alertas monitoram variações de preço, volume e sentimento em tempo real. Quando uma condição configurada é disparada, o bot gera Discord alerts com gráficos, texto e links relevantes no canal escolhido, mantendo todo o time informado sem precisar abrir dashboards externos.
+
+### Posso personalizar indicadores e frequência dos envios?
+
+Sim. Ajuste os indicadores ativos, thresholds e cadência diretamente nos arquivos de configuração ou variáveis de ambiente. Assim, os avisos chegam de acordo com o perfil de risco desejado, seja para acompanhar scalps, swing trades ou relatórios semanais para a comunidade.
