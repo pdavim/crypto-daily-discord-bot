@@ -19,6 +19,7 @@ Este guia reúne recomendações de segurança, configuração e uso das funcion
 
 1. Atualize o arquivo `.env` com as credenciais desejadas.
 2. Ajuste `config/default.json` ou `config/custom.json` para definir:
+   - `enableBinanceCommand` — liga/desliga o comando `/binance` (pode ser sobrescrito com `ENABLE_BINANCE_COMMAND=false`).
    - `trading.executor.enabled` — liga/desliga ordens reais.
    - `trading.risk.maxDrawdownPercent` e `portfolio.growth.maxDrawdownPercent` — proteções contra quedas.
    - `alerts.thresholds.minimumProfitPercent` — alinhado aos novos comandos `/settings profit`.
@@ -26,7 +27,7 @@ Este guia reúne recomendações de segurança, configuração e uso das funcion
 
 ## Funcionalidades disponíveis
 
-- **Comando `/binance`**: apresenta saldos spot, métricas de margem e posições abertas com links para a exchange quando disponíveis.
+- **Comando `/binance`** (controlado por `enableBinanceCommand`): apresenta saldos spot, métricas de margem e posições abertas com links para a exchange quando disponíveis.
 - **Executor automático**: envia ordens `MARKET` e `LIMIT` com logs detalhados em `logs/trading.log` e validação de postura bull/bear.
 - **Simulações e forecasting**: utilizam dados da Binance para projetar crescimento de portfólio e prever fechamentos, salvando históricos em `reports/`.
 - **Alertas enriquecidos**: variáveis de ambiente e configurações personalizadas refletem imediatamente nas mensagens enviadas.

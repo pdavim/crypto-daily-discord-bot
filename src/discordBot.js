@@ -278,6 +278,15 @@ export async function handleInteraction(interaction) {
             await interaction.editReply('Erro ao executar análise. Tente novamente mais tarde.');
         }
     } else if (interaction.commandName === 'binance') {
+        if (!CFG.enableBinanceCommand) {
+            if (typeof interaction.reply === 'function') {
+                await interaction.reply({
+                    content: 'O comando Binance está desativado neste servidor.',
+                    ephemeral: true,
+                });
+            }
+            return;
+        }
         await interaction.deferReply({ ephemeral: true });
         const log = withContext(logger, { command: 'binance' });
         try {
@@ -456,10 +465,6 @@ function getClient() {
                     ]
                 },
                 {
-                    name: 'binance',
-                    description: 'Mostra saldos, posições e margem da conta Binance'
-                },
-                {
                     name: 'settings',
                     description: 'Atualiza configurações do bot',
                     options: [
@@ -519,6 +524,12 @@ function getClient() {
                     ]
                 }
             ];
+            if (CFG.enableBinanceCommand) {
+                commands.splice(4, 0, {
+                    name: 'binance',
+                    description: 'Mostra saldos, posições e margem da conta Binance'
+                });
+            }
             await client.application.commands.set(commands);
             client.on('interactionCreate', handleInteraction);
             return client;

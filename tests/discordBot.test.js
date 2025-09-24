@@ -71,6 +71,7 @@ beforeEach(() => {
   for (const key of Object.keys(settingsStore)) {
     delete settingsStore[key];
   }
+  delete process.env.ENABLE_BINANCE_COMMAND;
 });
 
 describe('discord bot interactions', () => {
@@ -264,6 +265,36 @@ describe('discord bot interactions', () => {
     expect(message).toContain('Sem ativos na conta de margem.');
     expect(message).toContain('**Posições de Margem**');
     expect(message).toContain('Sem posições de margem abertas.');
+  });
+
+  it('informa quando o comando /binance está desativado', async () => {
+    process.env.ENABLE_BINANCE_COMMAND = 'false';
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(getAccountOverview).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'O comando Binance está desativado neste servidor.',
+      ephemeral: true,
+    });
+  });
+
+  it('não registra o comando /binance quando desativado', async () => {
+    process.env.ENABLE_BINANCE_COMMAND = 'false';
+    const { initBot } = await loadBot();
+
+    await initBot();
+
+    expect(setCommandsMock).toHaveBeenCalled();
+    const registered = setCommandsMock.mock.calls[0][0];
+    expect(registered.some(command => command.name === 'binance')).toBe(false);
   });
 
   it('reports credential issues on /binance command', async () => {
