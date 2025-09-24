@@ -23,7 +23,10 @@ export async function fetchWithRetry(fn, { retries = 3, baseDelay = 500 } = {}) 
             return result;
         } catch (err) {
             attempt++;
-            if (attempt > retries) {
+            const aggregateErrors = Array.isArray(err?.errors) ? err.errors : [];
+            const codes = [err?.code, ...aggregateErrors.map(e => e?.code)].filter(Boolean);
+            const isNetworkUnreachable = codes.includes('ENETUNREACH');
+            if (attempt > retries || isNetworkUnreachable) {
                 log.error({ fn: 'fetchWithRetry', err }, `[FATAL] ${err.message || err}`);
                 end();
                 throw err;

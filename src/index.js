@@ -21,22 +21,32 @@ import { notifyOps } from "./monitor.js";
 import { reportWeeklyPerf } from "./perf.js";
 import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
 import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
+import { runAssetsSafely } from "./runner.js";
+
+const ONCE = process.argv.includes("--once");
+
+process.on('unhandledRejection', (err) => {
+    const log = withContext(logger, { fn: 'unhandledRejection' });
+    log.error({ err }, 'Unhandled promise rejection');
+});
 
 initBot({ onAnalysis: handleAnalysisSlashCommand });
 
-const METRICS_PORT = process.env.METRICS_PORT || 3001;
-http.createServer(async (req, res) => {
-    if (req.method === 'GET' && req.url === '/metrics') {
-        res.setHeader('Content-Type', register.contentType);
-        res.end(await register.metrics());
-    } else {
-        res.statusCode = 404;
-        res.end('Not found');
-    }
-}).listen(METRICS_PORT, () => {
-    const log = withContext(logger);
-    log.info({ fn: 'metrics' }, `Metrics server listening on port ${METRICS_PORT}`);
-});
+if (!ONCE) {
+    const METRICS_PORT = process.env.METRICS_PORT || 3001;
+    http.createServer(async (req, res) => {
+        if (req.method === 'GET' && req.url === '/metrics') {
+            res.setHeader('Content-Type', register.contentType);
+            res.end(await register.metrics());
+        } else {
+            res.statusCode = 404;
+            res.end('Not found');
+        }
+    }).listen(METRICS_PORT, () => {
+        const log = withContext(logger);
+        log.info({ fn: 'metrics' }, `Metrics server listening on port ${METRICS_PORT}`);
+    });
+}
 
 /**
  * Converts an internal timeframe label into a Binance interval string.
@@ -88,7 +98,11 @@ async function runOnceForAsset(asset, options = {}) {
         postAnalysis: shouldPostAnalysis = enableAnalysis,
         postCharts: shouldPostCharts = enableCharts
     } = options;
-    const dailyPromise = fetchDailyCloses(asset.binance, 32);
+    const assetLog = withContext(logger, { asset: asset.key });
+    const dailyPromise = fetchDailyCloses(asset.binance, 32).catch(err => {
+        assetLog.warn({ fn: 'runOnceForAsset', err }, 'Daily closes unavailable; continuing without historical context');
+        return [];
+    });
     const snapshots = {};
     const chartPaths = [];
 
@@ -100,8 +114,15 @@ async function runOnceForAsset(asset, options = {}) {
         }
     }
     const intervalKeys = [...intervalPromises.keys()];
-    const intervalResults = await Promise.all(intervalKeys.map(k => intervalPromises.get(k)));
-    const candlesByInterval = new Map(intervalKeys.map((k, i) => [k, intervalResults[i]]));
+    let candlesByInterval;
+    try {
+        const intervalResults = await Promise.all(intervalKeys.map(k => intervalPromises.get(k)));
+        candlesByInterval = new Map(intervalKeys.map((k, i) => [k, intervalResults[i]]));
+    } catch (err) {
+        assetLog.error({ fn: 'runOnceForAsset', err }, 'Failed to load price data for asset');
+        await notifyOps(`Failed to load price data for ${asset.key}: ${err.message || err}`);
+        return { snapshots: {}, summary: null, chartPaths: [] };
+    }
 
     let cached45mCandles;
     const indicatorCache = new Map();
@@ -305,10 +326,12 @@ async function runOnceForAsset(asset, options = {}) {
  * @returns {Promise}
  */
 async function runAll() {
-    const limit = pLimit(calcConcurrency());
-    await Promise.all(
-        ASSETS.map(asset => limit(() => runOnceForAsset(asset)))
-    );
+    await runAssetsSafely({
+        assets: ASSETS,
+        limitFactory: () => pLimit(calcConcurrency()),
+        runAsset: runOnceForAsset,
+        logger,
+    });
 }
 
 const DAILY_ALERT_SCOPE = 'daily';
@@ -567,8 +590,6 @@ async function compileMonthlyPerformanceReport() {
     }
 }
 
-const ONCE = process.argv.includes("--once");
-
 const runningAssets = new Set();
 /**
  * Queues a background run for the given asset if one is not already in progress.
@@ -645,9 +666,12 @@ if (!ONCE) {
     compileMonthlyPerformanceReport();
 } else {
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    runAll();
+    await runAll();
     pruneOlderThan(sevenDaysMs);
-    runDailyAnalysis();
-    generateWeeklySnapshot();
-    compileMonthlyPerformanceReport();
+    await runDailyAnalysis();
+    await generateWeeklySnapshot();
+    await compileMonthlyPerformanceReport();
+    if (process.env.NODE_ENV !== 'test') {
+        process.exit(0);
+    }
 }

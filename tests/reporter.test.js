@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
   sparklineMock,
@@ -6,14 +6,21 @@ const {
   volumeDivergenceMock,
   trendFromMAsMock,
   scoreHeuristicMock,
-  semaforoMock
+  semaforoMock,
+  launchMock,
+  browserMock
 } = vi.hoisted(() => ({
   sparklineMock: vi.fn((series, size) => `spark(${series.length},${size})`),
   parabolicSARMock: vi.fn(() => [0.1, 0.2, 0.3]),
   volumeDivergenceMock: vi.fn(() => [0.01, 0.02, 0.03]),
   trendFromMAsMock: vi.fn((ma20, ma50, ma200 = []) => (ma20.at(-1) - ma50.at(-1)) + (ma50.at(-1) - (ma200.at(-1) ?? 0))),
   scoreHeuristicMock: vi.fn(({ rsi, macdHist, width, trend }) => (rsi ?? 0) / 10 + (macdHist ?? 0) + (width ?? 0) + (trend ?? 0)),
-  semaforoMock: vi.fn(score => (score > 0 ? '🟢' : score < 0 ? '🔴' : '🟡'))
+  semaforoMock: vi.fn(score => (score > 0 ? '🟢' : score < 0 ? '🔴' : '🟡')),
+  launchMock: vi.fn(),
+  browserMock: {
+    newPage: vi.fn(),
+    close: vi.fn()
+  }
 }));
 
 vi.mock('../src/indicators.js', () => ({
@@ -25,7 +32,20 @@ vi.mock('../src/indicators.js', () => ({
   semaforo: semaforoMock
 }));
 
-import { buildSnapshotForReport, buildSummary } from '../src/reporter.js';
+vi.mock('puppeteer', () => ({
+  default: {
+    launch: launchMock
+  }
+}));
+
+import {
+  buildSnapshotForReport,
+  buildSummary,
+  buildSummaryPdf,
+  pct,
+  num,
+  fmt
+} from '../src/reporter.js';
 
 describe('reporter', () => {
   beforeEach(() => {
@@ -150,5 +170,148 @@ describe('reporter', () => {
     expect(summary).toContain('24h ??');
     expect(summary).toContain('7d ??');
     expect(summary).toContain('30d ??');
+  });
+
+  it('formats multi-timeframe summaries with directional indicators', () => {
+    const summary = buildSummary({
+      assetKey: 'ETH',
+      snapshots: {
+        '5m': {
+          kpis: {
+            var: 0.01,
+            fearGreed: 'Greedy',
+            trend: 'Tendência de alta persistente',
+            reco: 'Comprar',
+            sem: '🟢',
+            score: 5,
+            adx14: 30,
+            kcState: 'Acima'
+          }
+        },
+        '15m': {
+          kpis: {
+            var: -0.02,
+            fearGreed: 'Neutro',
+            trend: -3,
+            reco: 'Vender',
+            sem: '🔴',
+            score: -3,
+            adx14: 22,
+            kcState: 'Dentro'
+          }
+        },
+        '30m': {
+          kpis: {
+            var: 0,
+            fearGreed: 'N/A',
+            trend: 'fase de baixa moderada',
+            reco: 'Manter',
+            sem: '🟡',
+            score: 0,
+            adx14: 19,
+            kcState: 'Abaixo'
+          }
+        },
+        '1h': {
+          kpis: {
+            price: 123.4567,
+            var: 0.05,
+            var24h: 0.1,
+            var7d: -0.05,
+            var30d: 0.2,
+            fearGreed: 42,
+            trend: 0,
+            reco: 'Comprar',
+            sem: '🟢',
+            score: 3,
+            adx14: 40,
+            kcState: 'Acima'
+          }
+        },
+        '4h': {
+          kpis: {
+            price: 150,
+            var: -0.01,
+            var24h: -0.02,
+            var7d: 0.03,
+            var30d: 0.04,
+            fearGreed: 'Desconhecido',
+            trend: 'Alta forte',
+            reco: 'Manter',
+            sem: '🟡',
+            score: 1,
+            adx14: 10,
+            kcState: 'Dentro'
+          }
+        }
+      }
+    });
+
+    expect(summary).toContain('**Asset name**: **ETH**');
+    expect(summary).toContain('**Preço**: 📈 150.0000');
+    expect(summary).toContain('-- 5m - 📈 1.00% / 15m - 📉 -2.00% / 30m - 🟡 0.00% / 1h - 📈 5.00% / 4h - 📉 -1.00% / 24h 📉 -2.00% / 7d 📈 3.00% / 30d 📈 4.00%');
+    expect(summary).toContain('-- 5m - Greedy / 15m - Neutro / 30m - N/A / 1h - 42 / 4h - Desconhecido');
+    expect(summary).toContain('-- 5m - 📈 Tendência de alta persistente / 15m - 📉 Baixa / 30m - 📉 fase de baixa moderada / 1h - 🟡 Neutro / 4h - 📈 Alta forte');
+    expect(summary).toContain('-- 5m - Comprar / 15m - Vender / 30m - Manter / 1h - Comprar / 4h - Manter');
+    expect(summary).toContain('-- 5m - 🟢 / 15m - 🔴 / 30m - 🟡 / 1h - 🟢 / 4h - 🟡');
+    expect(summary).toContain('-- 5m - 📈 5 / 15m - 📉 -3 / 30m - 🟡 0 / 1h - 📈 3 / 4h - 📈 1');
+    expect(summary).toContain('-- 5m - 💪 30 / 15m - 📈 22 / 30m - 🟡 19 / 1h - 💪 40 / 4h - 🟡 10');
+    expect(summary).toContain('-- 5m - 📈 Acima / 15m - 🟡 Dentro / 30m - 📉 Abaixo / 1h - 📈 Acima / 4h - 🟡 Dentro');
+  });
+
+  describe('buildSummaryPdf', () => {
+    let processOnceSpy;
+
+    beforeEach(() => {
+      launchMock.mockResolvedValue(browserMock);
+      browserMock.close.mockResolvedValue();
+      browserMock.newPage.mockReset();
+      processOnceSpy = vi.spyOn(process, 'once').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      processOnceSpy.mockRestore();
+    });
+
+    it('renders a PDF with sanitized HTML and reuses the browser', async () => {
+      const pages = [];
+      browserMock.newPage.mockImplementation(async () => {
+        const page = {
+          setContent: vi.fn().mockResolvedValue(),
+          pdf: vi.fn().mockResolvedValue(Buffer.from('pdf-data')),
+          close: vi.fn().mockResolvedValue()
+        };
+        pages.push(page);
+        return page;
+      });
+
+      const pdf1 = await buildSummaryPdf('# Heading', { assetKey: 'BTC', timeframe: '4h' });
+      expect(pdf1).toBeInstanceOf(Buffer);
+      expect(launchMock).toHaveBeenCalledTimes(1);
+      expect(processOnceSpy).toHaveBeenCalledWith('exit', expect.any(Function));
+      expect(pages[0].setContent).toHaveBeenCalledWith(expect.stringContaining('<title>BTC • 4h</title>'), { waitUntil: 'domcontentloaded' });
+      expect(pages[0].pdf).toHaveBeenCalledWith(expect.objectContaining({ format: 'A4', printBackground: true }));
+      expect(pages[0].close).toHaveBeenCalled();
+
+      const pdf2 = await buildSummaryPdf('*Another* summary');
+      expect(pdf2).toBeInstanceOf(Buffer);
+      expect(launchMock).toHaveBeenCalledTimes(1);
+      expect(pages[1].setContent).toHaveBeenCalledWith(expect.stringContaining('<title>Análise</title>'), { waitUntil: 'domcontentloaded' });
+      expect(pages[1].close).toHaveBeenCalled();
+    });
+
+    it('throws when attempting to render an empty summary', async () => {
+      await expect(buildSummaryPdf('')).rejects.toThrow('Cannot build PDF from empty summary');
+      expect(launchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('formats numeric helpers consistently', () => {
+    expect(pct(null)).toBe('—');
+    expect(pct(0.1234)).toBe('12.34%');
+    expect(num(undefined)).toBe('—');
+    expect(num('12.3456', 2)).toBe('12.35');
+    expect(fmt(null)).toBe('—');
+    expect(fmt(1234567)).toMatch(/1,234,567|1\.234\.567/);
   });
 });
