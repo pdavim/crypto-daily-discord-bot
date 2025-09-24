@@ -343,3 +343,187 @@ export async function renderForecastChart({
     log.debug({ ms, forecastValue, predictedX }, 'Forecast chart rendered');
     return outPath;
 }
+
+/**
+ * Renders a line chart summarizing the simulated portfolio growth progression.
+ * @param {object} params - Rendering parameters.
+ * @param {Array<object>} params.history - Portfolio history entries with timestamp, totalValue, cash and invested fields.
+ * @param {number} params.targetCapital - Capital goal to plot as a reference line.
+ * @param {object} [params.options={}] - Rendering options including directory and metric annotations.
+ * @returns {Promise<string|null>} Absolute path to the generated PNG or null when rendering is skipped.
+ */
+export async function renderPortfolioGrowthChart({ history, targetCapital, options = {} }) {
+    if (!Array.isArray(history) || history.length < 2) {
+        return null;
+    }
+
+    const points = history
+        .map((entry, index) => {
+            const time = typeof entry.timestamp === "string"
+                ? Date.parse(entry.timestamp)
+                : Number.isFinite(entry.timestamp)
+                    ? Number(entry.timestamp)
+                    : null;
+            const totalValue = Number.parseFloat(entry.totalValue ?? entry.value ?? NaN);
+            const cash = Number.parseFloat(entry.cash ?? NaN);
+            const invested = Number.parseFloat(entry.invested ?? (Number.isFinite(totalValue) && Number.isFinite(cash)
+                ? totalValue - cash
+                : NaN));
+            const drawdown = Number.parseFloat(entry.drawdownPct ?? entry.drawdown ?? NaN);
+            if (!Number.isFinite(totalValue) || time === null || !Number.isFinite(time)) {
+                return null;
+            }
+            return {
+                time,
+                index,
+                totalValue,
+                cash: Number.isFinite(cash) ? cash : null,
+                invested: Number.isFinite(invested) ? invested : null,
+                drawdown: Number.isFinite(drawdown) ? drawdown : null,
+            };
+        })
+        .filter(Boolean);
+
+    if (points.length < 2) {
+        return null;
+    }
+
+    const useTime = points.every(point => Number.isFinite(point.time));
+    const baseX = points.map(point => useTime ? point.time : point.index);
+
+    const valueSeries = points.map((point, idx) => ({ x: baseX[idx], y: point.totalValue }));
+    const investedSeries = points.map((point, idx) => ({ x: baseX[idx], y: point.invested ?? point.totalValue }));
+    const cashSeries = points
+        .map((point, idx) => Number.isFinite(point.cash) ? ({ x: baseX[idx], y: point.cash }) : null)
+        .filter(Boolean);
+    const drawdownSeries = points
+        .map((point, idx) => point.drawdown != null ? ({ x: baseX[idx], y: point.drawdown }) : null)
+        .filter(Boolean);
+
+    const directory = typeof options.directory === "string" && options.directory.trim() !== ""
+        ? options.directory.trim()
+        : "charts/growth";
+    if (!fs.existsSync(directory)) {
+        fs.mkdirSync(directory, { recursive: true });
+    }
+
+    const datasets = [
+        {
+            type: "line",
+            label: "Portfolio Value",
+            data: valueSeries,
+            borderColor: "#1f77b4",
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.25,
+            yAxisID: "y",
+        },
+        {
+            type: "line",
+            label: "Invested Capital",
+            data: investedSeries,
+            borderColor: "#2ca02c",
+            borderDash: [6, 4],
+            pointRadius: 0,
+            tension: 0.2,
+            yAxisID: "y",
+        },
+    ];
+
+    if (cashSeries.length > 0) {
+        datasets.push({
+            type: "line",
+            label: "Cash Buffer",
+            data: cashSeries,
+            borderColor: "#ff7f0e",
+            borderDash: [2, 2],
+            pointRadius: 0,
+            tension: 0.2,
+            yAxisID: "y",
+        });
+    }
+
+    if (Number.isFinite(targetCapital) && targetCapital > 0) {
+        datasets.push({
+            type: "line",
+            label: `Meta ${targetCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+            data: baseX.map((x) => ({ x, y: targetCapital })),
+            borderColor: "#d62728",
+            borderDash: [4, 4],
+            pointRadius: 0,
+            tension: 0,
+            yAxisID: "y",
+        });
+    }
+
+    if (drawdownSeries.length > 0) {
+        datasets.push({
+            type: "line",
+            label: "Drawdown",
+            data: drawdownSeries,
+            borderColor: "#9467bd",
+            borderWidth: 1,
+            pointRadius: 0,
+            yAxisID: "y1",
+        });
+    }
+
+    const titleParts = ["Evolução do Portfólio"];
+    if (Number.isFinite(options.cagr)) {
+        titleParts.push(`CAGR ${(options.cagr * 100).toFixed(2)}%`);
+    }
+    if (Number.isFinite(options.maxDrawdownPct)) {
+        titleParts.push(`Max DD ${(options.maxDrawdownPct * 100).toFixed(1)}%`);
+    }
+
+    const scales = useTime
+        ? {
+            x: { type: "time", time: { tooltipFormat: "yyyy-LL-dd" } },
+            y: { type: "linear", title: { display: true, text: "Valor (€)" } },
+        }
+        : {
+            x: { type: "linear" },
+            y: { type: "linear", title: { display: true, text: "Valor (€)" } },
+        };
+
+    if (drawdownSeries.length > 0) {
+        scales.y1 = {
+            type: "linear",
+            position: "right",
+            grid: { display: false },
+            ticks: {
+                callback: (value) => `${(Number(value) * 100).toFixed(0)}%`,
+            },
+            min: 0,
+            max: Math.min(1, Math.max(...drawdownSeries.map(point => point.y)) * 1.2 || 0.5),
+            title: { display: true, text: "Drawdown" },
+        };
+    }
+
+    const config = {
+        type: "line",
+        data: { datasets },
+        options: {
+            responsive: false,
+            parsing: false,
+            plugins: {
+                legend: { display: true },
+                title: { display: true, text: titleParts.join(" • ") },
+                tooltip: { mode: "index", intersect: false },
+            },
+            scales,
+        },
+    };
+
+    const start = performance.now();
+    const buffer = await canvas.renderToBuffer(config);
+    const lastTime = points.at(-1)?.time ?? Date.now();
+    const outPath = `${directory}/portfolio_growth_${Math.round(lastTime)}.png`;
+    fs.writeFileSync(outPath, buffer);
+    const ms = performance.now() - start;
+    recordPerf("renderPortfolioGrowthChart", ms);
+    const log = withContext(logger, { fn: "renderPortfolioGrowthChart" });
+    log.debug({ ms, outPath }, "Rendered portfolio growth chart");
+    return outPath;
+}
+

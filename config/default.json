@@ -78,6 +78,52 @@
       "appendToUploads": false
     }
   },
+  "portfolioGrowth": {
+    "enabled": false,
+    "initialCapital": 100,
+    "targetCapital": 10000000,
+    "simulation": {
+      "historyDays": 1095,
+      "riskFreeRate": 0.02,
+      "contribution": {
+        "amount": 100,
+        "intervalDays": 30
+      },
+      "slippagePct": 0.001
+    },
+    "rebalance": {
+      "intervalDays": 30,
+      "tolerancePct": 0.05
+    },
+    "risk": {
+      "maxDrawdownPct": 0.35,
+      "stopLossPct": 0.12,
+      "takeProfitPct": 0.25,
+      "maxPositionPct": 0.4,
+      "volatilityLookback": 30,
+      "volatilityTargetPct": 0.15
+    },
+    "reporting": {
+      "enabled": true,
+      "directory": "reports/growth",
+      "chartDirectory": "charts/growth",
+      "appendToUploads": false
+    },
+    "strategies": {
+      "default": {
+        "name": "Base Rebalance",
+        "allocation": {
+          "BTC": 0.45,
+          "ETH": 0.3,
+          "SOL": 0.15,
+          "POL": 0.05,
+          "SUI": 0.05
+        },
+        "minAllocationPct": 0,
+        "maxAllocationPct": 0.6
+      }
+    }
+  },
 
   "indicators": {
     "smaPeriods": {

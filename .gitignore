@@ -3,6 +3,7 @@ dist/
 charts/
 logs/
 reports/forecasts/
+reports/growth/
 .env
 .DS_Store
 .vscode/

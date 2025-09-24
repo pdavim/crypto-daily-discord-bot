@@ -27,6 +27,7 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 - [Introdução ao projeto](./guide/introducao.md)
 - [Deploy no Discord](./guide/deploy-discord.md)
 - [Hospedagem da documentação na GitHub Pages](./guide/github-pages.md)
+- [Estratégia de crescimento do portfólio](./guide/portfolio-growth.md)
 
 ## Precisa de ajuda?
 

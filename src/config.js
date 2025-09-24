@@ -227,6 +227,59 @@ const DEFAULT_FORECAST_CONFIG = {
     charts: DEFAULT_FORECAST_CHART_CONFIG,
 };
 
+const DEFAULT_PORTFOLIO_CONTRIBUTION_CONFIG = {
+    amount: 100,
+    intervalDays: 30,
+};
+
+const DEFAULT_PORTFOLIO_SIMULATION_CONFIG = {
+    historyDays: 1095,
+    riskFreeRate: 0.02,
+    contribution: DEFAULT_PORTFOLIO_CONTRIBUTION_CONFIG,
+    slippagePct: 0.001,
+};
+
+const DEFAULT_PORTFOLIO_REBALANCE_CONFIG = {
+    intervalDays: 30,
+    tolerancePct: 0.05,
+};
+
+const DEFAULT_PORTFOLIO_RISK_CONFIG = {
+    maxDrawdownPct: 0.35,
+    stopLossPct: 0.12,
+    takeProfitPct: 0.25,
+    maxPositionPct: 0.4,
+    volatilityLookback: 30,
+    volatilityTargetPct: 0.15,
+};
+
+const DEFAULT_PORTFOLIO_REPORTING_CONFIG = {
+    enabled: true,
+    directory: "reports/growth",
+    chartDirectory: "charts/growth",
+    appendToUploads: false,
+};
+
+const DEFAULT_PORTFOLIO_STRATEGY_CONFIG = {
+    name: "Base Rebalance",
+    allocation: {},
+    minAllocationPct: 0,
+    maxAllocationPct: 0.6,
+};
+
+const DEFAULT_PORTFOLIO_GROWTH_CONFIG = {
+    enabled: false,
+    initialCapital: 100,
+    targetCapital: 10_000_000,
+    simulation: DEFAULT_PORTFOLIO_SIMULATION_CONFIG,
+    rebalance: DEFAULT_PORTFOLIO_REBALANCE_CONFIG,
+    risk: DEFAULT_PORTFOLIO_RISK_CONFIG,
+    reporting: DEFAULT_PORTFOLIO_REPORTING_CONFIG,
+    strategies: {
+        default: DEFAULT_PORTFOLIO_STRATEGY_CONFIG,
+    },
+};
+
 
 const clampNumber = (value, fallback, { min, max } = {}) => {
     if (!Number.isFinite(value)) {
@@ -240,6 +293,48 @@ const clampNumber = (value, fallback, { min, max } = {}) => {
     }
     return value;
 };
+
+const parseAllocationPairs = (value) => {
+    if (typeof value !== "string" || value.trim() === "") {
+        return null;
+    }
+    const allocation = {};
+    const parts = value.split(",");
+    for (const part of parts) {
+        if (!part) continue;
+        const [symbolPart, weightPart] = part.split(/[:=]/);
+        const symbol = symbolPart?.trim()?.toUpperCase?.();
+        const weight = Number.parseFloat(weightPart ?? "");
+        if (symbol && Number.isFinite(weight) && weight > 0) {
+            allocation[symbol] = weight;
+        }
+    }
+    return Object.keys(allocation).length > 0 ? allocation : null;
+};
+
+const normalizeAllocation = (allocation) => {
+    const base = isPlainObject(allocation) ? allocation : {};
+    const weights = [];
+    for (const [asset, rawWeight] of Object.entries(base)) {
+        const parsed = Number.parseFloat(rawWeight);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            weights.push([asset.toUpperCase(), parsed]);
+        }
+    }
+    if (weights.length === 0) {
+        return {};
+    }
+    const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+    if (!Number.isFinite(total) || total <= 0) {
+        return {};
+    }
+    const normalized = {};
+    for (const [asset, weight] of weights) {
+        normalized[asset] = weight / total;
+    }
+    return normalized;
+};
+
 
 const buildTradingConfig = (baseConfig = {}) => {
     const base = isPlainObject(baseConfig) ? baseConfig : {};
@@ -385,6 +480,171 @@ const buildForecastConfig = (baseConfig = {}) => {
         process.env.FORECASTING_CHART_ATTACH,
         config.charts.appendToUploads,
     );
+
+    return config;
+};
+
+const buildPortfolioGrowthConfig = (baseConfig = {}) => {
+    const base = isPlainObject(baseConfig) ? baseConfig : {};
+    const defaults = clone(DEFAULT_PORTFOLIO_GROWTH_CONFIG);
+    const config = {
+        ...defaults,
+        ...base,
+        simulation: {
+            ...defaults.simulation,
+            ...(isPlainObject(base.simulation) ? base.simulation : {}),
+            contribution: {
+                ...defaults.simulation.contribution,
+                ...(isPlainObject(base.simulation?.contribution) ? base.simulation.contribution : {}),
+            },
+        },
+        rebalance: {
+            ...defaults.rebalance,
+            ...(isPlainObject(base.rebalance) ? base.rebalance : {}),
+        },
+        risk: {
+            ...defaults.risk,
+            ...(isPlainObject(base.risk) ? base.risk : {}),
+        },
+        reporting: {
+            ...defaults.reporting,
+            ...(isPlainObject(base.reporting) ? base.reporting : {}),
+        },
+        strategies: {},
+    };
+
+    config.enabled = toBoolean(process.env.PORTFOLIO_GROWTH_ENABLED, config.enabled);
+
+    const initialCapital = toNumber(process.env.PORTFOLIO_INITIAL_CAPITAL, config.initialCapital);
+    config.initialCapital = clampNumber(initialCapital, config.initialCapital, { min: 0.01 });
+
+    const targetCapital = toNumber(process.env.PORTFOLIO_TARGET_CAPITAL, config.targetCapital);
+    config.targetCapital = clampNumber(targetCapital, config.targetCapital, { min: config.initialCapital });
+
+    const historyDays = toInt(process.env.PORTFOLIO_HISTORY_DAYS, config.simulation.historyDays);
+    config.simulation.historyDays = clampNumber(historyDays, config.simulation.historyDays, { min: 30, max: 3650 });
+
+    const riskFreeRate = toNumber(process.env.PORTFOLIO_RISK_FREE_RATE, config.simulation.riskFreeRate);
+    config.simulation.riskFreeRate = clampNumber(riskFreeRate, config.simulation.riskFreeRate, { min: 0, max: 1 });
+
+    const contributionAmount = toNumber(process.env.PORTFOLIO_CONTRIBUTION_AMOUNT, config.simulation.contribution.amount);
+    config.simulation.contribution.amount = clampNumber(contributionAmount, config.simulation.contribution.amount, { min: 0 });
+
+    const contributionInterval = toInt(process.env.PORTFOLIO_CONTRIBUTION_INTERVAL, config.simulation.contribution.intervalDays);
+    config.simulation.contribution.intervalDays = clampNumber(
+        contributionInterval,
+        config.simulation.contribution.intervalDays,
+        { min: 1, max: 365 },
+    );
+
+    const slippagePct = toNumber(process.env.PORTFOLIO_SLIPPAGE_PCT, config.simulation.slippagePct);
+    config.simulation.slippagePct = clampNumber(slippagePct, config.simulation.slippagePct, { min: 0, max: 0.05 });
+
+    const rebalanceInterval = toInt(process.env.PORTFOLIO_REBALANCE_INTERVAL, config.rebalance.intervalDays);
+    config.rebalance.intervalDays = clampNumber(rebalanceInterval, config.rebalance.intervalDays, { min: 1, max: 365 });
+
+    const tolerancePct = toNumber(process.env.PORTFOLIO_REBALANCE_TOLERANCE, config.rebalance.tolerancePct);
+    config.rebalance.tolerancePct = clampNumber(tolerancePct, config.rebalance.tolerancePct, { min: 0, max: 0.2 });
+
+    const maxDrawdown = toNumber(process.env.PORTFOLIO_MAX_DRAWDOWN_PCT, config.risk.maxDrawdownPct);
+    config.risk.maxDrawdownPct = clampNumber(maxDrawdown, config.risk.maxDrawdownPct, { min: 0.01, max: 0.9 });
+
+    const stopLoss = toNumber(process.env.PORTFOLIO_STOP_LOSS_PCT, config.risk.stopLossPct);
+    config.risk.stopLossPct = clampNumber(stopLoss, config.risk.stopLossPct, { min: 0.01, max: 0.9 });
+
+    const takeProfit = toNumber(process.env.PORTFOLIO_TAKE_PROFIT_PCT, config.risk.takeProfitPct);
+    config.risk.takeProfitPct = clampNumber(takeProfit, config.risk.takeProfitPct, { min: 0.05, max: 1 });
+
+    const maxPosition = toNumber(process.env.PORTFOLIO_MAX_POSITION_PCT, config.risk.maxPositionPct);
+    config.risk.maxPositionPct = clampNumber(maxPosition, config.risk.maxPositionPct, { min: 0.05, max: 1 });
+
+    const volatilityLookback = toInt(process.env.PORTFOLIO_VOL_LOOKBACK, config.risk.volatilityLookback);
+    config.risk.volatilityLookback = clampNumber(volatilityLookback, config.risk.volatilityLookback, { min: 5, max: 365 });
+
+    const volatilityTarget = toNumber(process.env.PORTFOLIO_VOL_TARGET_PCT, config.risk.volatilityTargetPct);
+    config.risk.volatilityTargetPct = clampNumber(volatilityTarget, config.risk.volatilityTargetPct, { min: 0.01, max: 1 });
+
+    config.reporting.enabled = toBoolean(process.env.PORTFOLIO_REPORTING_ENABLED, config.reporting.enabled);
+
+    const reportDirEnv = process.env.PORTFOLIO_REPORT_DIR;
+    if (typeof reportDirEnv === "string" && reportDirEnv.trim() !== "") {
+        config.reporting.directory = reportDirEnv.trim();
+    } else if (typeof config.reporting.directory !== "string" || config.reporting.directory.trim() === "") {
+        config.reporting.directory = DEFAULT_PORTFOLIO_REPORTING_CONFIG.directory;
+    }
+
+    const chartDirEnv = process.env.PORTFOLIO_CHART_DIR;
+    if (typeof chartDirEnv === "string" && chartDirEnv.trim() !== "") {
+        config.reporting.chartDirectory = chartDirEnv.trim();
+    } else if (typeof config.reporting.chartDirectory !== "string" || config.reporting.chartDirectory.trim() === "") {
+        config.reporting.chartDirectory = DEFAULT_PORTFOLIO_REPORTING_CONFIG.chartDirectory;
+    }
+
+    config.reporting.appendToUploads = toBoolean(
+        process.env.PORTFOLIO_APPEND_UPLOADS,
+        config.reporting.appendToUploads,
+    );
+
+    const defaultStrategies = isPlainObject(defaults.strategies) ? defaults.strategies : {};
+    const inputStrategies = isPlainObject(base.strategies) ? base.strategies : {};
+
+    const envAllocation = parseAllocationPairs(process.env.PORTFOLIO_ALLOCATION);
+    if (envAllocation) {
+        inputStrategies.default = {
+            ...(isPlainObject(inputStrategies.default) ? inputStrategies.default : {}),
+            allocation: envAllocation,
+        };
+    }
+
+    const strategyKeys = new Set([
+        ...Object.keys(defaultStrategies),
+        ...Object.keys(inputStrategies),
+    ]);
+    if (strategyKeys.size === 0) {
+        strategyKeys.add("default");
+    }
+
+    for (const key of strategyKeys) {
+        const defaultStrategy = defaultStrategies[key] ?? defaultStrategies.default ?? DEFAULT_PORTFOLIO_STRATEGY_CONFIG;
+        const providedStrategy = inputStrategies[key];
+        const strategyBase = isPlainObject(providedStrategy) ? providedStrategy : {};
+        const merged = {
+            ...defaultStrategy,
+            ...strategyBase,
+        };
+        const allocation = normalizeAllocation(merged.allocation ?? defaultStrategy?.allocation ?? {});
+        let minAllocationPct = clampNumber(
+            toNumber(merged.minAllocationPct, defaultStrategy?.minAllocationPct ?? 0),
+            defaultStrategy?.minAllocationPct ?? 0,
+            { min: 0, max: 1 },
+        );
+        let maxAllocationPct = clampNumber(
+            toNumber(merged.maxAllocationPct, defaultStrategy?.maxAllocationPct ?? 1),
+            defaultStrategy?.maxAllocationPct ?? 1,
+            { min: 0.01, max: 1 },
+        );
+        if (maxAllocationPct < minAllocationPct) {
+            maxAllocationPct = Math.max(minAllocationPct, defaultStrategy?.maxAllocationPct ?? minAllocationPct);
+        }
+        const name = typeof merged.name === "string" && merged.name.trim() !== ""
+            ? merged.name.trim()
+            : (defaultStrategy?.name ?? key);
+        config.strategies[key] = {
+            name,
+            allocation,
+            minAllocationPct,
+            maxAllocationPct,
+        };
+    }
+
+    if (!config.strategies.default) {
+        config.strategies.default = {
+            name: "Default",
+            allocation: normalizeAllocation(defaultStrategies.default?.allocation ?? {}),
+            minAllocationPct: defaultStrategies.default?.minAllocationPct ?? 0,
+            maxAllocationPct: defaultStrategies.default?.maxAllocationPct ?? 1,
+        };
+    }
 
     return config;
 };
@@ -655,6 +915,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.trading = buildTradingConfig(nextCFG.trading);
     nextCFG.marketPosture = buildMarketPostureConfig(nextCFG.marketPosture);
     nextCFG.forecasting = buildForecastConfig(nextCFG.forecasting);
+    nextCFG.portfolioGrowth = buildPortfolioGrowthConfig(nextCFG.portfolioGrowth);
 
     nextCFG.indicators = buildIndicatorConfig(mergedConfig.indicators ?? nextCFG.indicators ?? {});
     nextCFG.alerts = isPlainObject(nextCFG.alerts) ? nextCFG.alerts : {};

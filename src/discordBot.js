@@ -6,7 +6,6 @@ import { fetchOHLCV } from './data/binance.js';
 import { renderChartPNG } from './chart.js';
 import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from './watchlist.js';
 import { setSetting, getSetting } from './settings.js';
-
 import { getAccountOverview } from './trading/binance.js';
 
 const startTime = Date.now();
@@ -39,7 +38,6 @@ const MIN_PROFIT_PERCENT_MAX = 100;
 function isPlainObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-
 
 function formatAmount(value, formatter = amountFormatter) {
     return Number.isFinite(value) ? formatter.format(value) : '0,00';
@@ -88,7 +86,6 @@ function applyMinimumProfitUpdate(nextValue) {
         CFG.minimumProfitThreshold = nextValue;
     }
 }
-
 
 function formatAccountAssets(assets = []) {
     if (!Array.isArray(assets) || assets.length === 0) {

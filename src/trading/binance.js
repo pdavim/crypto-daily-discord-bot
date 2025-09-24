@@ -48,7 +48,6 @@ async function privateRequest(method, path, params = {}, { context } = {}) {
 function toNumber(value) {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
-
 }
 
 function mapBalances(balances = [], { includeZero = false } = {}) {
@@ -224,6 +223,7 @@ export async function getAccountOverview(options = {}) {
 export async function placeMarketOrder(symbol, side, quantity, params = {}) {
     return submitOrder({ symbol, side, type: "MARKET", quantity, params });
 }
+
 
 export async function placeLimitOrder(symbol, side, quantity, price, params = {}) {
     return submitOrder({

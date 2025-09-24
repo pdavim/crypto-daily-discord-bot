@@ -12,7 +12,6 @@ vi.mock("../../src/trading/tradeLog.js", () => ({
     logTrade: logTradeMock,
 }));
 
-
 const originalEnv = { ...process.env };
 const axios = (await import("axios")).default;
 
@@ -29,7 +28,6 @@ describe("Binance trading integration", () => {
         process.env = { ...originalEnv, BINANCE_API_KEY: "test-key", BINANCE_SECRET: "test-secret" };
         axios.mockReset();
         logTradeMock.mockReset();
-
     });
 
     afterEach(() => {
@@ -236,5 +234,4 @@ describe("Binance trading integration", () => {
         const { transferMargin } = await import("../../src/trading/binance.js");
         await expect(transferMargin({ asset: "USDT", amount: 0 })).rejects.toThrow("Invalid margin amount");
     });
-
 });
