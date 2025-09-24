@@ -133,6 +133,53 @@ const toBoolean = (value, fallback) => {
     return fallback;
 };
 
+const DEFAULT_MIN_PROFIT_CONFIG = { default: 0, users: {} };
+
+const parseMinimumProfitValue = (value) => {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) {
+        return null;
+    }
+    if (parsed < 0 || parsed > 1) {
+        return null;
+    }
+    return parsed;
+};
+
+const normalizeMinimumProfitThreshold = (raw, fallback = DEFAULT_MIN_PROFIT_CONFIG) => {
+    const base = isPlainObject(raw) ? raw : {};
+    const normalized = {
+        default: parseMinimumProfitValue(base.default)
+            ?? parseMinimumProfitValue(fallback?.default)
+            ?? DEFAULT_MIN_PROFIT_CONFIG.default,
+        users: {},
+    };
+
+    const fallbackUsers = isPlainObject(fallback?.users) ? fallback.users : DEFAULT_MIN_PROFIT_CONFIG.users;
+    for (const [userId, value] of Object.entries(fallbackUsers)) {
+        const parsed = parseMinimumProfitValue(value);
+        if (parsed !== null) {
+            normalized.users[userId] = parsed;
+        }
+    }
+
+    if (isPlainObject(base.users)) {
+        for (const [userId, value] of Object.entries(base.users)) {
+            const parsed = parseMinimumProfitValue(value);
+            if (parsed !== null) {
+                normalized.users[userId] = parsed;
+            } else if (userId in normalized.users) {
+                delete normalized.users[userId];
+            }
+        }
+    }
+
+    return normalized;
+};
+
 const buildDiscordRateLimit = (baseConfig = {}) => {
     const baseDefault = isPlainObject(baseConfig.default) ? baseConfig.default : {};
     const baseWebhooks = isPlainObject(baseConfig.webhooks) ? baseConfig.webhooks : {};
@@ -370,6 +417,15 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.debug = toBoolean(process.env.DEBUG, nextCFG.debug ?? false);
     nextCFG.accountEquity = toNumber(process.env.ACCOUNT_EQUITY, nextCFG.accountEquity ?? 0);
     nextCFG.riskPerTrade = toNumber(process.env.RISK_PER_TRADE, nextCFG.riskPerTrade ?? 0.01);
+    const baseMinProfit = normalizeMinimumProfitThreshold(
+        mergedConfig.minimumProfitThreshold ?? nextCFG.minimumProfitThreshold,
+        DEFAULT_MIN_PROFIT_CONFIG,
+    );
+    const envMinProfit = parseMinimumProfitValue(process.env.MIN_PROFIT_THRESHOLD);
+    if (envMinProfit !== null) {
+        baseMinProfit.default = envMinProfit;
+    }
+    nextCFG.minimumProfitThreshold = baseMinProfit;
     nextCFG.alertDedupMinutes = toNumber(process.env.ALERT_DEDUP_MINUTES, nextCFG.alertDedupMinutes ?? 60);
 
     const baseCacheTtl = mergedConfig.binanceCacheTTL ?? DEFAULT_BINANCE_CACHE_TTL_MINUTES_FALLBACK;
@@ -394,6 +450,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
 
     loadSettings({
         riskPerTrade: nextCFG.riskPerTrade,
+        minimumProfitThreshold: nextCFG.minimumProfitThreshold,
     });
 
     const storedRisk = getSetting('riskPerTrade', nextCFG.riskPerTrade);
@@ -401,6 +458,15 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
         nextCFG.riskPerTrade = storedRisk;
     } else if (storedRisk !== nextCFG.riskPerTrade) {
         setSetting('riskPerTrade', nextCFG.riskPerTrade);
+    }
+
+    const storedMinProfit = getSetting('minimumProfitThreshold', nextCFG.minimumProfitThreshold);
+    const normalizedStoredMinProfit = normalizeMinimumProfitThreshold(storedMinProfit, nextCFG.minimumProfitThreshold);
+    const shouldPersistMinProfit = !isPlainObject(storedMinProfit)
+        || JSON.stringify(storedMinProfit) !== JSON.stringify(normalizedStoredMinProfit);
+    nextCFG.minimumProfitThreshold = normalizedStoredMinProfit;
+    if (shouldPersistMinProfit) {
+        setSetting('minimumProfitThreshold', normalizedStoredMinProfit);
     }
 
     assignConfig(CFG, nextCFG);
@@ -483,6 +549,15 @@ export async function saveConfig(partialConfig) {
     }
 
     deepMerge(customConfig, partialConfig);
+    if (customConfig.minimumProfitThreshold !== undefined) {
+        const fallback = isPlainObject(CFG.minimumProfitThreshold)
+            ? CFG.minimumProfitThreshold
+            : DEFAULT_MIN_PROFIT_CONFIG;
+        customConfig.minimumProfitThreshold = normalizeMinimumProfitThreshold(
+            customConfig.minimumProfitThreshold,
+            fallback,
+        );
+    }
     skipNextWatchReload = true;
     await writeFile(CUSTOM_CONFIG_PATH, `${JSON.stringify(customConfig, null, 4)}\n`);
     rebuildConfig({ reloadFromDisk: false });
