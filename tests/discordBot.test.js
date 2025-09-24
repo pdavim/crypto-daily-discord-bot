@@ -238,6 +238,7 @@ describe('discord bot interactions', () => {
     expect(message).toContain('Sem posições de margem abertas.');
   });
 
+
   it('reports credential issues on /binance command', async () => {
     getAccountOverview.mockRejectedValue(new Error('Missing Binance API credentials'));
     const { handleInteraction } = await loadBot();
@@ -271,4 +272,5 @@ describe('discord bot interactions', () => {
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(interaction.editReply).toHaveBeenCalledWith('Não foi possível carregar dados da Binance no momento.');
   });
+
 });
