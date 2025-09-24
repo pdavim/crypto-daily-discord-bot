@@ -549,6 +549,15 @@ export async function saveConfig(partialConfig) {
     }
 
     deepMerge(customConfig, partialConfig);
+    if (customConfig.minimumProfitThreshold !== undefined) {
+        const fallback = isPlainObject(CFG.minimumProfitThreshold)
+            ? CFG.minimumProfitThreshold
+            : DEFAULT_MIN_PROFIT_CONFIG;
+        customConfig.minimumProfitThreshold = normalizeMinimumProfitThreshold(
+            customConfig.minimumProfitThreshold,
+            fallback,
+        );
+    }
     skipNextWatchReload = true;
     await writeFile(CUSTOM_CONFIG_PATH, `${JSON.stringify(customConfig, null, 4)}\n`);
     rebuildConfig({ reloadFromDisk: false });
