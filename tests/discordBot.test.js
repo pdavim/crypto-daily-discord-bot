@@ -205,6 +205,40 @@ describe('discord bot interactions', () => {
     expect(message).toContain('... e mais 1 ativos');
   });
 
+  it('handles /binance command when overview lacks sections', async () => {
+    getAccountOverview.mockResolvedValue({
+      assets: [],
+      spotBalances: undefined,
+      marginAccount: null,
+      marginPositions: undefined,
+    });
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith(expect.any(String));
+    const message = interaction.editReply.mock.calls[0][0];
+    expect(message).toContain('**Ativos Configurados**');
+    expect(message).toContain('Sem dados de ativos configurados.');
+    expect(message).toContain('**Saldos Spot**');
+    expect(message).toContain('Sem saldos spot disponíveis.');
+    expect(message).toContain('**Conta de Margem**');
+    expect(message).toContain('Sem dados da conta de margem.');
+    expect(message).toContain('**Ativos na Margem**');
+    expect(message).toContain('Sem ativos na conta de margem.');
+    expect(message).toContain('**Posições de Margem**');
+    expect(message).toContain('Sem posições de margem abertas.');
+  });
+
+
   it('reports credential issues on /binance command', async () => {
     getAccountOverview.mockRejectedValue(new Error('Missing Binance API credentials'));
     const { handleInteraction } = await loadBot();
@@ -221,4 +255,22 @@ describe('discord bot interactions', () => {
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(interaction.editReply).toHaveBeenCalledWith('Credenciais da Binance não configuradas.');
   });
+
+  it('reports generic failures on /binance command', async () => {
+    getAccountOverview.mockRejectedValue(new Error('rate limit exceeded'));
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith('Não foi possível carregar dados da Binance no momento.');
+  });
+
 });
