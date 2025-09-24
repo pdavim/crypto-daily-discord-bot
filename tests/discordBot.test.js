@@ -47,6 +47,7 @@ const setSettingMock = vi.fn((key, value) => {
   return settingsStore[key];
 });
 
+
 vi.mock('../src/data/binance.js', () => ({ fetchOHLCV }));
 vi.mock('../src/chart.js', () => ({ renderChartPNG }));
 vi.mock('../src/watchlist.js', () => ({ addAssetToWatch, removeAssetFromWatch, getWatchlist }));
@@ -56,6 +57,7 @@ vi.mock('../src/settings.js', () => ({
   getSetting: getSettingMock,
   setSetting: setSettingMock,
 }));
+
 
 // environment setup for assets
 process.env.BINANCE_SYMBOL_BTC = 'BTCUSDT';

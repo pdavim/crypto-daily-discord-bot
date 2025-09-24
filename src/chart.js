@@ -526,3 +526,4 @@ export async function renderPortfolioGrowthChart({ history, targetCapital, optio
     log.debug({ ms, outPath }, "Rendered portfolio growth chart");
     return outPath;
 }
+

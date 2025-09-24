@@ -5,6 +5,7 @@
  * As previsões são utilizadas pelos relatórios (`reports/forecasts/`) e pelos alertas
  * que precisam antecipar movimento de preço respeitando configurações de risco.
  */
+
 import fs from "node:fs";
 import path from "node:path";
 import { logger, withContext } from "./logger.js";
