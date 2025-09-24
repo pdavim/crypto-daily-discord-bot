@@ -13,6 +13,10 @@ Bot Discord que entrega análises técnicas, gráficos e alertas diários sobre 
 - Agrega notícias, sentimento, métricas on-chain e gera relatórios semanais/mensais via webhook.
 - Expõe comandos slash para que qualquer usuário consulte gráficos, análises e configurações on-demand.
 
+## Documentação online
+
+- [Site do projeto](https://OWNER.github.io/crypto-daily-discord-bot/) — documentação construída com VitePress e publicada automaticamente via GitHub Pages (ajuste `DOCS_GITHUB_OWNER`, `DOCS_SITE_URL` e `DOCS_BASE` ao gerar o site).
+
 ## Requisitos
 
 | Ferramenta | Versão recomendada | Observações |
@@ -46,12 +50,14 @@ npm install
 
 | Tarefa | Comando | Descrição |
 |--------|---------|-----------|
-| Rodar o agendador com todos os jobs | `npm start` | Mantém o bot ativo, publica gráficos, notícias e alertas conforme as rotinas configuradas.
-| Executar apenas um ciclo de coleta/postagem | `npm run once` | Útil para validar integrações em ambientes de teste ou CI.
-| Limpar relatórios antigos | `npm run cleanup:reports` | Remove arquivos obsoletos em `reports/` e `data/`.
-| Testes unitários | `npm test` | Executa a suíte do Vitest.
-| Cobertura de testes | `npm run test:coverage` | Gera relatório de cobertura V8 (salvo em `coverage/`).
-| Renderização de gráfico isolado | `npm run test:chart` | Gera um gráfico localmente para debug dos assets/timeframes.
+| Rodar o agendador com todos os jobs | `npm start` | Mantém o bot ativo, publica gráficos, notícias e alertas conforme as rotinas configuradas. |
+| Executar apenas um ciclo de coleta/postagem | `npm run once` | Útil para validar integrações em ambientes de teste ou CI. |
+| Limpar relatórios antigos | `npm run cleanup:reports` | Remove arquivos obsoletos em `reports/` e `data/`. |
+| Documentação do site (modo dev) | `npm run site:dev` | Sobe o VitePress em `http://localhost:5173/crypto-daily-discord-bot/` para edição local. |
+| Gerar build estática do site | `npm run site:build` | Compila a documentação para `.vitepress/dist`, usada no deploy do GitHub Pages. |
+| Testes unitários | `npm test` | Executa a suíte do Vitest. |
+| Cobertura de testes | `npm run test:coverage` | Gera relatório de cobertura V8 (salvo em `coverage/`). |
+| Renderização de gráfico isolado | `npm run test:chart` | Gera um gráfico localmente para debug dos assets/timeframes. |
 
 ## CLI de configuração
 

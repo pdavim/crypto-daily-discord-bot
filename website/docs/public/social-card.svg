@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Crypto Daily Discord Bot</title>
+  <desc id="desc">Banner destacando um bot de Discord para análises de criptomoedas.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827" />
+      <stop offset="100%" stop-color="#1f2937" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" rx="36" />
+  <g transform="translate(80,120)" fill="#f9fafb" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif">
+    <text font-size="56" font-weight="600">Crypto Daily Discord Bot</text>
+    <text y="88" font-size="28" fill="#cbd5f5">Insights automáticos e alertas de mercado cripto.</text>
+  </g>
+  <g transform="translate(80,330)">
+    <rect width="320" height="140" rx="18" fill="#111827" stroke="url(#accent)" stroke-width="3" />
+    <g transform="translate(32,40)" fill="#e0f2fe" font-family="'Fira Code', monospace" font-size="24">
+      <text>&gt; npm run once</text>
+      <text y="36" fill="#bae6fd"># publica gráficos e alertas</text>
+    </g>
+  </g>
+  <g transform="translate(480,260)">
+    <rect width="640" height="240" rx="24" fill="#0f172a" opacity="0.85" />
+    <polyline points="40,180 160,120 240,150 360,70 460,110 580,40" fill="none" stroke="url(#accent)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+    <g fill="#94a3b8" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="20">
+      <text x="40" y="54">Sentimento</text>
+      <text x="40" y="94">Alertas ativos</text>
+      <text x="40" y="134">Taxa de acerto</text>
+    </g>
+    <g fill="#f8fafc" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="20" font-weight="600">
+      <text x="220" y="54">Bullish</text>
+      <text x="220" y="94">12</text>
+      <text x="220" y="134">78%</text>
+    </g>
+  </g>
+  <text x="80" y="560" fill="#cbd5f5" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="20">
+    Documentação completa em github.com/OWNER/crypto-daily-discord-bot
+  </text>
+</svg>
