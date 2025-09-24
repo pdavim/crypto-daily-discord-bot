@@ -262,6 +262,10 @@ export async function runAgent() {
             }
 
             // Prepare indicator series for alerts
+            const timeframeVariation = (closesH.at(-1) != null && closesH.at(-2) != null)
+                ? (closesH.at(-1) / closesH.at(-2) - 1)
+                : null;
+
             const alerts = await buildAlerts({
                 rsiSeries: rsi(closesH, 14),
                 macdObj: macdResult,
@@ -271,6 +275,8 @@ export async function runAgent() {
                 ma200: ma200Series,
                 lastClose: closesH.at(-1),
                 var24h: (closesH.at(-1) - closesH.at(-25)) / closesH.at(-25),
+                timeframe: "1h",
+                timeframeVariation,
                 closes: closesH,
                 highs: highsH,
                 lows: lowsH,
