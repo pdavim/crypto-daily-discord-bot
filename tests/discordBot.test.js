@@ -16,6 +16,8 @@ vi.mock('discord.js', () => ({
   ApplicationCommandOptionType: {
     String: 3,
     Subcommand: 1,
+    SubcommandGroup: 2,
+    Number: 10,
   },
 }));
 
@@ -25,10 +27,35 @@ const renderChartPNG = vi.fn();
 const addAssetToWatch = vi.fn();
 const removeAssetFromWatch = vi.fn();
 const getWatchlist = vi.fn(() => []);
+const getAccountOverview = vi.fn();
+const settingsStore = {};
+const loadSettingsMock = vi.fn((defaults = {}) => {
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!(key in settingsStore)) {
+      settingsStore[key] = value;
+    }
+  }
+  return settingsStore;
+});
+const getSettingMock = vi.fn((key, fallback) => (key in settingsStore ? settingsStore[key] : fallback));
+const setSettingMock = vi.fn((key, value) => {
+  if (value === undefined) {
+    delete settingsStore[key];
+    return undefined;
+  }
+  settingsStore[key] = value;
+  return settingsStore[key];
+});
 
 vi.mock('../src/data/binance.js', () => ({ fetchOHLCV }));
 vi.mock('../src/chart.js', () => ({ renderChartPNG }));
 vi.mock('../src/watchlist.js', () => ({ addAssetToWatch, removeAssetFromWatch, getWatchlist }));
+vi.mock('../src/trading/binance.js', () => ({ getAccountOverview }));
+vi.mock('../src/settings.js', () => ({
+  loadSettings: loadSettingsMock,
+  getSetting: getSettingMock,
+  setSetting: setSettingMock,
+}));
 
 // environment setup for assets
 process.env.BINANCE_SYMBOL_BTC = 'BTCUSDT';
@@ -40,6 +67,10 @@ async function loadBot() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
+  getAccountOverview.mockReset();
+  for (const key of Object.keys(settingsStore)) {
+    delete settingsStore[key];
+  }
 });
 
 describe('discord bot interactions', () => {
@@ -138,5 +169,218 @@ describe('discord bot interactions', () => {
       content: expect.stringContaining('BTC, ETH'),
       ephemeral: true,
     });
+  });
+
+  it('handles /binance command and formats overview', async () => {
+    getAccountOverview.mockResolvedValue({
+      assets: [
+        { coin: 'BTC', depositAllEnable: true, withdrawAllEnable: false },
+        { coin: 'ETH', depositAllEnable: true, withdrawAllEnable: true },
+        { coin: 'SOL', depositAllEnable: false, withdrawAllEnable: false },
+        { coin: 'ADA', depositAllEnable: true, withdrawAllEnable: true },
+        { coin: 'XRP', depositAllEnable: true, withdrawAllEnable: true },
+        { coin: 'DOGE', depositAllEnable: true, withdrawAllEnable: true },
+      ],
+      spotBalances: [
+        { asset: 'BTC', free: 1.2, locked: 0.3, total: 1.5 },
+        { asset: 'USDT', free: 1000, locked: 0, total: 1000 },
+      ],
+      marginAccount: {
+        totalAssetOfBtc: 0.5,
+        totalLiabilityOfBtc: 0.1,
+        totalNetAssetOfBtc: 0.4,
+        marginLevel: 3.2,
+        userAssets: [
+          { asset: 'USDT', free: 500, borrowed: 100, interest: 2, netAsset: 398 },
+        ],
+      },
+      marginPositions: [
+        {
+          symbol: 'BTCUSDT',
+          marginType: 'cross',
+          positionAmt: 0.01,
+          entryPrice: 25000,
+          markPrice: 26000,
+          unrealizedProfit: 100,
+          liquidationPrice: 20000,
+        },
+      ],
+    });
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(getAccountOverview).toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith(expect.any(String));
+    const message = interaction.editReply.mock.calls[0][0];
+    expect(message).toContain('**Saldos Spot**');
+    expect(message).toContain('BTC: 1,50 (Livre 1,20 | Travado 0,30)');
+    expect(message).toContain('USDT: 1.000,00 (Livre 1.000,00 | Travado 0,00)');
+    expect(message).toContain('• Patrimônio líquido: 0,4000 BTC');
+    expect(message).toContain('• Ativos: 0,5000 BTC | Passivos: 0,1000 BTC');
+    expect(message).toContain('• Nível de margem: 3,20x');
+    expect(message).toContain('• USDT: Livre 500,00 | Empréstimo 100,00 | Juros 2,00 | Líquido 398,00');
+    expect(message).toContain('BTCUSDT (cross)');
+    expect(message).toContain('Qtde: 0,0100 | Entrada: 25.000,00 | Marca: 26.000,00 | PnL: 100,00 | Liq.: 20.000,00');
+    expect(message).toContain('... e mais 1 ativos');
+  });
+
+  it('handles /binance command when overview lacks sections', async () => {
+    getAccountOverview.mockResolvedValue({
+      assets: [],
+      spotBalances: undefined,
+      marginAccount: null,
+      marginPositions: undefined,
+    });
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith(expect.any(String));
+    const message = interaction.editReply.mock.calls[0][0];
+    expect(message).toContain('**Ativos Configurados**');
+    expect(message).toContain('Sem dados de ativos configurados.');
+    expect(message).toContain('**Saldos Spot**');
+    expect(message).toContain('Sem saldos spot disponíveis.');
+    expect(message).toContain('**Conta de Margem**');
+    expect(message).toContain('Sem dados da conta de margem.');
+    expect(message).toContain('**Ativos na Margem**');
+    expect(message).toContain('Sem ativos na conta de margem.');
+    expect(message).toContain('**Posições de Margem**');
+    expect(message).toContain('Sem posições de margem abertas.');
+  });
+
+  it('reports credential issues on /binance command', async () => {
+    getAccountOverview.mockRejectedValue(new Error('Missing Binance API credentials'));
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith('Credenciais da Binance não configuradas.');
+  });
+
+  it('reports generic failures on /binance command', async () => {
+    getAccountOverview.mockRejectedValue(new Error('rate limit exceeded'));
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(interaction.editReply).toHaveBeenCalledWith('Não foi possível carregar dados da Binance no momento.');
+  });
+
+  it('updates global minimum profit threshold through /settings profit default', async () => {
+    settingsStore.minimumProfitThreshold = { default: 0.05, users: { existing: 0.12 } };
+    const { handleInteraction } = await loadBot();
+    const { CFG } = await import('../src/config.js');
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'default',
+        getNumber: () => 15,
+      },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(setSettingMock).toHaveBeenCalledWith('minimumProfitThreshold', {
+      default: 0.15,
+      users: { existing: 0.12 },
+    });
+    expect(CFG.minimumProfitThreshold.default).toBeCloseTo(0.15);
+    expect(CFG.minimumProfitThreshold.users).toEqual({ existing: 0.12 });
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'Lucro mínimo padrão atualizado para 15%',
+      ephemeral: true,
+    });
+  });
+
+  it('updates personal minimum profit threshold through /settings profit personal', async () => {
+    settingsStore.minimumProfitThreshold = { default: 0.03, users: { other: 0.09 } };
+    const { handleInteraction } = await loadBot();
+    const { CFG } = await import('../src/config.js');
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'personal',
+        getNumber: () => 2.5,
+      },
+      user: { id: 'user-77' },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(setSettingMock).toHaveBeenCalledWith('minimumProfitThreshold', {
+      default: 0.03,
+      users: { other: 0.09, 'user-77': 0.025 },
+    });
+    expect(CFG.minimumProfitThreshold.default).toBeCloseTo(0.03);
+    expect(CFG.minimumProfitThreshold.users).toEqual({ other: 0.09, 'user-77': 0.025 });
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'Lucro mínimo pessoal atualizado para 2.50%',
+      ephemeral: true,
+    });
+  });
+
+  it('validates the minimum profit percentage bounds', async () => {
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'default',
+        getNumber: () => 150,
+      },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'Informe um percentual entre 0 e 100.',
+      ephemeral: true,
+    });
+    expect(setSettingMock).not.toHaveBeenCalled();
   });
 });

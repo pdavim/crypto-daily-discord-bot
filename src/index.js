@@ -8,20 +8,25 @@ import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, adx, stochastic
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert, postMonthlyReport } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";
-import { renderChartPNG } from "./chart.js";
-import { buildAlerts, formatAlertMessage } from "./alerts.js";
+import { renderChartPNG, renderForecastChart } from "./chart.js";
+import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore, getAlertHash, updateAlertHash, resetAlertHashes } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
 import { logger, withContext } from "./logger.js";
 import pLimit, { calcConcurrency } from "./limit.js";
 import { buildHash, shouldSend, pruneOlderThan } from "./alertCache.js";
-import { register } from "./metrics.js";
+import { register, forecastConfidenceHistogram, forecastDirectionCounter, forecastErrorHistogram } from "./metrics.js";
 import { notifyOps } from "./monitor.js";
 import { reportWeeklyPerf } from "./perf.js";
 import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
 import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
+import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
+import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
+import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
+import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
+import { runPortfolioGrowthSimulation } from "./portfolio/growth.js";
 
 const ONCE = process.argv.includes("--once");
 
@@ -105,6 +110,8 @@ async function runOnceForAsset(asset, options = {}) {
     });
     const snapshots = {};
     const chartPaths = [];
+    const forecastChartPaths = [];
+    const timeframeMeta = new Map();
 
     const intervalPromises = new Map();
     for (const tf of TIMEFRAMES) {
@@ -221,6 +228,34 @@ async function runOnceForAsset(asset, options = {}) {
                 volSeries: vol
             });
             snapshots[tf] = snapshot;
+            const timeframeVariation = snapshot?.kpis?.var ?? null;
+            const guidance = snapshot?.kpis?.reco ?? null;
+
+            const posture = evaluateMarketPosture({
+                closes: close,
+                maFastSeries: indicators.ma50,
+                maSlowSeries: indicators.ma200,
+                rsiSeries: indicators.rsiSeries,
+                adxSeries: indicators.adxSeries,
+                config: CFG.marketPosture,
+            });
+            const strategyPlan = deriveStrategyFromPosture(posture, CFG.trading?.strategy);
+            log.info({
+                fn: 'runOnceForAsset',
+                posture: posture.posture,
+                confidence: posture.confidence,
+                strategy: strategyPlan.action,
+            }, 'Evaluated market posture');
+
+            const meta = {
+                consolidated: [],
+                actionable: [],
+                guidance,
+                variation: timeframeVariation,
+                posture,
+                strategy: strategyPlan,
+            };
+            timeframeMeta.set(tf, meta);
 
             if (enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
@@ -233,6 +268,107 @@ async function runOnceForAsset(asset, options = {}) {
                 chartPaths.push(chartPath);
             }
 
+            if (CFG.forecasting?.enabled) {
+                const forecastLog = withContext(logger, { asset: asset.key, timeframe: tf });
+                try {
+                    const candleTimes = candles.map(c => c.t);
+                    const forecastResult = forecastNextClose({
+                        closes: close,
+                        timestamps: candleTimes,
+                        lookback: CFG.forecasting.lookback,
+                        minHistory: CFG.forecasting.minHistory,
+                    });
+                    if (forecastResult) {
+                        const runAtIso = new Date().toISOString();
+                        const predictedAtIso = Number.isFinite(forecastResult.nextTime)
+                            ? new Date(forecastResult.nextTime).toISOString()
+                            : null;
+                        const lastCloseIso = Number.isFinite(forecastResult.lastTime)
+                            ? new Date(forecastResult.lastTime).toISOString()
+                            : null;
+                        const persistence = persistForecastEntry({
+                            assetKey: asset.key,
+                            timeframe: tf,
+                            entry: {
+                                runAt: runAtIso,
+                                predictedAt: predictedAtIso,
+                                lastCloseAt: lastCloseIso,
+                                lastClose: forecastResult.lastClose,
+                                forecastClose: forecastResult.forecast,
+                                delta: forecastResult.delta,
+                                confidence: forecastResult.confidence,
+                                method: forecastResult.method,
+                                samples: forecastResult.samples,
+                                mae: forecastResult.mae,
+                                rmse: forecastResult.rmse,
+                                slope: forecastResult.slope,
+                                intercept: forecastResult.intercept,
+                                horizonMs: forecastResult.horizonMs,
+                            },
+                            directory: CFG.forecasting.outputDir,
+                            historyLimit: CFG.forecasting.historyLimit,
+                        });
+
+                        if (Number.isFinite(forecastResult.confidence)) {
+                            forecastConfidenceHistogram.observe(forecastResult.confidence);
+                        }
+
+                        if (CFG.forecasting.charts?.enabled) {
+                            const forecastChartPath = await renderForecastChart({
+                                assetKey: asset.key,
+                                timeframe: tf,
+                                closes: close,
+                                timestamps: candleTimes,
+                                forecastValue: forecastResult.forecast,
+                                forecastTime: forecastResult.nextTime,
+                                confidence: forecastResult.confidence,
+                                options: {
+                                    directory: CFG.forecasting.charts.directory,
+                                    historyPoints: CFG.forecasting.charts.historyPoints,
+                                },
+                            });
+                            if (forecastChartPath) {
+                                forecastChartPaths.push(forecastChartPath);
+                            }
+                        }
+
+                        const evaluation = persistence?.evaluation ?? null;
+                        if (evaluation && Number.isFinite(evaluation.pctError)) {
+                            forecastErrorHistogram.observe(evaluation.pctError);
+                        }
+                        if (evaluation && typeof evaluation.directionHit === 'boolean') {
+                            forecastDirectionCounter.labels(evaluation.directionHit ? 'hit' : 'miss').inc();
+                        }
+
+                        const logPayload = {
+                            fn: 'runOnceForAsset',
+                            forecast: forecastResult.forecast,
+                            confidence: forecastResult.confidence,
+                            delta: forecastResult.delta,
+                            mae: forecastResult.mae,
+                            rmse: forecastResult.rmse,
+                            historyPath: persistence?.filePath ?? null,
+                        };
+
+                        if (evaluation) {
+                            logPayload.accuracy = {
+                                absError: evaluation.absError,
+                                pctError: evaluation.pctError,
+                                directionHit: evaluation.directionHit,
+                            };
+                            logPayload.actual = evaluation.actual;
+                            logPayload.predictedAt = evaluation.predictedAt;
+                            logPayload.actualAt = evaluation.actualAt;
+                            forecastLog.info(logPayload, 'Generated forecast');
+                        } else {
+                            forecastLog.debug(logPayload, 'Generated forecast');
+                        }
+                    }
+                } catch (err) {
+                    forecastLog.error({ fn: 'runOnceForAsset', err }, 'Forecast generation failed');
+                }
+            }
+
             if (enableAlerts) {
                 const alerts = await buildAlerts({
                     rsiSeries: indicators.rsiSeries,
@@ -243,6 +379,8 @@ async function runOnceForAsset(asset, options = {}) {
                     ma200: indicators.ma200,
                     lastClose: snapshot.kpis.price,
                     var24h: snapshot.kpis.var24h,
+                    timeframe: tf,
+                    timeframeVariation,
                     closes: close,
                     highs: high,
                     lows: low,
@@ -277,20 +415,13 @@ async function runOnceForAsset(asset, options = {}) {
                         consolidated.push(withCount);
                     }
                 }
-                const hasSignals = consolidated.some(a =>
-                    !a.msg.startsWith('💰 Preço') && !a.msg.startsWith('📊 Var24h'));
-                if (hasSignals) {
-                    const mention = "@here";
-                    const alertMsg = [
-                        `**⚠️ Alertas — ${asset.key} ${tf}** ${mention}`,
-                        ...consolidated.map(alert => `• ${formatAlertMessage(alert, alert.count)}`)
-                    ].join("\n");
-                    const hash = buildHash(alertMsg);
-                    const windowMs = CFG.alertDedupMinutes * 60 * 1000;
-                    if (shouldSend({ asset: asset.key, tf, hash }, windowMs)) {
-                        await sendDiscordAlert(alertMsg);
-                    }
-                }
+                const actionable = consolidated.filter(a =>
+                    !a.msg.startsWith('💰 Preço') && !a.msg.startsWith('📊 Var'));
+                timeframeMeta.set(tf, {
+                    ...meta,
+                    consolidated,
+                    actionable,
+                });
             }
         } catch (e) {
             log.error({ fn: 'runOnceForAsset', err: e }, 'Processing error');
@@ -299,6 +430,47 @@ async function runOnceForAsset(asset, options = {}) {
     });
 
     await Promise.all(timeframeTasks);
+
+    if (enableAlerts) {
+        const variationByTimeframe = {};
+        for (const tf of TIMEFRAMES) {
+            const variation = snapshots[tf]?.kpis?.var;
+            if (Number.isFinite(variation)) {
+                variationByTimeframe[tf] = variation;
+            }
+        }
+
+        const timeframeSummaries = TIMEFRAMES.map(tf => {
+            const meta = timeframeMeta.get(tf);
+            if (!meta || meta.actionable.length === 0) {
+                return null;
+            }
+            return {
+                timeframe: tf,
+                guidance: meta.guidance,
+                alerts: meta.consolidated
+            };
+        }).filter(Boolean);
+
+        if (timeframeSummaries.length > 0) {
+            const alertMsg = buildAssetAlertMessage({
+                assetKey: asset.key,
+                mention: "@here",
+                timeframeSummaries,
+                variationByTimeframe,
+                timeframeOrder: TIMEFRAMES
+            });
+            if (alertMsg) {
+                const hash = buildHash(alertMsg);
+                const windowMs = CFG.alertDedupMinutes * 60 * 1000;
+                const scope = "aggregate";
+                if (shouldSend({ asset: asset.key, tf: scope, hash }, windowMs)) {
+                    enqueueAlertPayload({ asset: asset.key, timeframe: scope, message: alertMsg });
+                }
+            }
+        }
+    }
+
     saveStore();
     let summary = null;
     if (snapshots["4h"]) {
@@ -311,14 +483,20 @@ async function runOnceForAsset(asset, options = {}) {
             }
         }
     }
-    if (enableCharts && shouldPostCharts && chartPaths.length > 0) {
-        const chartsSent = await postCharts(chartPaths);
-        if (!chartsSent) {
-            const log = withContext(logger, { asset: asset.key });
-            log.warn({ fn: 'runOnceForAsset' }, 'chart upload failed');
+    if (enableCharts && shouldPostCharts) {
+        const uploads = [...chartPaths];
+        if (CFG.forecasting?.charts?.appendToUploads) {
+            uploads.push(...forecastChartPaths);
+        }
+        if (uploads.length > 0) {
+            const chartsSent = await postCharts(uploads);
+            if (!chartsSent) {
+                const log = withContext(logger, { asset: asset.key });
+                log.warn({ fn: 'runOnceForAsset' }, 'chart upload failed');
+            }
         }
     }
-    return { snapshots, summary, chartPaths };
+    return { snapshots, summary, chartPaths, forecastCharts: forecastChartPaths };
 }
 
 /**
@@ -332,6 +510,25 @@ async function runAll() {
         runAsset: runOnceForAsset,
         logger,
     });
+    await flushAlertQueue({
+        sender: async ({ message, options }) => {
+            await sendDiscordAlert(message, options);
+        },
+        timeframeOrder: TIMEFRAMES
+    });
+    try {
+        const growthSummary = await runPortfolioGrowthSimulation();
+        if (growthSummary?.uploads?.length) {
+            const uploaded = await postCharts(growthSummary.uploads);
+            if (!uploaded) {
+                const log = withContext(logger, { fn: "runAll" });
+                log.warn({ uploads: growthSummary.uploads }, "Failed to post portfolio growth chart");
+            }
+        }
+    } catch (error) {
+        const log = withContext(logger, { fn: "runAll" });
+        log.warn({ err: error }, "Portfolio growth simulation failed");
+    }
 }
 
 const DAILY_ALERT_SCOPE = 'daily';
