@@ -150,5 +150,6 @@ describe('forecasting', () => {
         expect(gitignore).toContain('reports/forecasts/');
         expect(gitignore).toContain('charts/');
     });
+
 });
 

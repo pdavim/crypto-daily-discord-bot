@@ -5,6 +5,7 @@
  * As previsões são utilizadas pelos relatórios (`reports/forecasts/`) e pelos alertas
  * que precisam antecipar movimento de preço respeitando configurações de risco.
  */
+
 import fs from "node:fs";
 import path from "node:path";
 import { logger, withContext } from "./logger.js";
@@ -52,6 +53,7 @@ const toFiniteNumber = (value) => {
     }
     return null;
 };
+
 
 const regressionFromSeries = (xs, ys) => {
     const n = Math.min(xs.length, ys.length);
@@ -200,6 +202,7 @@ export function persistForecastEntry({
         const filePath = path.join(assetDir, `${timeframe}.json`);
         let history = [];
         let evaluation = null;
+
         if (fs.existsSync(filePath)) {
             try {
                 const raw = fs.readFileSync(filePath, "utf-8");
@@ -248,6 +251,7 @@ export function persistForecastEntry({
         }
         fs.writeFileSync(filePath, `${JSON.stringify(history, null, 2)}\n`);
         return { filePath, evaluation };
+
     } catch (err) {
         log.error({ err }, "Failed to persist forecast");
         return null;

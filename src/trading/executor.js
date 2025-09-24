@@ -1,6 +1,7 @@
 import { CFG } from "../config.js";
 import { logger, withContext } from "../logger.js";
 import { tradingExecutionCounter, tradingNotionalHistogram } from "../metrics.js";
+
 import { submitOrder, transferMargin, borrowMargin, repayMargin } from "./binance.js";
 
 function isPlainObject(value) {
@@ -44,6 +45,7 @@ function recordTradeOutcome(action, result, { notional } = {}) {
 
 function abortTrade(log, fn, reason, details = {}) {
     recordTradeOutcome(fn, 'skipped');
+
     log.warn({ fn, reason, ...details }, 'Skipped automated trade');
     return { executed: false, reason, details };
 }

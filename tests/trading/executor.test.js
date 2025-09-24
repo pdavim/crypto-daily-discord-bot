@@ -16,6 +16,7 @@ const { CFG } = await import("../../src/config.js");
 const { openPosition, closePosition, adjustMargin } = await import("../../src/trading/executor.js");
 const { register } = await import("../../src/metrics.js");
 
+
 describe("trading executor", () => {
     beforeEach(() => {
         submitOrderMock.mockReset();
@@ -23,6 +24,7 @@ describe("trading executor", () => {
         borrowMarginMock.mockReset();
         repayMarginMock.mockReset();
         register.resetMetrics();
+
         CFG.trading = {
             enabled: true,
             minNotional: 20,

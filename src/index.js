@@ -287,6 +287,7 @@ async function runOnceForAsset(asset, options = {}) {
                             ? new Date(forecastResult.lastTime).toISOString()
                             : null;
                         const persistence = persistForecastEntry({
+
                             assetKey: asset.key,
                             timeframe: tf,
                             entry: {
@@ -363,6 +364,7 @@ async function runOnceForAsset(asset, options = {}) {
                         } else {
                             forecastLog.debug(logPayload, 'Generated forecast');
                         }
+
                     }
                 } catch (err) {
                     forecastLog.error({ fn: 'runOnceForAsset', err }, 'Forecast generation failed');
