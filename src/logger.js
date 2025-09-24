@@ -40,26 +40,49 @@ function pruneOldLogs() {
 const isTestEnv = process.env.NODE_ENV === 'test';
 if (!isTestEnv) { ensureLogsDir(); pruneOldLogs(); }
 
-const useSyncTransport = process.env.LOG_SYNC === 'true' || process.argv.includes('--once');
+const NODE_MAJOR_VERSION = Number.parseInt(process.versions?.node?.split?.('.')[0] ?? '0', 10);
+const defaultSyncTransport = process.platform === 'win32' || NODE_MAJOR_VERSION >= 22;
 
-const transport = isTestEnv ? undefined : pino.transport({
-  target: '@jvddavid/pino-rotating-file',
-  options: {
-    path: LOGS_DIR,
-    pattern: LOG_FILE_PATTERN,
-    maxSize: MAX_LOG_SIZE_BYTES,
-    mkdir: true,
-    append: true,
-    sync: useSyncTransport,
-    fsync: false,
-  },
-});
+const hasCliOnceFlag = process.argv.includes('--once');
+const hasExplicitSync = process.env.LOG_SYNC === 'true';
+const hasExplicitAsync = process.env.LOG_SYNC === 'false';
+
+const useSyncTransport = hasExplicitAsync
+  ? false
+  : hasExplicitSync || hasCliOnceFlag || defaultSyncTransport;
+
+let transport;
+if (!isTestEnv) {
+  try {
+    transport = pino.transport({
+      target: '@jvddavid/pino-rotating-file',
+      options: {
+        path: LOGS_DIR,
+        pattern: LOG_FILE_PATTERN,
+        maxSize: MAX_LOG_SIZE_BYTES,
+        mkdir: true,
+        append: true,
+        sync: useSyncTransport,
+        fsync: false,
+      },
+    });
+
+    if (typeof transport?.on === 'function') {
+      transport.on('error', (err) => {
+        console.error('Logger transport error; falling back to stdout logging.', err);
+      });
+    }
+  } catch (err) {
+    console.error('Failed to initialize rotating-file transport; falling back to stdout logging.', err);
+    transport = undefined;
+  }
+}
 
 
 // 👇 pass transport as the 2nd argument, not inside options.transport
 export const logger = isTestEnv
   ? pino({ level: process.env.LOG_LEVEL || 'info' })
-  : pino({ level: process.env.LOG_LEVEL || 'info' }, transport);
+  : pino({ level: process.env.LOG_LEVEL || 'info' }, transport ?? pino.destination({ sync: true }));
 
 export function createContext(ctx = {}) {
   const { asset, timeframe, ...rest } = ctx;
