@@ -28,6 +28,7 @@ import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/post
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
 import { runPortfolioGrowthSimulation } from "./portfolio/growth.js";
 
+
 const ONCE = process.argv.includes("--once");
 
 process.on('unhandledRejection', (err) => {
@@ -500,6 +501,7 @@ async function runAll() {
         const log = withContext(logger, { fn: "runAll" });
         log.warn({ err: error }, "Portfolio growth simulation failed");
     }
+
 }
 
 const DAILY_ALERT_SCOPE = 'daily';

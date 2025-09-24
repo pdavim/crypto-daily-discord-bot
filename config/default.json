@@ -124,6 +124,7 @@
       }
     }
   },
+
   "indicators": {
     "smaPeriods": {
       "ma20": 20,

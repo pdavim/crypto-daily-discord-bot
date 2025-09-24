@@ -224,6 +224,7 @@ export async function placeMarketOrder(symbol, side, quantity, params = {}) {
     return submitOrder({ symbol, side, type: "MARKET", quantity, params });
 }
 
+
 export async function placeLimitOrder(symbol, side, quantity, price, params = {}) {
     return submitOrder({
         symbol,
