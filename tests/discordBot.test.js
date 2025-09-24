@@ -16,6 +16,8 @@ vi.mock('discord.js', () => ({
   ApplicationCommandOptionType: {
     String: 3,
     Subcommand: 1,
+    SubcommandGroup: 2,
+    Number: 10,
   },
 }));
 
@@ -26,11 +28,36 @@ const addAssetToWatch = vi.fn();
 const removeAssetFromWatch = vi.fn();
 const getWatchlist = vi.fn(() => []);
 const getAccountOverview = vi.fn();
+const settingsStore = {};
+const loadSettingsMock = vi.fn((defaults = {}) => {
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!(key in settingsStore)) {
+      settingsStore[key] = value;
+    }
+  }
+  return settingsStore;
+});
+const getSettingMock = vi.fn((key, fallback) => (key in settingsStore ? settingsStore[key] : fallback));
+const setSettingMock = vi.fn((key, value) => {
+  if (value === undefined) {
+    delete settingsStore[key];
+    return undefined;
+  }
+  settingsStore[key] = value;
+  return settingsStore[key];
+});
+
 
 vi.mock('../src/data/binance.js', () => ({ fetchOHLCV }));
 vi.mock('../src/chart.js', () => ({ renderChartPNG }));
 vi.mock('../src/watchlist.js', () => ({ addAssetToWatch, removeAssetFromWatch, getWatchlist }));
 vi.mock('../src/trading/binance.js', () => ({ getAccountOverview }));
+vi.mock('../src/settings.js', () => ({
+  loadSettings: loadSettingsMock,
+  getSetting: getSettingMock,
+  setSetting: setSettingMock,
+}));
+
 
 // environment setup for assets
 process.env.BINANCE_SYMBOL_BTC = 'BTCUSDT';
@@ -43,6 +70,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
   getAccountOverview.mockReset();
+  for (const key of Object.keys(settingsStore)) {
+    delete settingsStore[key];
+  }
+
 });
 
 describe('discord bot interactions', () => {
@@ -271,6 +302,90 @@ describe('discord bot interactions', () => {
 
     expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
     expect(interaction.editReply).toHaveBeenCalledWith('Não foi possível carregar dados da Binance no momento.');
+  });
+
+  it('updates global minimum profit threshold through /settings profit default', async () => {
+    settingsStore.minimumProfitThreshold = { default: 0.05, users: { existing: 0.12 } };
+    const { handleInteraction } = await loadBot();
+    const { CFG } = await import('../src/config.js');
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'default',
+        getNumber: () => 15,
+      },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(setSettingMock).toHaveBeenCalledWith('minimumProfitThreshold', {
+      default: 0.15,
+      users: { existing: 0.12 },
+    });
+    expect(CFG.minimumProfitThreshold.default).toBeCloseTo(0.15);
+    expect(CFG.minimumProfitThreshold.users).toEqual({ existing: 0.12 });
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'Lucro mínimo padrão atualizado para 15%',
+      ephemeral: true,
+    });
+  });
+
+  it('updates personal minimum profit threshold through /settings profit personal', async () => {
+    settingsStore.minimumProfitThreshold = { default: 0.03, users: { other: 0.09 } };
+    const { handleInteraction } = await loadBot();
+    const { CFG } = await import('../src/config.js');
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'personal',
+        getNumber: () => 2.5,
+      },
+      user: { id: 'user-77' },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(setSettingMock).toHaveBeenCalledWith('minimumProfitThreshold', {
+      default: 0.03,
+      users: { other: 0.09, 'user-77': 0.025 },
+    });
+    expect(CFG.minimumProfitThreshold.default).toBeCloseTo(0.03);
+    expect(CFG.minimumProfitThreshold.users).toEqual({ other: 0.09, 'user-77': 0.025 });
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'Lucro mínimo pessoal atualizado para 2.50%',
+      ephemeral: true,
+    });
+  });
+
+  it('validates the minimum profit percentage bounds', async () => {
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'default',
+        getNumber: () => 150,
+      },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'Informe um percentual entre 0 e 100.',
+      ephemeral: true,
+    });
+    expect(setSettingMock).not.toHaveBeenCalled();
   });
 
 });
