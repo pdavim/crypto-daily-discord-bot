@@ -33,6 +33,10 @@
   "debug": false,
   "accountEquity": 0,
   "riskPerTrade": 0.01,
+  "minimumProfitThreshold": {
+    "default": 0.02,
+    "users": {}
+  },
   "alertDedupMinutes": 60,
   "binanceCacheTTL": 10,
   "maxConcurrency": null,
