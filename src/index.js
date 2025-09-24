@@ -8,7 +8,8 @@ import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, adx, stochastic
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert, postMonthlyReport } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";
-import { renderChartPNG } from "./chart.js";
+import { renderChartPNG, renderForecastChart } from "./chart.js";
+
 import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
 import { getSignature, updateSignature, saveStore, getAlertHash, updateAlertHash, resetAlertHashes } from "./store.js";
@@ -25,6 +26,7 @@ import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
+import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
 
 
 const ONCE = process.argv.includes("--once");
@@ -109,6 +111,8 @@ async function runOnceForAsset(asset, options = {}) {
     });
     const snapshots = {};
     const chartPaths = [];
+    const forecastChartPaths = [];
+
     const timeframeMeta = new Map();
 
     const intervalPromises = new Map();
@@ -267,6 +271,78 @@ async function runOnceForAsset(asset, options = {}) {
                 chartPaths.push(chartPath);
             }
 
+            if (CFG.forecasting?.enabled) {
+                const forecastLog = withContext(logger, { asset: asset.key, timeframe: tf });
+                try {
+                    const candleTimes = candles.map(c => c.t);
+                    const forecastResult = forecastNextClose({
+                        closes: close,
+                        timestamps: candleTimes,
+                        lookback: CFG.forecasting.lookback,
+                        minHistory: CFG.forecasting.minHistory,
+                    });
+                    if (forecastResult) {
+                        const runAtIso = new Date().toISOString();
+                        const predictedAtIso = Number.isFinite(forecastResult.nextTime)
+                            ? new Date(forecastResult.nextTime).toISOString()
+                            : null;
+                        const lastCloseIso = Number.isFinite(forecastResult.lastTime)
+                            ? new Date(forecastResult.lastTime).toISOString()
+                            : null;
+                        persistForecastEntry({
+                            assetKey: asset.key,
+                            timeframe: tf,
+                            entry: {
+                                runAt: runAtIso,
+                                predictedAt: predictedAtIso,
+                                lastCloseAt: lastCloseIso,
+                                lastClose: forecastResult.lastClose,
+                                forecastClose: forecastResult.forecast,
+                                delta: forecastResult.delta,
+                                confidence: forecastResult.confidence,
+                                method: forecastResult.method,
+                                samples: forecastResult.samples,
+                                mae: forecastResult.mae,
+                                rmse: forecastResult.rmse,
+                                slope: forecastResult.slope,
+                                intercept: forecastResult.intercept,
+                                horizonMs: forecastResult.horizonMs,
+                            },
+                            directory: CFG.forecasting.outputDir,
+                            historyLimit: CFG.forecasting.historyLimit,
+                        });
+
+                        if (CFG.forecasting.charts?.enabled) {
+                            const forecastChartPath = await renderForecastChart({
+                                assetKey: asset.key,
+                                timeframe: tf,
+                                closes: close,
+                                timestamps: candleTimes,
+                                forecastValue: forecastResult.forecast,
+                                forecastTime: forecastResult.nextTime,
+                                confidence: forecastResult.confidence,
+                                options: {
+                                    directory: CFG.forecasting.charts.directory,
+                                    historyPoints: CFG.forecasting.charts.historyPoints,
+                                },
+                            });
+                            if (forecastChartPath) {
+                                forecastChartPaths.push(forecastChartPath);
+                            }
+                        }
+
+                        forecastLog.debug({
+                            fn: 'runOnceForAsset',
+                            forecast: forecastResult.forecast,
+                            confidence: forecastResult.confidence,
+                            delta: forecastResult.delta,
+                        }, 'Generated forecast');
+                    }
+                } catch (err) {
+                    forecastLog.error({ fn: 'runOnceForAsset', err }, 'Forecast generation failed');
+                }
+            }
+
             if (enableAlerts) {
                 const alerts = await buildAlerts({
                     rsiSeries: indicators.rsiSeries,
@@ -382,14 +458,20 @@ async function runOnceForAsset(asset, options = {}) {
             }
         }
     }
-    if (enableCharts && shouldPostCharts && chartPaths.length > 0) {
-        const chartsSent = await postCharts(chartPaths);
-        if (!chartsSent) {
-            const log = withContext(logger, { asset: asset.key });
-            log.warn({ fn: 'runOnceForAsset' }, 'chart upload failed');
+    if (enableCharts && shouldPostCharts) {
+        const uploads = [...chartPaths];
+        if (CFG.forecasting?.charts?.appendToUploads) {
+            uploads.push(...forecastChartPaths);
+        }
+        if (uploads.length > 0) {
+            const chartsSent = await postCharts(uploads);
+            if (!chartsSent) {
+                const log = withContext(logger, { asset: asset.key });
+                log.warn({ fn: 'runOnceForAsset' }, 'chart upload failed');
+            }
         }
     }
-    return { snapshots, summary, chartPaths };
+    return { snapshots, summary, chartPaths, forecastCharts: forecastChartPaths };
 }
 
 /**

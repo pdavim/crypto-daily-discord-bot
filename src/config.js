@@ -211,6 +211,23 @@ const DEFAULT_MARKET_POSTURE_CONFIG = {
     rsiBearish: 45,
 };
 
+const DEFAULT_FORECAST_CHART_CONFIG = {
+    enabled: true,
+    historyPoints: 120,
+    directory: "charts/forecasts",
+    appendToUploads: false,
+};
+
+const DEFAULT_FORECAST_CONFIG = {
+    enabled: true,
+    lookback: 48,
+    minHistory: 72,
+    historyLimit: 240,
+    outputDir: "reports/forecasts",
+    charts: DEFAULT_FORECAST_CHART_CONFIG,
+};
+
+
 const clampNumber = (value, fallback, { min, max } = {}) => {
     if (!Number.isFinite(value)) {
         return fallback;
@@ -318,6 +335,56 @@ const buildMarketPostureConfig = (baseConfig = {}) => {
         config.rsiBullish = DEFAULT_MARKET_POSTURE_CONFIG.rsiBullish;
         config.rsiBearish = DEFAULT_MARKET_POSTURE_CONFIG.rsiBearish;
     }
+
+    return config;
+};
+
+const buildForecastConfig = (baseConfig = {}) => {
+    const base = isPlainObject(baseConfig) ? baseConfig : {};
+    const chartsBase = isPlainObject(base.charts) ? base.charts : {};
+    const config = {
+        ...DEFAULT_FORECAST_CONFIG,
+        ...base,
+        charts: {
+            ...DEFAULT_FORECAST_CHART_CONFIG,
+            ...chartsBase,
+        },
+    };
+
+    config.enabled = toBoolean(process.env.FORECASTING_ENABLED, config.enabled);
+
+    const lookback = toInt(process.env.FORECASTING_LOOKBACK, config.lookback);
+    config.lookback = clampNumber(lookback, DEFAULT_FORECAST_CONFIG.lookback, { min: 5, max: 5000 });
+
+    const minHistory = toInt(process.env.FORECASTING_MIN_HISTORY, config.minHistory);
+    const minHistoryClamped = clampNumber(minHistory, config.minHistory, { min: config.lookback, max: 10000 });
+    config.minHistory = Math.max(config.lookback, minHistoryClamped);
+
+    const historyLimit = toInt(process.env.FORECASTING_HISTORY_LIMIT, config.historyLimit);
+    config.historyLimit = clampNumber(historyLimit, config.historyLimit, { min: 10, max: 10000 });
+
+    const outputDirEnv = process.env.FORECASTING_OUTPUT_DIR;
+    if (typeof outputDirEnv === "string" && outputDirEnv.trim() !== "") {
+        config.outputDir = outputDirEnv.trim();
+    } else if (typeof config.outputDir !== "string" || config.outputDir.trim() === "") {
+        config.outputDir = DEFAULT_FORECAST_CONFIG.outputDir;
+    }
+
+    config.charts.enabled = toBoolean(process.env.FORECASTING_CHARTS_ENABLED, config.charts.enabled);
+    const chartHistory = toInt(process.env.FORECASTING_CHART_HISTORY, config.charts.historyPoints);
+    config.charts.historyPoints = clampNumber(chartHistory, config.charts.historyPoints, { min: 10, max: 5000 });
+
+    const chartDirEnv = process.env.FORECASTING_CHART_DIR;
+    if (typeof chartDirEnv === "string" && chartDirEnv.trim() !== "") {
+        config.charts.directory = chartDirEnv.trim();
+    } else if (typeof config.charts.directory !== "string" || config.charts.directory.trim() === "") {
+        config.charts.directory = DEFAULT_FORECAST_CHART_CONFIG.directory;
+    }
+
+    config.charts.appendToUploads = toBoolean(
+        process.env.FORECASTING_CHART_ATTACH,
+        config.charts.appendToUploads,
+    );
 
     return config;
 };
@@ -587,6 +654,8 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.maxConcurrency = Number.isFinite(computedMaxConcurrency) ? computedMaxConcurrency : undefined;
     nextCFG.trading = buildTradingConfig(nextCFG.trading);
     nextCFG.marketPosture = buildMarketPostureConfig(nextCFG.marketPosture);
+    nextCFG.forecasting = buildForecastConfig(nextCFG.forecasting);
+
     nextCFG.indicators = buildIndicatorConfig(mergedConfig.indicators ?? nextCFG.indicators ?? {});
     nextCFG.alerts = isPlainObject(nextCFG.alerts) ? nextCFG.alerts : {};
     nextCFG.alerts.modules = buildAlertModuleConfig(mergedConfig.alerts?.modules ?? nextCFG.alerts?.modules ?? {});

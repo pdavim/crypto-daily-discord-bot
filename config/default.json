@@ -65,6 +65,20 @@
     "rsiBullish": 55,
     "rsiBearish": 45
   },
+  "forecasting": {
+    "enabled": true,
+    "lookback": 48,
+    "minHistory": 72,
+    "historyLimit": 240,
+    "outputDir": "reports/forecasts",
+    "charts": {
+      "enabled": true,
+      "historyPoints": 120,
+      "directory": "charts/forecasts",
+      "appendToUploads": false
+    }
+  },
+
   "indicators": {
     "smaPeriods": {
       "ma20": 20,
