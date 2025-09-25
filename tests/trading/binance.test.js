@@ -118,6 +118,46 @@ describe("Binance trading integration", () => {
         ]);
     });
 
+    it("fetches USD-M futures balances with normalization", async () => {
+        axios.mockResolvedValueOnce({
+            data: [
+                {
+                    asset: "USDT",
+                    balance: "125.5",
+                    availableBalance: "100",
+                    crossWalletBalance: "110",
+                    crossUnPnl: "5.5",
+                    maxWithdrawAmount: "95"
+                },
+                {
+                    asset: "BNB",
+                    balance: "0",
+                    availableBalance: "0",
+                    crossWalletBalance: "0",
+                    crossUnPnl: "0",
+                    maxWithdrawAmount: "0"
+                }
+            ]
+        });
+
+        const { getUsdFuturesBalances } = await import("../../src/trading/binance.js");
+        const balances = await getUsdFuturesBalances();
+
+        expect(axios).toHaveBeenCalledTimes(1);
+        const call = axios.mock.calls[0][0];
+        expect(call.url.startsWith("https://fapi.binance.com/fapi/v2/balance?")).toBe(true);
+        expect(balances).toEqual([
+            {
+                asset: "USDT",
+                balance: 125.5,
+                availableBalance: 100,
+                crossWalletBalance: 110,
+                crossUnrealizedPnl: 5.5,
+                maxWithdrawAmount: 95
+            }
+        ]);
+    });
+
     it("returns formatted margin positions", async () => {
         axios.mockResolvedValueOnce({
             data: [
@@ -162,7 +202,19 @@ describe("Binance trading integration", () => {
                     userAssets: []
                 }
             })
-            .mockResolvedValueOnce({ data: [] });
+            .mockResolvedValueOnce({ data: [] })
+            .mockResolvedValueOnce({
+                data: [
+                    {
+                        asset: "USDT",
+                        balance: "200",
+                        availableBalance: "150",
+                        crossWalletBalance: "175",
+                        crossUnPnl: "25",
+                        maxWithdrawAmount: "150"
+                    }
+                ]
+            });
 
         const { getAccountOverview } = await import("../../src/trading/binance.js");
         const overview = await getAccountOverview();
@@ -177,19 +229,31 @@ describe("Binance trading integration", () => {
                 marginLevel: 3,
                 userAssets: []
             },
-            marginPositions: []
+            marginPositions: [],
+            futuresBalances: [
+                {
+                    asset: "USDT",
+                    balance: 200,
+                    availableBalance: 150,
+                    crossWalletBalance: 175,
+                    crossUnrealizedPnl: 25,
+                    maxWithdrawAmount: 150
+                }
+            ]
         });
-        expect(axios).toHaveBeenCalledTimes(4);
+        expect(axios).toHaveBeenCalledTimes(5);
     });
 
     it("returns partial overview when optional sections fail", async () => {
         const assetsError = Object.assign(new Error("IP banned"), { response: { status: 403, data: { code: -2015 } } });
         const marginError = Object.assign(new Error("Margin disabled"), { response: { status: 403, data: { code: -3008 } } });
+        const futuresError = Object.assign(new Error("Futures locked"), { response: { status: 418, data: { code: -4048 } } });
         axios
             .mockRejectedValueOnce(assetsError)
             .mockResolvedValueOnce({ data: { balances: [] } })
             .mockRejectedValueOnce(marginError)
-            .mockResolvedValueOnce({ data: [{ symbol: "BTCUSDT", positionAmt: "0", entryPrice: "0", markPrice: "0", unRealizedProfit: "0", liquidationPrice: "0", marginType: "cross" }] });
+            .mockResolvedValueOnce({ data: [{ symbol: "BTCUSDT", positionAmt: "0", entryPrice: "0", markPrice: "0", unRealizedProfit: "0", liquidationPrice: "0", marginType: "cross" }] })
+            .mockRejectedValueOnce(futuresError);
 
         const { getAccountOverview } = await import("../../src/trading/binance.js");
         const overview = await getAccountOverview();
@@ -208,12 +272,13 @@ describe("Binance trading integration", () => {
                 marginType: "cross",
             }
         ]);
+        expect(overview.futuresBalances).toEqual([]);
 
         const overviewSections = withContextMock.mock.calls
             .filter(([, ctx]) => ctx?.scope === "accountOverview")
             .map(([, ctx]) => ctx.section);
-        expect(overviewSections).toEqual(expect.arrayContaining(["assets", "marginAccount"]));
-        expect(loggerMock.warn).toHaveBeenCalledTimes(2);
+        expect(overviewSections).toEqual(expect.arrayContaining(["assets", "marginAccount", "futuresBalances"]));
+        expect(loggerMock.warn).toHaveBeenCalledTimes(3);
     });
 
     it("propagates errors when every overview section fails", async () => {

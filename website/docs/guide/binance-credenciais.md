@@ -17,7 +17,7 @@ Este guia reúne recomendações de segurança, configuração e uso das funcion
 
 ## Configurando o bot
 
-1. Atualize o arquivo `.env` com as credenciais desejadas.
+1. Atualize o arquivo `.env` com as credenciais desejadas (`BINANCE_API_KEY`, `BINANCE_SECRET`) e, se quiser desligar o recurso, defina `ENABLE_BINANCE_COMMAND=false`.
 2. Ajuste `config/default.json` ou `config/custom.json` para definir:
    - `enableBinanceCommand` — liga/desliga o comando `/binance` (pode ser sobrescrito com `ENABLE_BINANCE_COMMAND=false`).
    - `trading.executor.enabled` — liga/desliga ordens reais.
@@ -25,6 +25,7 @@ Este guia reúne recomendações de segurança, configuração e uso das funcion
    - `trading.risk.maxDrawdownPercent` e `portfolio.growth.maxDrawdownPercent` — proteções contra quedas.
    - `alerts.thresholds.minimumProfitPercent` — alinhado aos novos comandos `/settings profit`.
 3. Reinicie o bot para que as mudanças de ambiente e config sejam aplicadas.
+4. Execute `npm exec config-cli secrets check` para validar se as variáveis obrigatórias estão presentes antes do deploy.
 
 ## Funcionalidades disponíveis
 
@@ -37,9 +38,16 @@ Este guia reúne recomendações de segurança, configuração e uso das funcion
 ## Visualizando saldos com `/binance`
 
 - Respostas sempre ephemerais: os detalhes da conta aparecem apenas para o solicitante, reduzindo o risco de exposição de patrimônio.
-- Chaves somente leitura são suficientes para o resumo; o bot ignora seções para as quais a API retorna erro de permissão e exibe uma mensagem explicando a indisponibilidade.
+- Chaves somente leitura são suficientes para o resumo. Se quiser ver saldo USD-M, habilite também o flag "Enable Futures" na chave. O bot ignora seções para as quais a API retorna erro de permissão e exibe uma mensagem explicando a indisponibilidade.
 - Desative rapidamente com `ENABLE_BINANCE_COMMAND=false` ou `enableBinanceCommand: false` caso esteja rodando o bot em servidores compartilhados.
 - As seções (ativos configurados, saldos spot, conta/ativos de margem e posições) ficam disponíveis separadamente, permitindo validar quais permissões precisam ser reativadas sem inspecionar logs sensíveis.
+
+### Checklist do `/binance`
+
+- [ ] `ENABLE_BINANCE_COMMAND` ajustado conforme a política do servidor.
+- [ ] Chave Binance com leitura Spot/Margin e flag "Enable Futures" quando quiser exibir saldo USD-M.
+- [ ] `BINANCE_API_KEY`/`BINANCE_SECRET` configurados e validados com `config-cli secrets check`.
+- [ ] Logs com contexto `accountOverview` revisados após o primeiro uso para confirmar que seções opcionais (margin/futures) estão respondendo.
 
 ## Checklist de segurança
 

@@ -43,6 +43,13 @@ const amountFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 
 const quantityFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 8 });
 const priceFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const MAX_LIST_ITEMS = {
+    assets: 5,
+    spotBalances: 6,
+    marginAssets: 6,
+    marginPositions: 5,
+};
+
 const MIN_PROFIT_PERCENT_MIN = 0;
 const MIN_PROFIT_PERCENT_MAX = 100;
 
@@ -54,19 +61,26 @@ function formatPercentDisplay(value) {
     return value % 1 === 0 ? value.toFixed(0) : value.toFixed(2);
 }
 
+function appendOverflowLine(lines, total, max, labelSingular, labelPlural) {
+    if (total > max) {
+        const remaining = total - max;
+        const noun = remaining === 1 ? labelSingular : labelPlural;
+        lines.push(`• ... e mais ${remaining} ${noun}`);
+    }
+}
+
 function formatAccountAssets(assets = []) {
     if (!Array.isArray(assets) || assets.length === 0) {
         return 'Sem dados de ativos configurados.';
     }
-    const lines = assets.slice(0, 5).map(asset => {
+    const limit = MAX_LIST_ITEMS.assets;
+    const lines = assets.slice(0, limit).map(asset => {
         const name = asset.coin ?? asset.asset ?? asset.symbol ?? '—';
         const deposit = asset.depositAllEnable === false ? '❌' : '✅';
         const withdraw = asset.withdrawAllEnable === false ? '❌' : '✅';
         return `• ${name}: Depósito ${deposit} | Saque ${withdraw}`;
     });
-    if (assets.length > 5) {
-        lines.push(`• ... e mais ${assets.length - 5} ativos`);
-    }
+    appendOverflowLine(lines, assets.length, limit, 'ativo', 'ativos');
     return lines.join('\n');
 }
 
@@ -74,12 +88,15 @@ function formatSpotBalances(balances = []) {
     if (!Array.isArray(balances) || balances.length === 0) {
         return 'Sem saldos spot disponíveis.';
     }
-    return balances.map(balance => {
+    const limit = MAX_LIST_ITEMS.spotBalances;
+    const lines = balances.slice(0, limit).map(balance => {
         const total = formatAmount(balance.total);
         const free = formatAmount(balance.free);
         const locked = formatAmount(balance.locked);
         return `• ${balance.asset}: ${total} (Livre ${free} | Travado ${locked})`;
-    }).join('\n');
+    });
+    appendOverflowLine(lines, balances.length, limit, 'saldo', 'saldos');
+    return lines.join('\n');
 }
 
 function formatMarginAccount(account) {
@@ -106,27 +123,33 @@ function formatMarginAssets(userAssets = []) {
     if (!Array.isArray(userAssets) || userAssets.length === 0) {
         return 'Sem ativos na conta de margem.';
     }
-    return userAssets.map(asset => {
+    const limit = MAX_LIST_ITEMS.marginAssets;
+    const lines = userAssets.slice(0, limit).map(asset => {
         const free = formatAmount(asset.free);
         const borrowed = formatAmount(asset.borrowed);
         const interest = formatAmount(asset.interest);
         const net = formatAmount(asset.netAsset);
         return `• ${asset.asset}: Livre ${free} | Empréstimo ${borrowed} | Juros ${interest} | Líquido ${net}`;
-    }).join('\n');
+    });
+    appendOverflowLine(lines, userAssets.length, limit, 'ativo', 'ativos');
+    return lines.join('\n');
 }
 
 function formatMarginPositions(positions = []) {
     if (!Array.isArray(positions) || positions.length === 0) {
         return 'Sem posições de margem abertas.';
     }
-    return positions.map(position => {
+    const limit = MAX_LIST_ITEMS.marginPositions;
+    const lines = positions.slice(0, limit).map(position => {
         const qty = formatAmount(position.positionAmt, quantityFormatter);
         const entry = formatAmount(position.entryPrice, priceFormatter);
         const mark = formatAmount(position.markPrice, priceFormatter);
         const pnl = formatAmount(position.unrealizedProfit, priceFormatter);
         const liq = Number.isFinite(position.liquidationPrice) ? ` | Liq.: ${formatAmount(position.liquidationPrice, priceFormatter)}` : '';
         return `• ${position.symbol} (${position.marginType})\n  Qtde: ${qty} | Entrada: ${entry} | Marca: ${mark} | PnL: ${pnl}${liq}`;
-    }).join('\n');
+    });
+    appendOverflowLine(lines, positions.length, limit, 'posição', 'posições');
+    return lines.join('\n');
 }
 
 function buildAccountOverviewMessage(overview) {

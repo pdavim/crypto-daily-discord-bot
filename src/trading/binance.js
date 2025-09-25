@@ -13,6 +13,7 @@ import { logTrade } from "./tradeLog.js";
 import { logger, withContext } from "../logger.js";
 
 const BASE = "https://api.binance.com";
+const FUTURES_BASE = "https://fapi.binance.com";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
 const DEFAULT_RECV_WINDOW = Number.parseInt(process.env.BINANCE_RECV_WINDOW ?? "5000", 10);
 
@@ -31,7 +32,7 @@ function sign(params, secret) {
     return `${query}&signature=${signature}`;
 }
 
-async function privateRequest(method, path, params = {}, { context } = {}) {
+async function privateRequest(method, path, params = {}, { context, baseUrl = BASE } = {}) {
     const { key, secret } = getCredentials();
     const timestamp = Date.now();
     const recvWindow = Number.isFinite(DEFAULT_RECV_WINDOW) ? DEFAULT_RECV_WINDOW : 5000;
@@ -42,7 +43,7 @@ async function privateRequest(method, path, params = {}, { context } = {}) {
     };
 
     const qs = sign(payload, secret);
-    const url = `${BASE}${path}?${qs}`;
+    const url = `${baseUrl}${path}?${qs}`;
     try {
         const { data } = await axios({ method, url, headers: { "X-MBX-APIKEY": key } });
         return data;
@@ -90,6 +91,26 @@ function mapMarginAssets(userAssets = [], { includeZero = false } = {}) {
             };
         })
         .filter(entry => includeZero || entry.netAsset !== 0 || entry.free !== 0 || entry.borrowed !== 0 || entry.interest !== 0);
+}
+
+function mapFuturesBalances(balances = [], { includeZero = false } = {}) {
+    return balances
+        .map(balance => {
+            const walletBalance = toNumber(balance.balance);
+            const availableBalance = toNumber(balance.availableBalance);
+            const crossWalletBalance = toNumber(balance.crossWalletBalance);
+            const crossUnrealizedPnl = toNumber(balance.crossUnPnl);
+            const maxWithdrawAmount = toNumber(balance.maxWithdrawAmount);
+            return {
+                asset: balance.asset,
+                balance: walletBalance,
+                availableBalance,
+                crossWalletBalance,
+                crossUnrealizedPnl,
+                maxWithdrawAmount,
+            };
+        })
+        .filter(entry => includeZero || entry.balance !== 0 || entry.availableBalance !== 0 || entry.crossWalletBalance !== 0 || entry.crossUnrealizedPnl !== 0 || entry.maxWithdrawAmount !== 0);
 }
 
 function computeAverageFillPrice(fills = []) {
@@ -212,6 +233,14 @@ export async function getMarginPositionRisk({ symbol } = {}) {
         : [];
 }
 
+export async function getUsdFuturesBalances(options = {}) {
+    const data = await privateRequest("GET", "/fapi/v2/balance", {}, {
+        context: { scope: "usdMFutures" },
+        baseUrl: FUTURES_BASE,
+    });
+    return mapFuturesBalances(data, options);
+}
+
 function logAccountSectionFailure(section, err) {
     const context = { scope: "accountOverview", section };
     const status = err?.response?.status;
@@ -226,6 +255,7 @@ export async function getAccountOverview(options = {}) {
         { key: "spotBalances", loader: () => getSpotBalances(options.spot) },
         { key: "marginAccount", loader: () => getMarginAccount(options.margin) },
         { key: "marginPositions", loader: () => getMarginPositionRisk(options.positions) },
+        { key: "futuresBalances", loader: () => getUsdFuturesBalances(options.futures) },
     ];
 
     const overview = {
@@ -233,6 +263,7 @@ export async function getAccountOverview(options = {}) {
         spotBalances: [],
         marginAccount: null,
         marginPositions: [],
+        futuresBalances: [],
     };
 
     const results = await Promise.allSettled(tasks.map(task => task.loader()));
