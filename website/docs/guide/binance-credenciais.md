@@ -34,6 +34,13 @@ Este guia reúne recomendações de segurança, configuração e uso das funcion
 - **Simulações e forecasting**: utilizam dados da Binance para projetar crescimento de portfólio e prever fechamentos, salvando históricos em `reports/`.
 - **Alertas enriquecidos**: variáveis de ambiente e configurações personalizadas refletem imediatamente nas mensagens enviadas.
 
+## Visualizando saldos com `/binance`
+
+- Respostas sempre ephemerais: os detalhes da conta aparecem apenas para o solicitante, reduzindo o risco de exposição de patrimônio.
+- Chaves somente leitura são suficientes para o resumo; o bot ignora seções para as quais a API retorna erro de permissão e exibe uma mensagem explicando a indisponibilidade.
+- Desative rapidamente com `ENABLE_BINANCE_COMMAND=false` ou `enableBinanceCommand: false` caso esteja rodando o bot em servidores compartilhados.
+- As seções (ativos configurados, saldos spot, conta/ativos de margem e posições) ficam disponíveis separadamente, permitindo validar quais permissões precisam ser reativadas sem inspecionar logs sensíveis.
+
 ## Checklist de segurança
 
 - [ ] IP allowlist configurada para as chaves com permissão de trade.

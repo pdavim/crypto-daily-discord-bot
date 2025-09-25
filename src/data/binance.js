@@ -58,7 +58,7 @@ export async function fetchOHLCV(symbol, interval) {
             return axios.get(url);
         });
         if (CFG.debug) {
-            log.info({ fn: 'fetchOHLCV', data }, "OHLCV data");
+            log.info({ fn: 'fetchOHLCV', data }, 'OHLCV data');
         }
         const result = data.map(c => ({
             t: new Date(c[0]),
@@ -94,7 +94,7 @@ export async function fetchDailyCloses(symbol, days = 32) {
             return axios.get(url);
         });
         if (CFG.debug) {
-            log.info({ fn: 'fetchDailyCloses', data }, "Daily closes data");
+            log.info({ fn: 'fetchDailyCloses', data }, 'Daily closes data');
         }
         const result = data.map(c => ({ t: new Date(c[0]), c: +c[4], v: +c[5] }));
         cache.set(cacheKey, result);

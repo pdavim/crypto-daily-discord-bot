@@ -21,14 +21,20 @@ As suítes em `tests/quality` verificam cada uma dessas regras automaticamente. 
 
 Pastas como `data/`, `reports/` e `charts/` são reservadas para execução local. A partir desta versão o repositório mantém apenas arquivos `.gitkeep` como placeholders e o teste `generated directories remain clean` falha caso qualquer outro arquivo seja versionado.
 
-Para limpar resíduos rapidamente:
+Para limpar resíduos rapidamente utilize o script dedicado:
 
 ```bash
-npm run cleanup:reports
-rm -rf data/* reports/* charts/*
+npm run cleanup:artifacts
 ```
 
-Se precisar inspecionar os relatórios, faça isso localmente e execute os comandos acima antes de commitar.
+O comando remove conteúdos de `logs/`, `reports/`, `charts/` e `coverage/`, preservando apenas os `.gitkeep` versionados. Se precisar inspecionar os relatórios, faça isso localmente e execute o script antes de commitar.
+
+## Gerenciamento de configuração
+
+- `config/default.json` concentra os valores padrão rastreados no repositório e não deve ser editado manualmente.
+- O utilitário `npm exec config-cli` gera/atualiza `config/custom.json` com ajustes específicos do ambiente sem arriscar conflitos durante o review.
+- Use `npm exec config-cli list` para auditar o merge entre os arquivos e `npm exec config-cli secrets check` para garantir que `.env` contém as credenciais obrigatórias.
+- Variáveis sensíveis nunca devem ser commitadas. Em ambientes de CI/CD injete-as como secrets e combine com `config-cli` para validar a presença antes de promover uma release.
 
 ## Documentação e JSDoc
 

@@ -212,20 +212,61 @@ export async function getMarginPositionRisk({ symbol } = {}) {
         : [];
 }
 
-export async function getAccountOverview(options = {}) {
-    const [assets, spotBalances, marginAccount, marginPositions] = await Promise.all([
-        getAccountAssets(),
-        getSpotBalances(options.spot),
-        getMarginAccount(options.margin),
-        getMarginPositionRisk(options.positions)
-    ]);
+function logAccountSectionFailure(section, err) {
+    const context = { scope: "accountOverview", section };
+    const status = err?.response?.status;
+    const code = err?.response?.data?.code ?? err?.code;
+    const message = err?.message;
+    withContext(logger, context).warn({ fn: "getAccountOverview", status, code, message }, 'Failed to load Binance section');
+}
 
-    return {
-        assets,
-        spotBalances,
-        marginAccount,
-        marginPositions
+export async function getAccountOverview(options = {}) {
+    const tasks = [
+        { key: "assets", loader: () => getAccountAssets() },
+        { key: "spotBalances", loader: () => getSpotBalances(options.spot) },
+        { key: "marginAccount", loader: () => getMarginAccount(options.margin) },
+        { key: "marginPositions", loader: () => getMarginPositionRisk(options.positions) },
+    ];
+
+    const overview = {
+        assets: [],
+        spotBalances: [],
+        marginAccount: null,
+        marginPositions: [],
     };
+
+    const results = await Promise.allSettled(tasks.map(task => task.loader()));
+    let fatalError = null;
+    let successCount = 0;
+
+    results.forEach((result, index) => {
+        const { key } = tasks[index];
+        if (result.status === "fulfilled") {
+            const value = result.value;
+            overview[key] = value ?? overview[key];
+            successCount += 1;
+        } else {
+            const error = result.reason;
+            if (!fatalError && error instanceof Error && error.message.includes("Missing Binance API credentials")) {
+                fatalError = error;
+            }
+            logAccountSectionFailure(key, error);
+        }
+    });
+
+    if (fatalError) {
+        throw fatalError;
+    }
+
+    if (successCount === 0) {
+        const fallbackError = results.find(entry => entry.status === "rejected")?.reason;
+        if (fallbackError) {
+            throw fallbackError;
+        }
+        throw new Error("Failed to load Binance account overview");
+    }
+
+    return overview;
 }
 
 export async function placeMarketOrder(symbol, side, quantity, params = {}) {

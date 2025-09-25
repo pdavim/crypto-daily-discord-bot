@@ -8,6 +8,22 @@ vi.mock("axios", () => {
 
 const logTradeMock = vi.fn();
 
+const loggerMock = {
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+};
+loggerMock.child = vi.fn(() => loggerMock);
+const withContextMock = vi.fn(() => loggerMock);
+
+vi.mock("../../src/logger.js", () => ({
+    __esModule: true,
+    logger: loggerMock,
+    default: loggerMock,
+    withContext: withContextMock,
+}));
+
 vi.mock("../../src/trading/tradeLog.js", () => ({
     logTrade: logTradeMock,
 }));
@@ -28,6 +44,12 @@ describe("Binance trading integration", () => {
         process.env = { ...originalEnv, BINANCE_API_KEY: "test-key", BINANCE_SECRET: "test-secret" };
         axios.mockReset();
         logTradeMock.mockReset();
+        withContextMock.mockClear();
+        loggerMock.info.mockClear();
+        loggerMock.debug.mockClear();
+        loggerMock.warn.mockClear();
+        loggerMock.error.mockClear();
+        loggerMock.child.mockClear();
     });
 
     afterEach(() => {
@@ -158,6 +180,48 @@ describe("Binance trading integration", () => {
             marginPositions: []
         });
         expect(axios).toHaveBeenCalledTimes(4);
+    });
+
+    it("returns partial overview when optional sections fail", async () => {
+        const assetsError = Object.assign(new Error("IP banned"), { response: { status: 403, data: { code: -2015 } } });
+        const marginError = Object.assign(new Error("Margin disabled"), { response: { status: 403, data: { code: -3008 } } });
+        axios
+            .mockRejectedValueOnce(assetsError)
+            .mockResolvedValueOnce({ data: { balances: [] } })
+            .mockRejectedValueOnce(marginError)
+            .mockResolvedValueOnce({ data: [{ symbol: "BTCUSDT", positionAmt: "0", entryPrice: "0", markPrice: "0", unRealizedProfit: "0", liquidationPrice: "0", marginType: "cross" }] });
+
+        const { getAccountOverview } = await import("../../src/trading/binance.js");
+        const overview = await getAccountOverview();
+
+        expect(overview.assets).toEqual([]);
+        expect(overview.spotBalances).toEqual([]);
+        expect(overview.marginAccount).toBeNull();
+        expect(overview.marginPositions).toEqual([
+            {
+                symbol: "BTCUSDT",
+                positionAmt: 0,
+                entryPrice: 0,
+                markPrice: 0,
+                unrealizedProfit: 0,
+                liquidationPrice: 0,
+                marginType: "cross",
+            }
+        ]);
+
+        const overviewSections = withContextMock.mock.calls
+            .filter(([, ctx]) => ctx?.scope === "accountOverview")
+            .map(([, ctx]) => ctx.section);
+        expect(overviewSections).toEqual(expect.arrayContaining(["assets", "marginAccount"]));
+        expect(loggerMock.warn).toHaveBeenCalledTimes(2);
+    });
+
+    it("propagates errors when every overview section fails", async () => {
+        const failure = new Error("network down");
+        axios.mockRejectedValue(failure);
+
+        const { getAccountOverview } = await import("../../src/trading/binance.js");
+        await expect(getAccountOverview()).rejects.toThrow("network down");
     });
 
     it("submits generic order and records fill price", async () => {
