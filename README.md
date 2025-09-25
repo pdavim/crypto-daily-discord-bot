@@ -27,6 +27,7 @@ Bot Discord que entrega análises técnicas, gráficos e alertas diários sobre 
 ## Documentação online
 
 - [Site do projeto](https://OWNER.github.io/crypto-daily-discord-bot/) — documentação construída com VitePress e publicada automaticamente via GitHub Pages (ajuste `DOCS_GITHUB_OWNER`, `DOCS_SITE_URL` e `DOCS_BASE` ao gerar o site).
+- [Notas de versão](website/docs/guide/releases.md) — resumo das funcionalidades lançadas, cobertura de testes e links úteis para auditorias de regressão.
 
 ## Requisitos
 
@@ -64,6 +65,14 @@ npm install
 - Armazene `BINANCE_API_KEY` e `BINANCE_SECRET` apenas em `.env` locais ou nos segredos do provedor de deploy (GitHub Actions, Railway, etc.).
 - Utilize `npm exec config-cli secrets check` (ou pipelines equivalentes) para validar se as variáveis estão presentes antes do deploy.
 - Rotacione as chaves periodicamente e monitore os logs de `src/trading/executor.js` para detectar tentativas de uso indevido.
+
+## Fluxo do comando `/binance`
+
+- Defina `enableBinanceCommand` em `config/default.json` (ou `ENABLE_BINANCE_COMMAND=false` no ambiente) caso queira desligar o resumo financeiro em servidores públicos.
+- O comando só responde quando `BINANCE_API_KEY` e `BINANCE_SECRET` estão configurados; utilize chaves somente leitura sempre que não precisar executar ordens.
+- As respostas são sempre **ephemerais** para evitar vazamentos de patrimônio nos canais do Discord.
+- Quando alguma permissão (ex.: margem) estiver desabilitada, o bot degrada o resultado e explica quais seções ficaram indisponíveis em vez de falhar por completo.
+- Logs com contexto `accountOverview` registram falhas nas seções individuais para facilitar auditorias sem expor dados sensíveis.
 
 ## Execução
 

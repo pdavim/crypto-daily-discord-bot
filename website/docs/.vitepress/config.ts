@@ -40,6 +40,7 @@ export default defineConfig({
     nav: [
       { text: 'Início', link: '/' },
       { text: 'Guia rápido', link: '/guide/introducao' },
+      { text: 'Notas de versão', link: '/guide/releases' },
       { text: 'Identidade visual', link: '/guide/identidade-visual' }
     ],
     sidebar: {
@@ -50,7 +51,8 @@ export default defineConfig({
             { text: 'Introdução', link: '/guide/introducao' },
             { text: 'Deploy no Discord', link: '/guide/deploy-discord' },
             { text: 'Hospedagem na GitHub Pages', link: '/guide/github-pages' },
-            { text: 'Identidade visual e assets', link: '/guide/identidade-visual' }
+            { text: 'Identidade visual e assets', link: '/guide/identidade-visual' },
+            { text: 'Release Notes', link: '/guide/releases' }
           ]
         }
       ]

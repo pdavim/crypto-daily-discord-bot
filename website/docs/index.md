@@ -20,12 +20,13 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 
 ## Novidades recentes
 
-- **Comando `/binance`** consolidando saldos spot/margin e posições com base nas credenciais fornecidas.
+- **Comando `/binance`** com respostas ephemerais, modo somente leitura e degradação suave caso alguma permissão da Binance esteja indisponível.
 - **Thresholds de lucro configuráveis** por usuário ou globalmente via `/settings profit`.
 - **Alertas com orientação de buy/sell/hold** e métricas por timeframe.
 - **Simulador 100€ → 10M€** com relatórios armazenados em `reports/portfolio/`.
 - **Módulo de forecasting** que persiste previsões e gráficos comparativos de tendência.
 - **Testes de qualidade automatizados** validando estilo, semicolons e limpeza de diretórios gerados.
+- **Notas de versão dedicadas** documentando funcionalidades concluídas, cobertura de testes e links úteis de auditoria.
 
 ## Como começar
 
