@@ -881,6 +881,10 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.enableAlerts = toBoolean(process.env.ENABLE_ALERTS, nextCFG.enableAlerts ?? true);
     nextCFG.enableAnalysis = toBoolean(process.env.ENABLE_ANALYSIS, nextCFG.enableAnalysis ?? true);
     nextCFG.enableReports = toBoolean(process.env.ENABLE_REPORTS, nextCFG.enableReports ?? true);
+    nextCFG.enableBinanceCommand = toBoolean(
+        process.env.ENABLE_BINANCE_COMMAND,
+        nextCFG.enableBinanceCommand ?? true,
+    );
     nextCFG.debug = toBoolean(process.env.DEBUG, nextCFG.debug ?? false);
     nextCFG.accountEquity = toNumber(process.env.ACCOUNT_EQUITY, nextCFG.accountEquity ?? 0);
     nextCFG.riskPerTrade = toNumber(process.env.RISK_PER_TRADE, nextCFG.riskPerTrade ?? 0.01);

@@ -51,3 +51,13 @@ npm test
 ```
 
 Com isso você valida integrações antes de hospedar o serviço em produção.
+
+## Ajustando o lucro mínimo por comando
+
+O bot permite ajustar um alvo mínimo de lucro para filtrar oportunidades de trade e destacar alertas realmente relevantes:
+
+- `/settings profit view` exibe o valor padrão do servidor, o seu limite pessoal (se existir) e o alvo efetivo aplicado nas análises.
+- `/settings profit default value:<percentual>` define o lucro mínimo global em porcentagem (por exemplo, `5` para 5%).
+- `/settings profit personal value:<percentual>` grava o seu limite individual, sobrescrevendo o padrão para respostas das interações.
+
+Os valores ficam persistidos em `data/settings.json` e influenciam recomendações como o alerta de níveis de trade, que agora sinaliza quando o alvo projetado está abaixo do limite configurado.
