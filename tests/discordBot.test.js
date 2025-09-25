@@ -71,6 +71,7 @@ beforeEach(() => {
   for (const key of Object.keys(settingsStore)) {
     delete settingsStore[key];
   }
+  delete process.env.ENABLE_BINANCE_COMMAND;
 });
 
 describe('discord bot interactions', () => {
@@ -266,6 +267,36 @@ describe('discord bot interactions', () => {
     expect(message).toContain('Sem posições de margem abertas.');
   });
 
+  it('informa quando o comando /binance está desativado', async () => {
+    process.env.ENABLE_BINANCE_COMMAND = 'false';
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(getAccountOverview).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: 'O comando Binance está desativado neste servidor.',
+      ephemeral: true,
+    });
+  });
+
+  it('não registra o comando /binance quando desativado', async () => {
+    process.env.ENABLE_BINANCE_COMMAND = 'false';
+    const { initBot } = await loadBot();
+
+    await initBot();
+
+    expect(setCommandsMock).toHaveBeenCalled();
+    const registered = setCommandsMock.mock.calls[0][0];
+    expect(registered.some(command => command.name === 'binance')).toBe(false);
+  });
+
   it('reports credential issues on /binance command', async () => {
     getAccountOverview.mockRejectedValue(new Error('Missing Binance API credentials'));
     const { handleInteraction } = await loadBot();
@@ -357,6 +388,60 @@ describe('discord bot interactions', () => {
     expect(CFG.minimumProfitThreshold.users).toEqual({ other: 0.09, 'user-77': 0.025 });
     expect(interaction.reply).toHaveBeenCalledWith({
       content: 'Lucro mínimo pessoal atualizado para 2.50%',
+      ephemeral: true,
+    });
+  });
+
+  it('shows the configured minimum profit thresholds through /settings profit view', async () => {
+    settingsStore.minimumProfitThreshold = { default: 0.04, users: { 'user-77': 0.07 } };
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'view',
+      },
+      user: { id: 'user-77' },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: [
+        'Lucro mínimo padrão: 4%',
+        'Seu lucro mínimo: 7.00%',
+        'Valor aplicado nas análises: 7.00%'
+      ].join('\n'),
+      ephemeral: true,
+    });
+  });
+
+  it('falls back to default threshold when personal value is missing on /settings profit view', async () => {
+    settingsStore.minimumProfitThreshold = { default: 0.05, users: {} };
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'view',
+      },
+      user: { id: 'user-999' },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: [
+        'Lucro mínimo padrão: 5%',
+        'Seu lucro mínimo: usando o padrão do servidor',
+        'Valor aplicado nas análises: 5%'
+      ].join('\n'),
       ephemeral: true,
     });
   });
