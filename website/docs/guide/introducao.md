@@ -89,3 +89,4 @@ Para tornar o feed de alertas mais digerível, as notificações agregadas agora
 - Na ausência desse dado, os ativos são listados alfabeticamente, garantindo previsibilidade mesmo para tickers personalizados ou recém-adicionados.
 
 Com essa organização, fica mais simples acompanhar o que está acontecendo com BTC, ETH e demais moedas sem saltos ou inversões de ordem no canal de alertas.
+
