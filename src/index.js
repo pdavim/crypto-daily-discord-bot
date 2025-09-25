@@ -24,6 +24,8 @@ import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
+import { deriveDecisionDetails } from "./alerts/decision.js";
+
 import { collectVariationMetrics } from "./alerts/variationMetrics.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
@@ -249,6 +251,11 @@ async function runOnceForAsset(asset, options = {}) {
                 strategy: strategyPlan.action,
             }, 'Evaluated market posture');
 
+            const decision = deriveDecisionDetails({
+                strategy: strategyPlan,
+                posture,
+            });
+
             const meta = {
                 consolidated: [],
                 actionable: [],
@@ -256,6 +263,7 @@ async function runOnceForAsset(asset, options = {}) {
                 variation: timeframeVariation,
                 posture,
                 strategy: strategyPlan,
+                decision,
             };
             timeframeMeta.set(tf, meta);
 
@@ -448,6 +456,7 @@ async function runOnceForAsset(asset, options = {}) {
             return {
                 timeframe: tf,
                 guidance: meta.guidance,
+                decision: meta.decision,
                 alerts: meta.consolidated
             };
         }).filter(Boolean);

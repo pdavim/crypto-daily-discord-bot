@@ -71,6 +71,16 @@ Os alertas consolidados passaram a incluir uma linha dedicada às variações de
 
 Essa visão unificada facilita priorizar oportunidades e entender se um movimento forte em timeframes curtos está alinhado (ou não) com a tendência de médio prazo.
 
+## Decisão buy/sell/hold por timeframe
+
+Cada bloco de alertas agora inclui uma linha explícita de decisão (`Decisão: …`) logo abaixo de cada item listado. O bot cruza o resultado do avaliador de postura de mercado (`src/trading/posture.js`) com a estratégia ativa para traduzir os indicadores em uma recomendação prática:
+
+- **Buy (🟢)** quando a estratégia sugere posição comprada com confiança suficiente.
+- **Sell (🔴)** caso a leitura aponte para venda/posição vendida.
+- **Hold (🟡)** se o cenário estiver neutro ou com convicção insuficiente.
+
+Além do rótulo, a linha de decisão mostra a postura dominante (alta, baixa ou neutra), o nível de confiança e os principais motivos calculados pelo motor de postura. Isso facilita validar rapidamente o racional por trás de cada alerta sem abrir relatórios adicionais.
+
 ## Alertas organizados por ativo
 
 Para tornar o feed de alertas mais digerível, as notificações agregadas agora são ordenadas por ativo antes de chegarem ao Discord. O dispatcher reúne todos os payloads gerados durante o ciclo e aplica duas regras:
