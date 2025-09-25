@@ -30,6 +30,7 @@
   "enableAlerts": true,
   "enableAnalysis": true,
   "enableReports": true,
+  "enableBinanceCommand": true,
   "debug": false,
   "accountEquity": 0,
   "riskPerTrade": 0.01,
@@ -53,6 +54,20 @@
       "asset": "USDT",
       "minFree": 50,
       "transferAmount": 25
+    },
+    "automation": {
+      "enabled": false,
+      "timeframe": "4h",
+      "minConfidence": 0.55,
+      "positionPct": 0.05,
+      "maxPositions": 3,
+      "positionEpsilon": 0.0001,
+      "mode": "margin",
+      "quoteAsset": "USDT",
+      "margin": {
+        "borrowOnShort": true,
+        "repayOnClose": true
+      }
     }
   },
   "marketPosture": {
