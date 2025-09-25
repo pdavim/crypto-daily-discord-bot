@@ -13,6 +13,7 @@ Este documento resume o fluxo esperado para desenvolver novas funcionalidades e 
    cp .env.example .env
    ```
 3. Utilize o utilitário de configuração para validar segredos e sobrepor valores sem editar JSON manualmente (os valores padrão permanecem em `config/default.json`; alterações ficam em `config/custom.json`):
+
    ```bash
    npm exec config-cli list
    npm exec config-cli set alerts.modules.rsi true
