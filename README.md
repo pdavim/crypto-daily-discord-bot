@@ -77,11 +77,14 @@ npm install
 
 ## Fluxo do comando `/binance`
 
-- Defina `enableBinanceCommand` em `config/default.json` (ou `ENABLE_BINANCE_COMMAND=false` no ambiente) caso queira desligar o resumo financeiro em servidores públicos.
-- O comando só responde quando `BINANCE_API_KEY` e `BINANCE_SECRET` estão configurados; utilize chaves somente leitura sempre que não precisar executar ordens.
+1. **Ative o recurso conscientemente**: por padrão `enableBinanceCommand` vem como `true` no `config/default.json`. Desative-o com `ENABLE_BINANCE_COMMAND=false` ou `enableBinanceCommand: false` sempre que operar em servidores compartilhados.
+2. **Forneça credenciais com escopo suficiente**: o resumo precisa de `BINANCE_API_KEY` e `BINANCE_SECRET` válidos com leitura de Spot/Margin. Ative também o flag "Enable Futures" na chave para liberar o saldo USD-M (o bot apenas lê os dados).
+3. **Valide antes do deploy**: execute `npm exec config-cli secrets check` para garantir que as variáveis estejam presentes e reinicie o bot para aplicar as mudanças de ambiente/configuração.
+
 - As respostas são sempre **ephemerais** para evitar vazamentos de patrimônio nos canais do Discord.
-- Quando alguma permissão (ex.: margem) estiver desabilitada, o bot degrada o resultado e explica quais seções ficaram indisponíveis em vez de falhar por completo.
+- Quando alguma permissão (ex.: margem ou futures) estiver desabilitada, o bot degrada o resultado e explica quais seções ficaram indisponíveis em vez de falhar por completo.
 - Logs com contexto `accountOverview` registram falhas nas seções individuais para facilitar auditorias sem expor dados sensíveis.
+- Ajuste o `binanceCacheTTL` se precisar reduzir chamadas ao endpoint; valores baixos (padrão 10 segundos) deixam o `/binance` mais responsivo durante testes interativos.
 
 ## Execução
 
