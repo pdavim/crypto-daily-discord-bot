@@ -24,6 +24,7 @@ import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
+import { collectVariationMetrics } from "./alerts/variationMetrics.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
 import { runPortfolioGrowthSimulation } from "./portfolio/growth.js";
@@ -228,6 +229,7 @@ async function runOnceForAsset(asset, options = {}) {
                 volSeries: vol
             });
             snapshots[tf] = snapshot;
+            const variationMetrics = collectVariationMetrics({ snapshots });
             const timeframeVariation = snapshot?.kpis?.var ?? null;
             const guidance = snapshot?.kpis?.reco ?? null;
 
@@ -402,7 +404,9 @@ async function runOnceForAsset(asset, options = {}) {
                     cciSeries: indicators.cciSeries,
                     obvSeries: indicators.obvSeries,
                     equity: CFG.accountEquity,
-                    riskPct: CFG.riskPerTrade
+                    riskPct: CFG.riskPerTrade,
+                    variationByTimeframe: variationMetrics,
+                    timeframeOrder: TIMEFRAMES
                 });
                 const consolidated = [];
                 const dedupMap = new Map();
@@ -434,13 +438,7 @@ async function runOnceForAsset(asset, options = {}) {
     await Promise.all(timeframeTasks);
 
     if (enableAlerts) {
-        const variationByTimeframe = {};
-        for (const tf of TIMEFRAMES) {
-            const variation = snapshots[tf]?.kpis?.var;
-            if (Number.isFinite(variation)) {
-                variationByTimeframe[tf] = variation;
-            }
-        }
+        const variationByTimeframe = collectVariationMetrics({ snapshots });
 
         const timeframeSummaries = TIMEFRAMES.map(tf => {
             const meta = timeframeMeta.get(tf);

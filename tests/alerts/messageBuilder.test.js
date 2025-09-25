@@ -23,12 +23,12 @@ describe('buildAssetAlertMessage', () => {
           ]
         }
       ],
-      variationByTimeframe: { '4h': 0.0123, '1h': -0.01 },
+      variationByTimeframe: { '4h': 0.0123, '1h': -0.01, '24h': 0.05 },
       timeframeOrder: ['4h', '1h']
     });
 
     expect(message).toContain('**⚠️ Alertas — BTC** @here');
-    expect(message).toContain('_Variações: 4h +1.23% • 1h -1.00%_');
+    expect(message).toContain('_Variações: 4h +1.23% • 1h -1.00% • 24h +5.00%_');
     expect(message).toContain('> **4h** — Recomendação: Comprar (📈) — Variação: +1.23%');
     expect(message).toContain('> **1h** — Recomendação: Manter (🔁) — Variação: -1.00%');
     expect(message).toContain('• 🔴 **ALTA:** _Tendência_ — 📈 Breakout x2');
