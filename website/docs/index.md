@@ -41,6 +41,7 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 - [Hospedagem da documentação na GitHub Pages](./guide/github-pages.md)
 - [Estratégia de crescimento do portfólio](./guide/portfolio-growth.md)
 - [Credenciais e integrações Binance](./guide/binance-credenciais.md)
+- [Validação operacional do comando `/binance`](./guide/binance-validacao-operacional.md)
 - [Padrões de qualidade e checklist](./guide/qualidade.md)
 
 
