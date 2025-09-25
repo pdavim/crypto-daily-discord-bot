@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 
 async function importDispatcher({ assets } = {}) {
   vi.resetModules();
@@ -7,7 +8,8 @@ async function importDispatcher({ assets } = {}) {
   } else {
     vi.unmock('../../src/assets.js');
   }
-  const module = await import('../../src/alerts/dispatcher.js');
+  const module = await import("../../src/alerts/dispatcher.js");
+
   return module;
 }
 

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { deriveDecisionDetails, formatDecisionLine, DECISION_LABELS } from '../../src/alerts/decision.js';
+import { describe, expect, it } from "vitest";
+import { deriveDecisionDetails, formatDecisionLine, DECISION_LABELS } from "../../src/alerts/decision.js";
+
 
 describe('deriveDecisionDetails', () => {
   it('derives buy decision from long strategy with posture context', () => {

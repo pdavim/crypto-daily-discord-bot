@@ -3,8 +3,8 @@ import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import fs from "node:fs";
 import "chartjs-adapter-luxon";
 import { logger, withContext } from "./logger.js";
-import { performance } from 'node:perf_hooks';
-import { recordPerf } from './perf.js';
+import { performance } from "node:perf_hooks";
+import { recordPerf } from "./perf.js";
 import {
     CandlestickController,
     CandlestickElement,

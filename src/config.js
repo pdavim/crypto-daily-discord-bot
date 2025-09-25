@@ -1,10 +1,10 @@
-import 'dotenv/config';
-import { existsSync, readFileSync, watch } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
-import { ASSETS } from './assets.js';
-import { logger, withContext } from './logger.js';
-import { DEFAULT_ALERT_MODULES } from './alerts/registry.js';
-import { loadSettings, getSetting, setSetting } from './settings.js';
+import "dotenv/config";
+import { existsSync, readFileSync, watch } from "node:fs";
+import { writeFile } from "node:fs/promises";
+import { ASSETS } from "./assets.js";
+import { logger, withContext } from "./logger.js";
+import { DEFAULT_ALERT_MODULES } from "./alerts/registry.js";
+import { loadSettings, getSetting, setSetting } from "./settings.js";
 
 const DEFAULT_CONFIG_PATH = new URL('../config/default.json', import.meta.url);
 const CUSTOM_CONFIG_PATH = new URL('../config/custom.json', import.meta.url);

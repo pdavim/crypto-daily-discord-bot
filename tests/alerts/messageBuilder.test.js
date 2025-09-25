@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { buildAssetAlertMessage, __private__ } from '../../src/alerts/messageBuilder.js';
-import { ALERT_LEVELS, ALERT_CATEGORIES } from '../../src/alerts/shared.js';
+import { describe, expect, it } from "vitest";
+import { buildAssetAlertMessage, __private__ } from "../../src/alerts/messageBuilder.js";
+import { ALERT_LEVELS, ALERT_CATEGORIES } from "../../src/alerts/shared.js";
+
 
 describe('buildAssetAlertMessage', () => {
   it('includes variation overview and guidance for each timeframe', () => {
@@ -52,7 +53,6 @@ describe('buildAssetAlertMessage', () => {
             predictedAt: '2024-01-01T13:00:00Z',
             timeZone: 'UTC'
           },
-
           alerts: [
             { msg: '⚠️ Pullback detectado', level: ALERT_LEVELS.MEDIUM, category: ALERT_CATEGORIES.INFO }
           ]

@@ -1,4 +1,21 @@
-import { withContext as withContextDefault } from './logger.js';
+import { withContext as withContextDefault } from "./logger.js";
+
+/**
+ * @callback LimitExecutor
+ * @param {function(): Promise<any>} task
+ * @returns {Promise<any>}
+ */
+
+/**
+ * @callback LimitFactory
+ * @returns {LimitExecutor}
+ */
+
+/**
+ * @callback AssetRunner
+ * @param {*} asset
+ * @returns {Promise<any>}
+ */
 
 /**
  * Executes the runOnce handler for each asset using the provided limiter while
@@ -6,13 +23,10 @@ import { withContext as withContextDefault } from './logger.js';
  *
  * @param {Object} params - Execution parameters.
  * @param {Array<{key: string}>} params.assets - Assets to process.
- * @param {() => (task: () => Promise<any>) => Promise<any>} params.limitFactory -
- *   Factory that produces a p-limit compatible limiter.
- * @param {(asset: any) => Promise<any>} params.runAsset - Handler that processes
- *   a single asset.
+ * @param {LimitFactory} params.limitFactory - Factory that produces a p-limit compatible limiter.
+ * @param {AssetRunner} params.runAsset - Handler that processes a single asset.
  * @param {{ error: Function }} params.logger - Base logger instance.
- * @returns {Promise<Array<{ asset: any, error: unknown }>>} Rejections captured
- *   during processing.
+ * @returns {Promise<Array<{ asset: any, error: unknown }>>} Rejections captured during processing.
  */
 export async function runAssetsSafely({ assets, limitFactory, runAsset, logger, withContext = withContextDefault }) {
     const limit = limitFactory();

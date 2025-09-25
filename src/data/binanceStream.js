@@ -1,6 +1,6 @@
-import WebSocket from 'ws';
-import { CFG } from '../config.js';
-import { logger, withContext } from '../logger.js';
+import WebSocket from "ws";
+import { CFG } from "../config.js";
+import { logger, withContext } from "../logger.js";
 
 const BASE_URL = 'wss://stream.binance.com:9443/stream?streams=';
 

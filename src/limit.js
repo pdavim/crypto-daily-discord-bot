@@ -1,5 +1,5 @@
-import os from 'os';
-import { CFG } from './config.js';
+import os from "os";
+import { CFG } from "./config.js";
 
 /**
  * Determines the maximum number of concurrent tasks the bot should run.

@@ -1,4 +1,4 @@
-import { ALERT_LEVELS, createAlert } from './shared.js';
+import { ALERT_LEVELS, createAlert } from "./shared.js";
 
 export default function priceInfoAlert({ lastClose }) {
     if (lastClose == null) {

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { runAssetsSafely } from '../src/runner.js';
+import { describe, expect, it, vi } from "vitest";
+import { runAssetsSafely } from "../src/runner.js";
 
 describe('runAssetsSafely', () => {
     const buildLimiter = () => {

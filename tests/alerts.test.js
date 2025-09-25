@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { buildAlerts, ALERT_LEVELS, formatAlertMessage } from '../src/alerts.js';
+import { describe, it, expect } from "vitest";
+import { buildAlerts, ALERT_LEVELS, formatAlertMessage } from "../src/alerts.js";
 
 describe('buildAlerts', () => {
   it('generates alerts based on indicator values', async () => {

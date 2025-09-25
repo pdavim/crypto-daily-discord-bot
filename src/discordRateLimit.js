@@ -1,4 +1,4 @@
-import { CFG, onConfigChange } from './config.js';
+import { CFG, onConfigChange } from "./config.js";
 
 const DEFAULT_LIMIT = {
     capacity: 5,

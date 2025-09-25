@@ -52,6 +52,16 @@ npm test
 
 Com isso você valida integrações antes de hospedar o serviço em produção.
 
+## Qualidade transversal
+
+Além das suítes funcionais, o repositório mantém testes de qualidade que garantem conformidade com o estilo (ESM, quatro espaços, `;` ao final das instruções) e verificam se diretórios como `data/`, `reports/` e `charts/` permanecem livres de artefatos antes de um commit.
+
+- Execute `npm run test` para rodar o pacote completo, incluindo `tests/quality/style.test.js` e `tests/quality/artifacts.test.js`.
+- Revise o [guia de padrões](./qualidade.md) para detalhes sobre a convenção de aspas, persistência de dados e checklist do PR.
+- Gere o JSDoc com `npm run docs` sempre que novas APIs forem expostas, garantindo que `docs/` esteja sincronizado com o código.
+
+Seguir esse ritual evita regressões sutis e mantém o histórico limpo para auditorias futuras.
+
 ## Ajustando o lucro mínimo por comando
 
 O bot permite ajustar um alvo mínimo de lucro para filtrar oportunidades de trade e destacar alertas realmente relevantes:

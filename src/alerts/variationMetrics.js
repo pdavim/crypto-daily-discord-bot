@@ -5,6 +5,14 @@ const KPI_KEY_BY_LABEL = Object.freeze({
     "30d": "var30d"
 });
 
+/**
+ * @typedef {Object} TimeframeSnapshot
+ * @property {Object.<string, number>} [kpis]
+ */
+
+/** @typedef {Object.<string, TimeframeSnapshot>} SnapshotMap */
+
+
 function isFiniteNumber(value) {
     return typeof value === "number" && Number.isFinite(value);
 }
@@ -33,7 +41,7 @@ function resolveAnchorSnapshot(snapshots) {
 /**
  * Consolidates price variation metrics extracted from timeframe snapshots.
  * @param {Object} params - Parameters for metric extraction.
- * @param {Record<string, { kpis?: Record<string, number> }>} params.snapshots - KPI snapshots keyed by timeframe.
+ * @param {SnapshotMap} params.snapshots - KPI snapshots keyed by timeframe.
  * @returns {Record<string, number>} Map with variation values per timeframe or horizon.
  */
 export function collectVariationMetrics({ snapshots = {} } = {}) {

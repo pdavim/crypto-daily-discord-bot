@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock('../src/logger.js', () => {
   const log = {
@@ -28,9 +28,9 @@ describe('fetchWithRetry', () => {
     vi.resetModules();
     vi.useFakeTimers();
     vi.spyOn(Math, 'random').mockReturnValue(0.25);
-    metrics = await import('../src/metrics.js');
-    logger = await import('../src/logger.js');
-    utils = await import('../src/utils.js');
+    metrics = await import("../src/metrics.js");
+    logger = await import("../src/logger.js");
+    utils = await import("../src/utils.js");
   });
 
   afterEach(() => {

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth, ema, vwap, stochastic, williamsR, cci, obv, scoreHeuristic, keltnerChannel } from '../src/indicators.js';
+import { describe, it, expect } from "vitest";
+import { sma, rsi, macd, parabolicSAR, trendFromMAs, bollWidth, ema, vwap, stochastic, williamsR, cci, obv, scoreHeuristic, keltnerChannel } from "../src/indicators.js";
 
 describe('sma', () => {
   it('calculates simple moving average', () => {

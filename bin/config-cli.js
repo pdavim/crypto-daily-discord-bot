@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-import { inspect } from 'node:util';
-import process from 'node:process';
+import { inspect } from "node:util";
+import process from "node:process";
 
 process.env.NODE_ENV ??= 'test';
 
-const { CFG, saveConfig } = await import('../src/config.js');
+const { CFG, saveConfig } = await import("../src/config.js");
 
 const HELP_MESSAGE = `Usage: config-cli <command> [arguments]\n\nCommands:\n  list                 Print the merged configuration as JSON.\n  get <path>           Read a configuration value using dot notation.\n  set <path> <value>   Persist a configuration value using dot notation.\n\nExamples:\n  config-cli list\n  config-cli get indicators.macd.fast\n  config-cli set alerts.modules.rsi true\n  config-cli set accountEquity 12500\n`;
 

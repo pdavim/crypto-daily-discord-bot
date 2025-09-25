@@ -3,20 +3,21 @@
  * recursos recentes como o resumo `/binance`, configurações de lucro mínimo e
  * gráficos com previsões/alertas enriquecidos.
  */
-import { Client, GatewayIntentBits, ApplicationCommandOptionType } from 'discord.js';
-import { CFG } from './config.js';
-import { logger, withContext } from './logger.js';
-import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from './assets.js';
-import { fetchOHLCV } from './data/binance.js';
-import { renderChartPNG } from './chart.js';
-import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from './watchlist.js';
-import { setSetting } from './settings.js';
+import { Client, GatewayIntentBits, ApplicationCommandOptionType } from "discord.js";
+import { CFG } from "./config.js";
+import { logger, withContext } from "./logger.js";
+import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
+import { fetchOHLCV } from "./data/binance.js";
+import { renderChartPNG } from "./chart.js";
+import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from "./watchlist.js";
+import { setSetting } from "./settings.js";
 import {
     getMinimumProfitSettings,
     setDefaultMinimumProfit,
     setPersonalMinimumProfit,
-} from './minimumProfit.js';
-import { getAccountOverview } from './trading/binance.js';
+} from "./minimumProfit.js";
+import { getAccountOverview } from "./trading/binance.js";
+
 
 const startTime = Date.now();
 

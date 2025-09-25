@@ -1,6 +1,6 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { buildAlerts } from '../src/alerts.js';
-import { CFG } from '../src/config.js';
+import { beforeEach, afterEach, describe, expect, it } from "vitest";
+import { buildAlerts } from "../src/alerts.js";
+import { CFG } from "../src/config.js";
 
 const cloneThresholds = () => ({ ...CFG.alertThresholds });
 

@@ -1,6 +1,7 @@
-import { atrStopTarget, positionSize } from '../trading/risk.js';
-import { ALERT_LEVELS, createAlert } from './shared.js';
-import { computeTargetProfit, getDefaultMinimumProfitThreshold } from '../minimumProfit.js';
+import { atrStopTarget, positionSize } from "../trading/risk.js";
+import { ALERT_LEVELS, createAlert } from "./shared.js";
+import { computeTargetProfit, getDefaultMinimumProfitThreshold } from "../minimumProfit.js";
+
 
 function formatPercent(value) {
     if (!Number.isFinite(value)) {

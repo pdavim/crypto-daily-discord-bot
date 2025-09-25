@@ -1,8 +1,8 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { forecastNextClose, persistForecastEntry } from '../src/forecasting.js';
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { forecastNextClose, persistForecastEntry } from "../src/forecasting.js";
 
 describe('forecasting', () => {
     it('predicts the next close using linear regression', () => {
@@ -147,8 +147,12 @@ describe('forecasting', () => {
 
     it('ensures forecast artifacts directories are ignored by git', () => {
         const gitignore = fs.readFileSync(path.resolve('.gitignore'), 'utf-8');
-        expect(gitignore).toContain('reports/forecasts/');
-        expect(gitignore).toContain('charts/');
+        expect(gitignore).toContain('reports/*');
+        expect(gitignore).toContain('!reports/.gitkeep');
+        expect(gitignore).toContain('charts/*');
+        expect(gitignore).toContain('!charts/.gitkeep');
+        expect(gitignore).toContain('data/*');
+        expect(gitignore).toContain('!data/.gitkeep');
     });
 
 });

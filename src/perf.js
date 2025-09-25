@@ -1,4 +1,4 @@
-import { logger, withContext } from './logger.js';
+import { logger, withContext } from "./logger.js";
 
 const stats = {
   fetchOHLCV: [],

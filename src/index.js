@@ -489,7 +489,6 @@ async function runOnceForAsset(asset, options = {}) {
                 decision: meta.decision,
                 alerts: meta.consolidated,
                 forecast: meta.forecast
-
             };
         }).filter(Boolean);
 

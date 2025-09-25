@@ -1,6 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const ALERTS_FILE = process.env.ALERTS_CACHE_FILE ? path.resolve(process.env.ALERTS_CACHE_FILE) : path.join(DATA_DIR, 'alerts.json');

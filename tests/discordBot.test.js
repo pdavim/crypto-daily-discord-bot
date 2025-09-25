@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Stub discord.js primitives so the module can be imported without a real client
 const loginMock = vi.fn();
@@ -61,7 +61,7 @@ vi.mock('../src/settings.js', () => ({
 process.env.BINANCE_SYMBOL_BTC = 'BTCUSDT';
 
 async function loadBot() {
-  return import('../src/discordBot.js');
+  return import("../src/discordBot.js");
 }
 
 beforeEach(() => {
@@ -334,7 +334,7 @@ describe('discord bot interactions', () => {
   it('updates global minimum profit threshold through /settings profit default', async () => {
     settingsStore.minimumProfitThreshold = { default: 0.05, users: { existing: 0.12 } };
     const { handleInteraction } = await loadBot();
-    const { CFG } = await import('../src/config.js');
+    const { CFG } = await import("../src/config.js");
 
     const interaction = {
       isChatInputCommand: () => true,
@@ -364,7 +364,7 @@ describe('discord bot interactions', () => {
   it('updates personal minimum profit threshold through /settings profit personal', async () => {
     settingsStore.minimumProfitThreshold = { default: 0.03, users: { other: 0.09 } };
     const { handleInteraction } = await loadBot();
-    const { CFG } = await import('../src/config.js');
+    const { CFG } = await import("../src/config.js");
 
     const interaction = {
       isChatInputCommand: () => true,

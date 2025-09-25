@@ -1,7 +1,7 @@
-import pino from 'pino';
-import { randomUUID } from 'crypto';
-import fs from 'fs';
-import { join, resolve } from 'path';
+import pino from "pino";
+import { randomUUID } from "crypto";
+import fs from "fs";
+import { join, resolve } from "path";
 
 const DEFAULT_RETENTION_DAYS = 7;
 const LOG_RETENTION_DAYS = Number.isFinite(Number(process.env.LOG_RETENTION_DAYS))

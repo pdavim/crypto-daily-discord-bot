@@ -1,5 +1,5 @@
-import { roundThreshold } from '../utils.js';
-import { ALERT_LEVELS, createAlert } from './shared.js';
+import { roundThreshold } from "../utils.js";
+import { ALERT_LEVELS, createAlert } from "./shared.js";
 
 export default function roundNumberAlert({ lastClose }) {
     const alerts = [];

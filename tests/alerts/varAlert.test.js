@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import varAlert, { __private__ } from '../../src/alerts/varAlert.js';
-import { ALERT_LEVELS, ALERT_CATEGORIES } from '../../src/alerts/shared.js';
+import { describe, expect, it } from "vitest";
+import varAlert, { __private__ } from "../../src/alerts/varAlert.js";
+import { ALERT_LEVELS, ALERT_CATEGORIES } from "../../src/alerts/shared.js";
+
 
 describe('varAlert', () => {
   it('aggregates multi-timeframe variation metrics with ordering', () => {

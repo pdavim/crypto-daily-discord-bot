@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const {
   sparklineMock,
@@ -45,7 +45,7 @@ import {
   pct,
   num,
   fmt
-} from '../src/reporter.js';
+} from "../src/reporter.js";
 
 describe('reporter', () => {
   beforeEach(() => {

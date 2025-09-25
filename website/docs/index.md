@@ -25,6 +25,7 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 - **Alertas com orientação de buy/sell/hold** e métricas por timeframe.
 - **Simulador 100€ → 10M€** com relatórios armazenados em `reports/portfolio/`.
 - **Módulo de forecasting** que persiste previsões e gráficos comparativos de tendência.
+- **Testes de qualidade automatizados** validando estilo, semicolons e limpeza de diretórios gerados.
 
 ## Como começar
 
@@ -39,6 +40,7 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 - [Hospedagem da documentação na GitHub Pages](./guide/github-pages.md)
 - [Estratégia de crescimento do portfólio](./guide/portfolio-growth.md)
 - [Credenciais e integrações Binance](./guide/binance-credenciais.md)
+- [Padrões de qualidade e checklist](./guide/qualidade.md)
 
 
 ## Precisa de ajuda?
