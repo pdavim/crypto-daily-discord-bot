@@ -1,7 +1,7 @@
 # Wish List
 
 [] on discord user can see binance account (assets, positions, etc)
-[] on discord user can set minimum profit value
+[x] on discord user can set minimum profit value
 [] on "alerts" you should consider the variation for each timeframe
 [] on "alerts" you should sort by asset
 [] on "alerts" ypu should have a clear line saying buy/sell/hold

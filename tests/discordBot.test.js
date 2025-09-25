@@ -392,6 +392,60 @@ describe('discord bot interactions', () => {
     });
   });
 
+  it('shows the configured minimum profit thresholds through /settings profit view', async () => {
+    settingsStore.minimumProfitThreshold = { default: 0.04, users: { 'user-77': 0.07 } };
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'view',
+      },
+      user: { id: 'user-77' },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: [
+        'Lucro mínimo padrão: 4%',
+        'Seu lucro mínimo: 7.00%',
+        'Valor aplicado nas análises: 7.00%'
+      ].join('\n'),
+      ephemeral: true,
+    });
+  });
+
+  it('falls back to default threshold when personal value is missing on /settings profit view', async () => {
+    settingsStore.minimumProfitThreshold = { default: 0.05, users: {} };
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'settings',
+      options: {
+        getSubcommandGroup: () => 'profit',
+        getSubcommand: () => 'view',
+      },
+      user: { id: 'user-999' },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: [
+        'Lucro mínimo padrão: 5%',
+        'Seu lucro mínimo: usando o padrão do servidor',
+        'Valor aplicado nas análises: 5%'
+      ].join('\n'),
+      ephemeral: true,
+    });
+  });
+
   it('validates the minimum profit percentage bounds', async () => {
     const { handleInteraction } = await loadBot();
 

@@ -10,7 +10,12 @@ import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from './assets.js';
 import { fetchOHLCV } from './data/binance.js';
 import { renderChartPNG } from './chart.js';
 import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from './watchlist.js';
-import { setSetting, getSetting } from './settings.js';
+import { setSetting } from './settings.js';
+import {
+    getMinimumProfitSettings,
+    setDefaultMinimumProfit,
+    setPersonalMinimumProfit,
+} from './minimumProfit.js';
 import { getAccountOverview } from './trading/binance.js';
 
 const startTime = Date.now();
@@ -40,56 +45,12 @@ const priceFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2
 const MIN_PROFIT_PERCENT_MIN = 0;
 const MIN_PROFIT_PERCENT_MAX = 100;
 
-function isPlainObject(value) {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function formatAmount(value, formatter = amountFormatter) {
     return Number.isFinite(value) ? formatter.format(value) : '0,00';
 }
 
-function readMinimumProfitSettings() {
-    const fallback = isPlainObject(CFG.minimumProfitThreshold) ? CFG.minimumProfitThreshold : { default: 0, users: {} };
-    const stored = getSetting('minimumProfitThreshold', fallback);
-    if (!isPlainObject(stored)) {
-        return {
-            default: Number.isFinite(fallback.default) ? fallback.default : 0,
-            users: { ...isPlainObject(fallback.users) ? fallback.users : {} },
-        };
-    }
-    const baseDefault = Number.isFinite(stored.default)
-        ? stored.default
-        : Number.isFinite(fallback.default)
-            ? fallback.default
-            : 0;
-    const baseUsers = isPlainObject(stored.users)
-        ? stored.users
-        : isPlainObject(fallback.users)
-            ? fallback.users
-            : {};
-    const users = {};
-    for (const [userId, value] of Object.entries(baseUsers)) {
-        if (Number.isFinite(value) && value >= 0 && value <= 1) {
-            users[userId] = value;
-        }
-    }
-    return {
-        default: baseDefault >= 0 && baseDefault <= 1 ? baseDefault : 0,
-        users,
-    };
-}
-
 function formatPercentDisplay(value) {
     return value % 1 === 0 ? value.toFixed(0) : value.toFixed(2);
-}
-
-function applyMinimumProfitUpdate(nextValue) {
-    if (isPlainObject(CFG.minimumProfitThreshold)) {
-        CFG.minimumProfitThreshold.default = nextValue.default;
-        CFG.minimumProfitThreshold.users = nextValue.users;
-    } else {
-        CFG.minimumProfitThreshold = nextValue;
-    }
 }
 
 function formatAccountAssets(assets = []) {
@@ -321,6 +282,31 @@ export async function handleInteraction(interaction) {
                 await interaction.reply({ content: 'Não foi possível atualizar o risco no momento.', ephemeral: true });
             }
         } else if (group === 'profit') {
+            if (sub === 'view') {
+                const settings = getMinimumProfitSettings();
+                const userId = interaction.user?.id ?? null;
+                const personalRatio = userId && settings.users[userId] !== undefined
+                    ? settings.users[userId]
+                    : null;
+                const appliedRatio = personalRatio !== null ? personalRatio : settings.default;
+                const defaultPercent = formatPercentDisplay(settings.default * 100);
+                const appliedPercent = formatPercentDisplay(appliedRatio * 100);
+                let personalLine;
+                if (personalRatio === null) {
+                    personalLine = 'Seu lucro mínimo: usando o padrão do servidor';
+                } else {
+                    const personalPercent = formatPercentDisplay(personalRatio * 100);
+                    personalLine = `Seu lucro mínimo: ${personalPercent}%`;
+                }
+                const lines = [
+                    `Lucro mínimo padrão: ${defaultPercent}%`,
+                    personalLine,
+                    `Valor aplicado nas análises: ${appliedPercent}%`,
+                ];
+                await interaction.reply({ content: lines.join('\n'), ephemeral: true });
+                return;
+            }
+
             if (sub !== 'default' && sub !== 'personal') {
                 await interaction.reply({ content: 'Configuração não suportada.', ephemeral: true });
                 return;
@@ -336,15 +322,9 @@ export async function handleInteraction(interaction) {
             const decimal = percent / 100;
             const formatted = formatPercentDisplay(percent);
             const log = withContext(logger, { command: 'settings', group, sub });
-            const current = readMinimumProfitSettings();
             try {
                 if (sub === 'default') {
-                    const nextValue = {
-                        default: decimal,
-                        users: { ...current.users },
-                    };
-                    setSetting('minimumProfitThreshold', nextValue);
-                    applyMinimumProfitUpdate(nextValue);
+                    setDefaultMinimumProfit(decimal);
                     await interaction.reply({
                         content: `Lucro mínimo padrão atualizado para ${formatted}%`,
                         ephemeral: true,
@@ -355,12 +335,7 @@ export async function handleInteraction(interaction) {
                         await interaction.reply({ content: 'Não foi possível identificar o usuário.', ephemeral: true });
                         return;
                     }
-                    const nextValue = {
-                        default: current.default,
-                        users: { ...current.users, [userId]: decimal },
-                    };
-                    setSetting('minimumProfitThreshold', nextValue);
-                    applyMinimumProfitUpdate(nextValue);
+                    setPersonalMinimumProfit(userId, decimal);
                     await interaction.reply({
                         content: `Lucro mínimo pessoal atualizado para ${formatted}%`,
                         ephemeral: true,
@@ -493,6 +468,11 @@ function getClient() {
                             description: 'Configurações de lucro mínimo',
                             type: ApplicationCommandOptionType.SubcommandGroup,
                             options: [
+                                {
+                                    name: 'view',
+                                    description: 'Mostra os valores configurados de lucro mínimo',
+                                    type: ApplicationCommandOptionType.Subcommand,
+                                },
                                 {
                                     name: 'default',
                                     description: 'Define o lucro mínimo padrão (0 a 100%)',
