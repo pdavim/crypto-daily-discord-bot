@@ -62,6 +62,14 @@ describe("portfolio growth simulation", () => {
                 chartDirectory: path.join(tmpRoot, "charts"),
                 appendToUploads: true,
             },
+            discord: {
+                enabled: true,
+                mention: "@here",
+                webhookUrl: "",
+                channelId: "",
+                locale: "pt-PT",
+                includeReportLinks: true,
+            },
             strategies: {
                 default: {
                     name: "Balanced",
@@ -106,6 +114,9 @@ describe("portfolio growth simulation", () => {
         expect(fs.existsSync(result?.reports?.progressionPath ?? "")).toBe(true);
         expect(renderPortfolioGrowthChartMock).toHaveBeenCalledOnce();
         expect(result?.uploads).toHaveLength(1);
+        expect(result?.progress?.pct).toBeGreaterThan(0);
+        expect(result?.discord?.message).toContain("Simulação 100€ → 10M€");
+        expect(result?.discordMessage).toBe(result?.discord?.message);
     });
 
     it("retorna null quando o módulo está desativado", async () => {

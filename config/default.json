@@ -30,6 +30,7 @@
   "enableAlerts": true,
   "enableAnalysis": true,
   "enableReports": true,
+  "enableBinanceCommand": true,
   "debug": false,
   "accountEquity": 0,
   "riskPerTrade": 0.01,
@@ -53,6 +54,20 @@
       "asset": "USDT",
       "minFree": 50,
       "transferAmount": 25
+    },
+    "automation": {
+      "enabled": false,
+      "timeframe": "4h",
+      "minConfidence": 0.55,
+      "positionPct": 0.05,
+      "maxPositions": 3,
+      "positionEpsilon": 0.0001,
+      "mode": "margin",
+      "quoteAsset": "USDT",
+      "margin": {
+        "borrowOnShort": true,
+        "repayOnClose": true
+      }
     }
   },
   "marketPosture": {
@@ -95,24 +110,32 @@
       "intervalDays": 30,
       "tolerancePct": 0.05
     },
-    "risk": {
-      "maxDrawdownPct": 0.35,
-      "stopLossPct": 0.12,
-      "takeProfitPct": 0.25,
-      "maxPositionPct": 0.4,
-      "volatilityLookback": 30,
-      "volatilityTargetPct": 0.15
-    },
-    "reporting": {
-      "enabled": true,
-      "directory": "reports/growth",
-      "chartDirectory": "charts/growth",
-      "appendToUploads": false
-    },
-    "strategies": {
-      "default": {
-        "name": "Base Rebalance",
-        "allocation": {
+  "risk": {
+    "maxDrawdownPct": 0.35,
+    "stopLossPct": 0.12,
+    "takeProfitPct": 0.25,
+    "maxPositionPct": 0.4,
+    "volatilityLookback": 30,
+    "volatilityTargetPct": 0.15
+  },
+  "reporting": {
+    "enabled": true,
+    "directory": "reports/growth",
+    "chartDirectory": "charts/growth",
+    "appendToUploads": false
+  },
+  "discord": {
+    "enabled": false,
+    "mention": "",
+    "webhookUrl": "",
+    "channelId": "",
+    "locale": "pt-PT",
+    "includeReportLinks": true
+  },
+  "strategies": {
+    "default": {
+      "name": "Base Rebalance",
+      "allocation": {
           "BTC": 0.45,
           "ETH": 0.3,
           "SOL": 0.15,

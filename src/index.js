@@ -24,7 +24,10 @@ import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
+import { deriveDecisionDetails } from "./alerts/decision.js";
+import { collectVariationMetrics } from "./alerts/variationMetrics.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
+import { automateTrading } from "./trading/automation.js";
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
 import { runPortfolioGrowthSimulation } from "./portfolio/growth.js";
 
@@ -228,6 +231,7 @@ async function runOnceForAsset(asset, options = {}) {
                 volSeries: vol
             });
             snapshots[tf] = snapshot;
+            const variationMetrics = collectVariationMetrics({ snapshots });
             const timeframeVariation = snapshot?.kpis?.var ?? null;
             const guidance = snapshot?.kpis?.reco ?? null;
 
@@ -247,6 +251,11 @@ async function runOnceForAsset(asset, options = {}) {
                 strategy: strategyPlan.action,
             }, 'Evaluated market posture');
 
+            const decision = deriveDecisionDetails({
+                strategy: strategyPlan,
+                posture,
+            });
+
             const meta = {
                 consolidated: [],
                 actionable: [],
@@ -254,8 +263,23 @@ async function runOnceForAsset(asset, options = {}) {
                 variation: timeframeVariation,
                 posture,
                 strategy: strategyPlan,
+                decision,
             };
             timeframeMeta.set(tf, meta);
+
+            try {
+                await automateTrading({
+                    assetKey: asset.key,
+                    symbol: asset.binance,
+                    timeframe: tf,
+                    decision,
+                    posture,
+                    strategy: strategyPlan,
+                    snapshot,
+                });
+            } catch (err) {
+                log.error({ fn: 'runOnceForAsset', err }, 'Automated trading failed');
+            }
 
             if (enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
@@ -286,29 +310,45 @@ async function runOnceForAsset(asset, options = {}) {
                         const lastCloseIso = Number.isFinite(forecastResult.lastTime)
                             ? new Date(forecastResult.lastTime).toISOString()
                             : null;
+                        const forecastEntry = {
+                            runAt: runAtIso,
+                            predictedAt: predictedAtIso,
+                            lastCloseAt: lastCloseIso,
+                            lastClose: forecastResult.lastClose,
+                            forecastClose: forecastResult.forecast,
+                            delta: forecastResult.delta,
+                            confidence: forecastResult.confidence,
+                            method: forecastResult.method,
+                            samples: forecastResult.samples,
+                            mae: forecastResult.mae,
+                            rmse: forecastResult.rmse,
+                            slope: forecastResult.slope,
+                            intercept: forecastResult.intercept,
+                            horizonMs: forecastResult.horizonMs,
+                        };
                         const persistence = persistForecastEntry({
-
                             assetKey: asset.key,
                             timeframe: tf,
-                            entry: {
-                                runAt: runAtIso,
-                                predictedAt: predictedAtIso,
-                                lastCloseAt: lastCloseIso,
-                                lastClose: forecastResult.lastClose,
-                                forecastClose: forecastResult.forecast,
-                                delta: forecastResult.delta,
-                                confidence: forecastResult.confidence,
-                                method: forecastResult.method,
-                                samples: forecastResult.samples,
-                                mae: forecastResult.mae,
-                                rmse: forecastResult.rmse,
-                                slope: forecastResult.slope,
-                                intercept: forecastResult.intercept,
-                                horizonMs: forecastResult.horizonMs,
-                            },
+                            entry: forecastEntry,
                             directory: CFG.forecasting.outputDir,
                             historyLimit: CFG.forecasting.historyLimit,
                         });
+
+                        meta.forecast = {
+                            forecastClose: forecastResult.forecast,
+                            lastClose: forecastResult.lastClose,
+                            lastCloseAt: lastCloseIso,
+                            delta: forecastResult.delta,
+                            confidence: forecastResult.confidence,
+                            predictedAt: predictedAtIso,
+                            runAt: runAtIso,
+                            method: forecastResult.method,
+                            horizonMs: forecastResult.horizonMs,
+                            samples: forecastResult.samples,
+                            evaluation: persistence?.evaluation ?? null,
+                            historyPath: persistence?.filePath ?? null,
+                            timeZone: CFG.tz,
+                        };
 
                         if (Number.isFinite(forecastResult.confidence)) {
                             forecastConfidenceHistogram.observe(forecastResult.confidence);
@@ -402,7 +442,9 @@ async function runOnceForAsset(asset, options = {}) {
                     cciSeries: indicators.cciSeries,
                     obvSeries: indicators.obvSeries,
                     equity: CFG.accountEquity,
-                    riskPct: CFG.riskPerTrade
+                    riskPct: CFG.riskPerTrade,
+                    variationByTimeframe: variationMetrics,
+                    timeframeOrder: TIMEFRAMES
                 });
                 const consolidated = [];
                 const dedupMap = new Map();
@@ -434,13 +476,7 @@ async function runOnceForAsset(asset, options = {}) {
     await Promise.all(timeframeTasks);
 
     if (enableAlerts) {
-        const variationByTimeframe = {};
-        for (const tf of TIMEFRAMES) {
-            const variation = snapshots[tf]?.kpis?.var;
-            if (Number.isFinite(variation)) {
-                variationByTimeframe[tf] = variation;
-            }
-        }
+        const variationByTimeframe = collectVariationMetrics({ snapshots });
 
         const timeframeSummaries = TIMEFRAMES.map(tf => {
             const meta = timeframeMeta.get(tf);
@@ -450,7 +486,9 @@ async function runOnceForAsset(asset, options = {}) {
             return {
                 timeframe: tf,
                 guidance: meta.guidance,
-                alerts: meta.consolidated
+                decision: meta.decision,
+                alerts: meta.consolidated,
+                forecast: meta.forecast
             };
         }).filter(Boolean);
 
@@ -525,6 +563,22 @@ async function runAll() {
             if (!uploaded) {
                 const log = withContext(logger, { fn: "runAll" });
                 log.warn({ uploads: growthSummary.uploads }, "Failed to post portfolio growth chart");
+            }
+        }
+        if (CFG.portfolioGrowth?.discord?.enabled && growthSummary?.discord?.message) {
+            const log = withContext(logger, { fn: "runAll" });
+            const options = {};
+            const webhook = CFG.portfolioGrowth.discord.webhookUrl?.trim();
+            const channelId = CFG.portfolioGrowth.discord.channelId?.trim();
+            if (webhook) {
+                options.webhookUrl = webhook;
+            }
+            if (channelId) {
+                options.channelId = channelId;
+            }
+            const delivered = await sendDiscordAlert(growthSummary.discord.message, options);
+            if (!delivered) {
+                log.warn({ fn: "runAll" }, 'Failed to dispatch portfolio growth summary');
             }
         }
     } catch (error) {
