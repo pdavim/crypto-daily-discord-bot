@@ -77,6 +77,19 @@ npm install
 | Testes unitários | `npm test` | Executa a suíte do Vitest. |
 | Cobertura de testes | `npm run test:coverage` | Gera relatório de cobertura V8 (salvo em `coverage/`). |
 | Renderização de gráfico isolado | `npm run test:chart` | Gera um gráfico localmente para debug dos assets/timeframes. |
+| Lint e formatação | `npm run lint` | Valida sintaxe ESM, indentação (4 espaços) e convenções de aspas. |
+| Ajustes automáticos | `npm run lint:fix` | Executa o lint com correções automáticas sempre que possível. |
+
+## Estrutura dos módulos
+
+O repositório segue uma organização modular para manter responsabilidades isoladas e refletidas na suíte de testes:
+
+- **`src/alerts/`** — Coleção de detectores especializados (`trendAlert`, `bollingerAlert`, `variationMetrics`, etc.) que transformam indicadores em payloads prontos para publicação. Os arquivos `dispatcher.js`, `messageBuilder.js` e `decision.js` centralizam enfileiramento, formatação e priorização dos alertas antes de chegarem ao Discord.
+- **`src/ai.js`** — Orquestra o agente de análise assistido por IA. Usa indicadores técnicos, notícias (`news.js`), buscas na web (`websearch.js`) e fallback heurístico para gerar relatórios detalhados quando a API da OpenRouter está indisponível.
+- **`src/data/`** — Adaptadores para dados externos. `binance.js` e `binanceStream.js` fazem coleta/cache de candles; `economic.js` monitora calendário macroeconômico; `newsapi.js` e `serpapi.js` fornecem notícias e snippets para enriquecer relatórios.
+- **`src/reporter.js`** — Converte snapshots técnicos em PDFs, aplica heurísticas de pontuação e exporta helpers (`pct`, `fmt`, `buildSnapshotForReport`) reutilizados em relatórios semanais/mensais e no site.
+
+Cada diretório de `tests/` espelha essa estrutura (`tests/alerts/`, `tests/ai.test.js`, `tests/data/`, `tests/reporter.test.js`) garantindo que novas funcionalidades venham acompanhadas de cobertura automatizada.
 
 ### Logs e compatibilidade
 
