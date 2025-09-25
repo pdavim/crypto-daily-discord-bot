@@ -90,3 +90,14 @@ Para tornar o feed de alertas mais digerível, as notificações agregadas agora
 
 Com essa organização, fica mais simples acompanhar o que está acontecendo com BTC, ETH e demais moedas sem saltos ou inversões de ordem no canal de alertas.
 
+## Forecasts de fechamento e gráficos históricos
+
+O módulo de forecasting (em `src/forecasting.js`) calcula uma projeção do próximo preço de fechamento para cada timeframe monitorado utilizando regressão linear. A cada execução do bot:
+
+- Os resultados são persistidos em `reports/forecasts/<ATIVO>/<timeframe>.json`, mantendo um histórico com data da previsão, confiança, delta e erro em relação ao fechamento observado posteriormente.
+- Quando `forecasting.charts.enabled` está ativo, um gráfico comparativo é renderizado em `charts/forecasts/`, destacando o candle mais recente e o ponto previsto.
+- A linha "Previsão" aparece nos alertas do Discord logo após o cabeçalho de cada timeframe, mostrando o preço estimado, variação esperada, confiança percentual, alvo temporal (convertido para o fuso definido em `CFG.tz`) e, quando disponível, a precisão da previsão anterior.
+- Se `forecasting.charts.appendToUploads` for verdadeiro, as imagens geradas são anexadas automaticamente ao mesmo post dos gráficos tradicionais.
+
+Os parâmetros padrão (lookback, histórico mínimo, limite de retenção e diretórios) podem ser ajustados em `config/default.json` ou sobrescritos via variáveis de ambiente (`FORECASTING_*`). Isso facilita calibrar a janela de análise conforme a volatilidade de cada exchange e manter os artefatos fora do versionamento.
+

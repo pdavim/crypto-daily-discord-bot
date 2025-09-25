@@ -310,29 +310,45 @@ async function runOnceForAsset(asset, options = {}) {
                         const lastCloseIso = Number.isFinite(forecastResult.lastTime)
                             ? new Date(forecastResult.lastTime).toISOString()
                             : null;
+                        const forecastEntry = {
+                            runAt: runAtIso,
+                            predictedAt: predictedAtIso,
+                            lastCloseAt: lastCloseIso,
+                            lastClose: forecastResult.lastClose,
+                            forecastClose: forecastResult.forecast,
+                            delta: forecastResult.delta,
+                            confidence: forecastResult.confidence,
+                            method: forecastResult.method,
+                            samples: forecastResult.samples,
+                            mae: forecastResult.mae,
+                            rmse: forecastResult.rmse,
+                            slope: forecastResult.slope,
+                            intercept: forecastResult.intercept,
+                            horizonMs: forecastResult.horizonMs,
+                        };
                         const persistence = persistForecastEntry({
-
                             assetKey: asset.key,
                             timeframe: tf,
-                            entry: {
-                                runAt: runAtIso,
-                                predictedAt: predictedAtIso,
-                                lastCloseAt: lastCloseIso,
-                                lastClose: forecastResult.lastClose,
-                                forecastClose: forecastResult.forecast,
-                                delta: forecastResult.delta,
-                                confidence: forecastResult.confidence,
-                                method: forecastResult.method,
-                                samples: forecastResult.samples,
-                                mae: forecastResult.mae,
-                                rmse: forecastResult.rmse,
-                                slope: forecastResult.slope,
-                                intercept: forecastResult.intercept,
-                                horizonMs: forecastResult.horizonMs,
-                            },
+                            entry: forecastEntry,
                             directory: CFG.forecasting.outputDir,
                             historyLimit: CFG.forecasting.historyLimit,
                         });
+
+                        meta.forecast = {
+                            forecastClose: forecastResult.forecast,
+                            lastClose: forecastResult.lastClose,
+                            lastCloseAt: lastCloseIso,
+                            delta: forecastResult.delta,
+                            confidence: forecastResult.confidence,
+                            predictedAt: predictedAtIso,
+                            runAt: runAtIso,
+                            method: forecastResult.method,
+                            horizonMs: forecastResult.horizonMs,
+                            samples: forecastResult.samples,
+                            evaluation: persistence?.evaluation ?? null,
+                            historyPath: persistence?.filePath ?? null,
+                            timeZone: CFG.tz,
+                        };
 
                         if (Number.isFinite(forecastResult.confidence)) {
                             forecastConfidenceHistogram.observe(forecastResult.confidence);
@@ -471,7 +487,9 @@ async function runOnceForAsset(asset, options = {}) {
                 timeframe: tf,
                 guidance: meta.guidance,
                 decision: meta.decision,
-                alerts: meta.consolidated
+                alerts: meta.consolidated,
+                forecast: meta.forecast
+
             };
         }).filter(Boolean);
 
