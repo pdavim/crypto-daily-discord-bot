@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "cleanup:reports": "node bin/cleanup-reports.js",
+    "cleanup:artifacts": "node bin/cleanup-artifacts.js",
     "docs": "jsdoc -c jsdoc.json && node bin/strip-doc-fonts.js",
     "site:dev": "vitepress dev website/docs",
     "site:build": "vitepress build website/docs",

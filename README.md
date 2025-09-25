@@ -58,6 +58,15 @@ npm install
 
 > 📌 Consulte `.env.example` para descrições completas e exemplos de cada variável disponível.
 
+## Gestão de configuração (`config/default.json`, `.env`, `config-cli`)
+
+- **Não edite `config/default.json` diretamente**: ele contém os valores padrão rastreados no repositório e serve como base de comparação para ambientes locais e produção.
+- Para ajustes permanentes, utilize `config/custom.json` — o arquivo é gerado automaticamente quando você aplica alterações pelo utilitário `config-cli` e permanece fora do versionamento.
+- Execute `npm exec config-cli list` para visualizar o merge entre `config/default.json` e `config/custom.json`.
+- Ajuste opções com `npm exec config-cli set caminho.valor novoValor`; o comando normaliza números/booleanos automaticamente e persiste as alterações em `config/custom.json`.
+- Credenciais sensíveis continuam exclusivamente no `.env`. Combine `npm exec config-cli secrets check` com ferramentas de CI/CD para validar se as variáveis obrigatórias foram definidas antes do deploy.
+- Em ambientes temporários, exporte variáveis em linha (`ENABLE_BINANCE_COMMAND=false npm run once`) sem alterar arquivos locais.
+
 ## Boas práticas para credenciais da Binance
 
 - Gere chaves **apenas com permissões necessárias**: leitura para alertas e dashboards; ativar "Enable Spot & Margin Trading" somente quando o executor automático for utilizado.
@@ -80,6 +89,7 @@ npm install
 |--------|---------|-----------|
 | Rodar o agendador com todos os jobs | `npm start` | Mantém o bot ativo, publica gráficos, notícias e alertas conforme as rotinas configuradas. |
 | Executar apenas um ciclo de coleta/postagem | `npm run once` | Útil para validar integrações em ambientes de teste ou CI. |
+| Limpeza completa de artefatos | `npm run cleanup:artifacts` | Remove conteúdo de `logs/`, `reports/`, `charts/` e `coverage/`, preservando apenas os `.gitkeep` rastreados. |
 | Limpar relatórios antigos | `npm run cleanup:reports` | Remove arquivos obsoletos em `reports/` e `data/`. |
 | Documentação do site (modo dev) | `npm run site:dev` | Sobe o VitePress em `http://localhost:5173/crypto-daily-discord-bot/` para edição local. |
 | Gerar build estática do site | `npm run site:build` | Compila a documentação para `.vitepress/dist`, usada no deploy do GitHub Pages. |
