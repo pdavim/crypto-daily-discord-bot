@@ -25,9 +25,9 @@ import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
 import { deriveDecisionDetails } from "./alerts/decision.js";
-
 import { collectVariationMetrics } from "./alerts/variationMetrics.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
+import { automateTrading } from "./trading/automation.js";
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
 import { runPortfolioGrowthSimulation } from "./portfolio/growth.js";
 
@@ -266,6 +266,20 @@ async function runOnceForAsset(asset, options = {}) {
                 decision,
             };
             timeframeMeta.set(tf, meta);
+
+            try {
+                await automateTrading({
+                    assetKey: asset.key,
+                    symbol: asset.binance,
+                    timeframe: tf,
+                    decision,
+                    posture,
+                    strategy: strategyPlan,
+                    snapshot,
+                });
+            } catch (err) {
+                log.error({ fn: 'runOnceForAsset', err }, 'Automated trading failed');
+            }
 
             if (enableCharts) {
                 const chartPath = await renderChartPNG(asset.key, tf, candles, {
