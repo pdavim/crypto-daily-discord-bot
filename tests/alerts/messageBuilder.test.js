@@ -30,6 +30,7 @@ describe('buildAssetAlertMessage', () => {
               directionHit: true
             }
           },
+
           alerts: [
             { msg: '📈 Breakout', level: ALERT_LEVELS.HIGH, category: ALERT_CATEGORIES.TREND, count: 2 }
           ]
@@ -51,6 +52,7 @@ describe('buildAssetAlertMessage', () => {
             predictedAt: '2024-01-01T13:00:00Z',
             timeZone: 'UTC'
           },
+
           alerts: [
             { msg: '⚠️ Pullback detectado', level: ALERT_LEVELS.MEDIUM, category: ALERT_CATEGORIES.INFO }
           ]

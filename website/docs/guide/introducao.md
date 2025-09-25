@@ -100,3 +100,4 @@ O módulo de forecasting (em `src/forecasting.js`) calcula uma projeção do pr�
 - Se `forecasting.charts.appendToUploads` for verdadeiro, as imagens geradas são anexadas automaticamente ao mesmo post dos gráficos tradicionais.
 
 Os parâmetros padrão (lookback, histórico mínimo, limite de retenção e diretórios) podem ser ajustados em `config/default.json` ou sobrescritos via variáveis de ambiente (`FORECASTING_*`). Isso facilita calibrar a janela de análise conforme a volatilidade de cada exchange e manter os artefatos fora do versionamento.
+
