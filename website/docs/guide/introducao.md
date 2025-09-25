@@ -101,3 +101,13 @@ O módulo de forecasting (em `src/forecasting.js`) calcula uma projeção do pr�
 
 Os parâmetros padrão (lookback, histórico mínimo, limite de retenção e diretórios) podem ser ajustados em `config/default.json` ou sobrescritos via variáveis de ambiente (`FORECASTING_*`). Isso facilita calibrar a janela de análise conforme a volatilidade de cada exchange e manter os artefatos fora do versionamento.
 
+## Simulador 100€ → 10M€ com resumos automáticos
+
+O job `runPortfolioGrowthSimulation` (em `src/portfolio/growth.js`) roda diariamente um backtest de longo prazo para acompanhar a jornada de €100 até €10 milhões. O simulador considera alocações configuráveis, aportes periódicos, controles de risco (drawdown, stop loss, take profit) e rebalanceamentos automáticos, salvando JSONs em `reports/growth/` e gráficos em `charts/growth/`.
+
+- Defina pesos por ativo em `portfolioGrowth.strategies` e personalize aportes, slippage e janelas históricas em `portfolioGrowth.simulation`.
+- A cada execução, o bot gera métricas como retorno acumulado, CAGR, volatilidade anualizada, Sharpe ratio e data estimada para alcançar a meta com base no crescimento composto.
+- Ative `portfolioGrowth.discord.enabled` para receber um resumo no Discord com menção opcional (`@here`, cargos ou usuários), progresso percentual, capital investido e os links locais dos relatórios gerados.
+
+O módulo respeita diretórios e webhooks definidos em variáveis `PORTFOLIO_*`, garantindo que nenhum arquivo temporário seja versionado e que as notificações possam ser direcionadas a canais específicos do servidor.
+

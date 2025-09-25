@@ -566,6 +566,22 @@ async function runAll() {
                 log.warn({ uploads: growthSummary.uploads }, "Failed to post portfolio growth chart");
             }
         }
+        if (CFG.portfolioGrowth?.discord?.enabled && growthSummary?.discord?.message) {
+            const log = withContext(logger, { fn: "runAll" });
+            const options = {};
+            const webhook = CFG.portfolioGrowth.discord.webhookUrl?.trim();
+            const channelId = CFG.portfolioGrowth.discord.channelId?.trim();
+            if (webhook) {
+                options.webhookUrl = webhook;
+            }
+            if (channelId) {
+                options.channelId = channelId;
+            }
+            const delivered = await sendDiscordAlert(growthSummary.discord.message, options);
+            if (!delivered) {
+                log.warn({ fn: "runAll" }, 'Failed to dispatch portfolio growth summary');
+            }
+        }
     } catch (error) {
         const log = withContext(logger, { fn: "runAll" });
         log.warn({ err: error }, "Portfolio growth simulation failed");

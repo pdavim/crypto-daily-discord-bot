@@ -260,6 +260,15 @@ const DEFAULT_PORTFOLIO_REPORTING_CONFIG = {
     appendToUploads: false,
 };
 
+const DEFAULT_PORTFOLIO_DISCORD_CONFIG = {
+    enabled: false,
+    mention: "",
+    webhookUrl: "",
+    channelId: "",
+    locale: "pt-PT",
+    includeReportLinks: true,
+};
+
 const DEFAULT_PORTFOLIO_STRATEGY_CONFIG = {
     name: "Base Rebalance",
     allocation: {},
@@ -275,6 +284,7 @@ const DEFAULT_PORTFOLIO_GROWTH_CONFIG = {
     rebalance: DEFAULT_PORTFOLIO_REBALANCE_CONFIG,
     risk: DEFAULT_PORTFOLIO_RISK_CONFIG,
     reporting: DEFAULT_PORTFOLIO_REPORTING_CONFIG,
+    discord: DEFAULT_PORTFOLIO_DISCORD_CONFIG,
     strategies: {
         default: DEFAULT_PORTFOLIO_STRATEGY_CONFIG,
     },
@@ -508,6 +518,10 @@ const buildPortfolioGrowthConfig = (baseConfig = {}) => {
             ...defaults.reporting,
             ...(isPlainObject(base.reporting) ? base.reporting : {}),
         },
+        discord: {
+            ...defaults.discord,
+            ...(isPlainObject(base.discord) ? base.discord : {}),
+        },
         strategies: {},
     };
 
@@ -581,6 +595,27 @@ const buildPortfolioGrowthConfig = (baseConfig = {}) => {
     config.reporting.appendToUploads = toBoolean(
         process.env.PORTFOLIO_APPEND_UPLOADS,
         config.reporting.appendToUploads,
+    );
+
+    config.discord.enabled = toBoolean(process.env.PORTFOLIO_DISCORD_ENABLED, config.discord.enabled);
+    if (typeof process.env.PORTFOLIO_DISCORD_WEBHOOK === "string") {
+        const rawWebhook = process.env.PORTFOLIO_DISCORD_WEBHOOK.trim();
+        config.discord.webhookUrl = rawWebhook !== "" ? rawWebhook : "";
+    }
+    if (typeof process.env.PORTFOLIO_DISCORD_CHANNEL === "string") {
+        const rawChannel = process.env.PORTFOLIO_DISCORD_CHANNEL.trim();
+        config.discord.channelId = rawChannel !== "" ? rawChannel : "";
+    }
+    if (typeof process.env.PORTFOLIO_DISCORD_MENTION === "string") {
+        config.discord.mention = process.env.PORTFOLIO_DISCORD_MENTION.trim();
+    }
+    if (typeof process.env.PORTFOLIO_DISCORD_LOCALE === "string") {
+        const locale = process.env.PORTFOLIO_DISCORD_LOCALE.trim();
+        config.discord.locale = locale !== "" ? locale : config.discord.locale;
+    }
+    config.discord.includeReportLinks = toBoolean(
+        process.env.PORTFOLIO_DISCORD_INCLUDE_REPORTS,
+        config.discord.includeReportLinks,
     );
 
     const defaultStrategies = isPlainObject(defaults.strategies) ? defaults.strategies : {};

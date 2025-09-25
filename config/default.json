@@ -110,24 +110,32 @@
       "intervalDays": 30,
       "tolerancePct": 0.05
     },
-    "risk": {
-      "maxDrawdownPct": 0.35,
-      "stopLossPct": 0.12,
-      "takeProfitPct": 0.25,
-      "maxPositionPct": 0.4,
-      "volatilityLookback": 30,
-      "volatilityTargetPct": 0.15
-    },
-    "reporting": {
-      "enabled": true,
-      "directory": "reports/growth",
-      "chartDirectory": "charts/growth",
-      "appendToUploads": false
-    },
-    "strategies": {
-      "default": {
-        "name": "Base Rebalance",
-        "allocation": {
+  "risk": {
+    "maxDrawdownPct": 0.35,
+    "stopLossPct": 0.12,
+    "takeProfitPct": 0.25,
+    "maxPositionPct": 0.4,
+    "volatilityLookback": 30,
+    "volatilityTargetPct": 0.15
+  },
+  "reporting": {
+    "enabled": true,
+    "directory": "reports/growth",
+    "chartDirectory": "charts/growth",
+    "appendToUploads": false
+  },
+  "discord": {
+    "enabled": false,
+    "mention": "",
+    "webhookUrl": "",
+    "channelId": "",
+    "locale": "pt-PT",
+    "includeReportLinks": true
+  },
+  "strategies": {
+    "default": {
+      "name": "Base Rebalance",
+      "allocation": {
           "BTC": 0.45,
           "ETH": 0.3,
           "SOL": 0.15,
