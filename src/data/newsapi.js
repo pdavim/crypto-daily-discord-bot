@@ -20,7 +20,7 @@ export async function searchNews(asset) {
             description: a.description || "",
         }));
     } catch (error) {
-        log.error({ fn: 'searchNews', err: error }, "Error fetching news");
+        log.error({ fn: 'searchNews', err: error }, 'Error fetching news');
         return [];
     }
 }

@@ -22,7 +22,7 @@ export async function fetchEconomicEvents() {
                 impact: e.impact
             }));
     } catch (err) {
-        log.error({ fn: 'fetchEconomicEvents', err }, "Error fetching economic events");
+        log.error({ fn: 'fetchEconomicEvents', err }, 'Error fetching economic events');
         return [];
     }
 }
