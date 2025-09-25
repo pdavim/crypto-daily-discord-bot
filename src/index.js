@@ -25,6 +25,7 @@ import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
 import { deriveDecisionDetails } from "./alerts/decision.js";
+
 import { collectVariationMetrics } from "./alerts/variationMetrics.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
