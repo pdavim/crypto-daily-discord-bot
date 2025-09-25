@@ -71,3 +71,12 @@ Os alertas consolidados passaram a incluir uma linha dedicada às variações de
 
 Essa visão unificada facilita priorizar oportunidades e entender se um movimento forte em timeframes curtos está alinhado (ou não) com a tendência de médio prazo.
 
+## Alertas organizados por ativo
+
+Para tornar o feed de alertas mais digerível, as notificações agregadas agora são ordenadas por ativo antes de chegarem ao Discord. O dispatcher reúne todos os payloads gerados durante o ciclo e aplica duas regras:
+
+- Se o ativo tiver metadados de capitalização (`marketCapRank`) definidos em `src/assets.js`, a ordenação prioriza os mercados mais relevantes (rank 1 primeiro, rank 2 em seguida, etc.).
+- Na ausência desse dado, os ativos são listados alfabeticamente, garantindo previsibilidade mesmo para tickers personalizados ou recém-adicionados.
+
+Com essa organização, fica mais simples acompanhar o que está acontecendo com BTC, ETH e demais moedas sem saltos ou inversões de ordem no canal de alertas.
+
