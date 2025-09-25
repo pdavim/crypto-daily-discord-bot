@@ -36,6 +36,8 @@ const createBaseData = () => ({
   cciSeries: Array(21).fill(0),
   obvSeries: Array(21).fill(1000),
   var24h: 0,
+  variationByTimeframe: { '4h': 0, '24h': 0 },
+  timeframeOrder: ['4h', '1h', '30m', '15m', '5m'],
   equity: 1000,
   riskPct: 0.01
 });

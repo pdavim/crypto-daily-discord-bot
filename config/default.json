@@ -30,6 +30,7 @@
   "enableAlerts": true,
   "enableAnalysis": true,
   "enableReports": true,
+  "enableBinanceCommand": true,
   "debug": false,
   "accountEquity": 0,
   "riskPerTrade": 0.01,
