@@ -61,3 +61,13 @@ O bot permite ajustar um alvo mínimo de lucro para filtrar oportunidades de tra
 - `/settings profit personal value:<percentual>` grava o seu limite individual, sobrescrevendo o padrão para respostas das interações.
 
 Os valores ficam persistidos em `data/settings.json` e influenciam recomendações como o alerta de níveis de trade, que agora sinaliza quando o alvo projetado está abaixo do limite configurado.
+
+## Variação por timeframe nos alertas
+
+Os alertas consolidados passaram a incluir uma linha dedicada às variações de preço por timeframe. Sempre que novas métricas são calculadas, o bot combina os movimentos recentes (5m, 15m, 30m, 45m, 1h, 4h) com janelas mais longas (24h, 7d e 30d) para oferecer contexto imediato sobre o momentum do ativo.
+
+- O módulo `varAlert` agrega os percentuais em uma única mensagem, respeitando a ordem configurada em `TIMEFRAMES` e destacando as janelas diárias e semanais.
+- A mensagem final no Discord inclui a lista `_Variações: …_`, garantindo que cada ativo mostre como está performando em múltiplos horizontes de tempo.
+
+Essa visão unificada facilita priorizar oportunidades e entender se um movimento forte em timeframes curtos está alinhado (ou não) com a tendência de médio prazo.
+
