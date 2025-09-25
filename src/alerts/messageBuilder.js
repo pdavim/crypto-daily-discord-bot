@@ -1,4 +1,5 @@
 import { formatAlertMessage } from "../alerts.js";
+import { formatDecisionLine } from "./decision.js";
 
 function formatPercent(value) {
     if (!Number.isFinite(value)) {
@@ -35,7 +36,7 @@ function formatVariationOverview(variationByTimeframe = {}, timeframeOrder = [])
 }
 
 function buildTimeframeSection(summary, variationByTimeframe) {
-    const { timeframe, guidance, alerts } = summary;
+    const { timeframe, guidance, decision, alerts } = summary;
     if (!Array.isArray(alerts) || alerts.length === 0) {
         return [];
     }
@@ -50,9 +51,14 @@ function buildTimeframeSection(summary, variationByTimeframe) {
     }
 
     const lines = [headerSegments.join(" — ")];
+    const decisionLine = formatDecisionLine(decision);
+
     for (const alert of alerts) {
         const count = alert?.count ?? 1;
         lines.push(`• ${formatAlertMessage(alert, count)}`);
+        if (decisionLine) {
+            lines.push(`    ↳ Decisão: ${decisionLine}`);
+        }
     }
     return lines;
 }
