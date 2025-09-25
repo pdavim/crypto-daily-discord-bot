@@ -70,3 +70,4 @@ Os alertas consolidados passaram a incluir uma linha dedicada às variações de
 - A mensagem final no Discord inclui a lista `_Variações: …_`, garantindo que cada ativo mostre como está performando em múltiplos horizontes de tempo.
 
 Essa visão unificada facilita priorizar oportunidades e entender se um movimento forte em timeframes curtos está alinhado (ou não) com a tendência de médio prazo.
+
