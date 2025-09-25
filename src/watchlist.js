@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const WATCH_FILE = process.env.WATCHLIST_FILE

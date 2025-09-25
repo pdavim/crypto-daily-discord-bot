@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 const tempDirs = [];
 
@@ -25,7 +25,7 @@ describe('settings persistence', () => {
     const settingsPath = process.env.SETTINGS_FILE;
     fs.writeFileSync(settingsPath, JSON.stringify({ persisted: true }));
 
-    const { loadSettings } = await import('../src/settings.js');
+    const { loadSettings } = await import("../src/settings.js");
 
     const result = loadSettings({ defaultOnly: 'value' });
 
@@ -35,7 +35,7 @@ describe('settings persistence', () => {
   it('sets and removes values while persisting to disk', async () => {
     const settingsPath = process.env.SETTINGS_FILE;
 
-    const { loadSettings, setSetting, getSetting } = await import('../src/settings.js');
+    const { loadSettings, setSetting, getSetting } = await import("../src/settings.js");
 
     loadSettings();
     setSetting('alpha', 42);
@@ -51,7 +51,7 @@ describe('settings persistence', () => {
   it('resets state and removes the persisted file', async () => {
     const settingsPath = process.env.SETTINGS_FILE;
 
-    const { loadSettings, setSetting, resetSettings, getSettings } = await import('../src/settings.js');
+    const { loadSettings, setSetting, resetSettings, getSettings } = await import("../src/settings.js");
 
     loadSettings();
     setSetting('beta', 'value');

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 describe('performance metrics', () => {
   beforeEach(() => {
@@ -16,8 +16,8 @@ describe('performance metrics', () => {
       withContext: vi.fn(() => log),
     }));
 
-    const perf = await import('../src/perf.js');
-    const loggerModule = await import('../src/logger.js');
+    const perf = await import("../src/perf.js");
+    const loggerModule = await import("../src/logger.js");
 
     perf.recordPerf('fetchOHLCV', 50);
     perf.recordPerf('fetchOHLCV', 150);

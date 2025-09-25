@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 describe('logger helpers', () => {
   beforeEach(() => {
@@ -10,7 +10,7 @@ describe('logger helpers', () => {
   });
 
   it('createContext adds a request id and preserves known fields', async () => {
-    const { createContext } = await import('../src/logger.js');
+    const { createContext } = await import("../src/logger.js");
 
     const context = createContext({ asset: 'BTC/USDT', timeframe: '1h', userId: 42, skip: undefined });
 
@@ -22,7 +22,7 @@ describe('logger helpers', () => {
   });
 
   it('withContext reuses existing context when requestId is provided', async () => {
-    const { withContext } = await import('../src/logger.js');
+    const { withContext } = await import("../src/logger.js");
 
     const child = vi.fn().mockReturnValue('child-logger');
     const baseLogger = { child };
@@ -35,7 +35,7 @@ describe('logger helpers', () => {
   });
 
   it('withContext creates a new context when requestId is missing', async () => {
-    const { withContext } = await import('../src/logger.js');
+    const { withContext } = await import("../src/logger.js");
 
     const child = vi.fn().mockReturnValue('child');
     const baseLogger = { child };

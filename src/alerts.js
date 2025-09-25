@@ -1,9 +1,9 @@
-import { performance } from 'node:perf_hooks';
-import { logger, withContext } from './logger.js';
-import { recordPerf } from './perf.js';
-import { CFG } from './config.js';
-import { DEFAULT_ALERT_MODULES } from './alerts/registry.js';
-import { ALERT_LEVELS, ALERT_CATEGORIES, ALERT_CATEGORY_LABELS } from './alerts/shared.js';
+import { performance } from "node:perf_hooks";
+import { logger, withContext } from "./logger.js";
+import { recordPerf } from "./perf.js";
+import { CFG } from "./config.js";
+import { DEFAULT_ALERT_MODULES } from "./alerts/registry.js";
+import { ALERT_LEVELS, ALERT_CATEGORIES, ALERT_CATEGORY_LABELS } from "./alerts/shared.js";
 
 const LEVEL_ORDER = {
     [ALERT_LEVELS.HIGH]: 0,

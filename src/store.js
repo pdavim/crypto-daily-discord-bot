@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const STORE_FILE = process.env.RUN_SIGNATURES_FILE

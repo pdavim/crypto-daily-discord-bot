@@ -1,4 +1,4 @@
-import { ALERT_LEVELS, ALERT_CATEGORIES, createAlert } from './shared.js';
+import { ALERT_LEVELS, ALERT_CATEGORIES, createAlert } from "./shared.js";
 
 export default function maPriceAlert({ ma20, ma50, ma200, lastClose, closes }) {
     const alerts = [];

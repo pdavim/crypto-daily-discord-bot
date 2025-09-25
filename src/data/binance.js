@@ -3,8 +3,8 @@ import { LRUCache } from "lru-cache";
 import { fetchWithRetry } from "../utils.js";
 import { CFG } from "../config.js";
 import { logger, withContext } from "../logger.js";
-import { performance } from 'node:perf_hooks';
-import { recordPerf } from '../perf.js';
+import { performance } from "node:perf_hooks";
+import { recordPerf } from "../perf.js";
 
 const BASE = "https://api.binance.com/api/v3/klines";
 const CANDLES = 200; // solicitamos pelo menos 200 barras

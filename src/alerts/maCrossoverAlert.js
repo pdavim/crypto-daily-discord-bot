@@ -1,5 +1,5 @@
-import { crossUp, crossDown } from '../indicators.js';
-import { ALERT_LEVELS, ALERT_CATEGORIES, createAlert } from './shared.js';
+import { crossUp, crossDown } from "../indicators.js";
+import { ALERT_LEVELS, ALERT_CATEGORIES, createAlert } from "./shared.js";
 
 export default function maCrossoverAlert({ ma20, ma50, ma200 }) {
     if (!Array.isArray(ma20) || !Array.isArray(ma50)) {

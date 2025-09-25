@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const LOG_FILE = path.join(DATA_DIR, 'trades.json');

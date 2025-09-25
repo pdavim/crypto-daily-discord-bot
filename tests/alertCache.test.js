@@ -1,14 +1,14 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'alerts-'));
 const file = path.join(tmpDir, 'alerts.json');
 process.env.ALERTS_CACHE_FILE = file;
 
 async function loadModule() {
-  return import('../src/alertCache.js');
+  return import("../src/alertCache.js");
 }
 
 beforeEach(() => {

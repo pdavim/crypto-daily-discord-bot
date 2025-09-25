@@ -14,6 +14,7 @@ import { CFG } from "../config.js";
 import { fetchDailyCloses } from "../data/binance.js";
 import { renderPortfolioGrowthChart } from "../chart.js";
 import { logger, withContext } from "../logger.js";
+import { buildPortfolioGrowthDiscordMessage } from "./growthSummary.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -604,6 +605,22 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
         ? ((avgDailyReturn - riskFreeDaily) / dailyStd) * Math.sqrt(365)
         : 0;
 
+    const targetCapital = Math.max(0, Number(config.targetCapital) || 0);
+    const progressPct = targetCapital > 0 && Number.isFinite(finalValue)
+        ? finalValue / targetCapital
+        : 0;
+    let estimatedYearsToTarget = null;
+    if (!targetReachedAt && targetCapital > 0 && finalValue > 0 && cagr > 0) {
+        const ratio = targetCapital / finalValue;
+        if (ratio > 1) {
+            const numerator = Math.log(ratio);
+            const denominator = Math.log(1 + cagr);
+            if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator > 0) {
+                estimatedYearsToTarget = numerator / denominator;
+            }
+        }
+    }
+
     const summary = {
         runAt: new Date().toISOString(),
         strategy: strategy.name,
@@ -613,7 +630,7 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
         contributionsCount,
         investedCapital,
         finalValue,
-        targetCapital: config.targetCapital,
+        targetCapital,
         targetReached: targetReachedAt != null,
         targetReachedAt: targetReachedAt ? new Date(targetReachedAt).toISOString() : null,
         metrics: {
@@ -621,6 +638,7 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
             cagr,
             maxDrawdownPct,
             durationDays,
+            durationYears: years,
             annualizedVolatility,
             sharpeRatio,
             rebalances: rebalances.length,
@@ -632,6 +650,25 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
         reports: {},
         runtimeMs: performance.now() - start,
     };
+
+    summary.progress = {
+        pct: Number.isFinite(progressPct) ? progressPct : 0,
+        remainingCapital: Math.max(0, targetCapital - finalValue),
+        estimatedYearsToTarget: Number.isFinite(estimatedYearsToTarget) && estimatedYearsToTarget > 0
+            ? estimatedYearsToTarget
+            : null,
+    };
+
+    const discordMessage = buildPortfolioGrowthDiscordMessage({
+        summary,
+        mention: config.discord?.mention,
+        locale: config.discord?.locale,
+        includeReportLinks: config.discord?.includeReportLinks !== false,
+    });
+    if (discordMessage) {
+        summary.discord = { message: discordMessage };
+        summary.discordMessage = discordMessage;
+    }
 
     if (config.reporting?.enabled) {
         const reportDir = config.reporting.directory ?? "reports/growth";

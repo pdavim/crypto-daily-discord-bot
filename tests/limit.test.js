@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockConfigModule = (value) => {
   vi.doMock('../src/config.js', () => ({
@@ -22,7 +22,7 @@ describe('calcConcurrency', () => {
     }));
     mockConfigModule(7);
 
-    const { calcConcurrency } = await import('../src/limit.js');
+    const { calcConcurrency } = await import("../src/limit.js");
 
     expect(calcConcurrency()).toBe(7);
     expect(cpus).not.toHaveBeenCalled();
@@ -35,7 +35,7 @@ describe('calcConcurrency', () => {
     }));
     mockConfigModule('not-a-number');
 
-    const { calcConcurrency } = await import('../src/limit.js');
+    const { calcConcurrency } = await import("../src/limit.js");
 
     expect(calcConcurrency()).toBe(3);
     expect(cpus).toHaveBeenCalledTimes(1);
@@ -50,7 +50,7 @@ describe('calcConcurrency', () => {
     }));
     mockConfigModule(0);
 
-    const { calcConcurrency } = await import('../src/limit.js');
+    const { calcConcurrency } = await import("../src/limit.js");
 
     expect(calcConcurrency()).toBe(1);
     expect(cpus).toHaveBeenCalledTimes(1);
@@ -70,7 +70,7 @@ describe('pLimit', () => {
 
   it('throws when concurrency is less than 1', async () => {
     mockConfigModule(undefined);
-    const { default: pLimit } = await import('../src/limit.js');
+    const { default: pLimit } = await import("../src/limit.js");
 
     expect(() => pLimit(0)).toThrowError(
       new TypeError('Expected `concurrency` to be a number greater than 0'),
@@ -79,7 +79,7 @@ describe('pLimit', () => {
 
   it('limits the number of concurrently executing tasks', async () => {
     mockConfigModule(undefined);
-    const { default: pLimit } = await import('../src/limit.js');
+    const { default: pLimit } = await import("../src/limit.js");
 
     const limiter = pLimit(2);
 

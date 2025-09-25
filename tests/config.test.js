@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 let writeFileMock;
 let settingsStore;
@@ -34,7 +34,7 @@ afterEach(() => {
 
 describe('saveConfig minimum profit normalization', () => {
   it('normalizes invalid minimum profit entries before persisting', async () => {
-    const { CFG, saveConfig } = await import('../src/config.js');
+    const { CFG, saveConfig } = await import("../src/config.js");
 
     let persisted;
     writeFileMock.mockImplementation(async (_, data) => {
@@ -64,7 +64,7 @@ describe('saveConfig minimum profit normalization', () => {
   });
 
   it('falls back to previous defaults when provided values are out of bounds', async () => {
-    const { CFG, saveConfig } = await import('../src/config.js');
+    const { CFG, saveConfig } = await import("../src/config.js");
 
     let persisted;
     writeFileMock.mockImplementation(async (_, data) => {

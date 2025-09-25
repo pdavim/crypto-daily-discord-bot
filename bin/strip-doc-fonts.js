@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 const docsDir = 'docs';
 const fontsDir = join(docsDir, 'fonts');

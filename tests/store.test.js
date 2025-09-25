@@ -1,14 +1,14 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'store-'));
 const file = path.join(tmpDir, 'signatures.json');
 process.env.RUN_SIGNATURES_FILE = file;
 
 async function loadStore() {
-  return import('../src/store.js');
+  return import("../src/store.js");
 }
 
 beforeEach(() => {

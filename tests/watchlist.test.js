@@ -1,7 +1,7 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 vi.mock('../src/config.js', () => ({
   CFG: {},
@@ -15,7 +15,7 @@ const file = path.join(tmpDir, 'watch.json');
 process.env.WATCHLIST_FILE = file;
 
 async function loadModule() {
-  return import('../src/watchlist.js');
+  return import("../src/watchlist.js");
 }
 
 beforeEach(() => {

@@ -1,5 +1,5 @@
-import { logger, withContext } from './logger.js';
-import { fetchWithRetryCounter, fetchWithRetryHistogram } from './metrics.js';
+import { logger, withContext } from "./logger.js";
+import { fetchWithRetryCounter, fetchWithRetryHistogram } from "./metrics.js";
 
 /**
  * Executes an asynchronous function with exponential backoff retries.

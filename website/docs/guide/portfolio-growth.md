@@ -60,6 +60,14 @@ Trecho relevante de `config/default.json`:
     "chartDirectory": "charts/growth",
     "appendToUploads": false
   },
+  "discord": {
+    "enabled": false,
+    "mention": "",
+    "webhookUrl": "",
+    "channelId": "",
+    "locale": "pt-PT",
+    "includeReportLinks": true
+  },
   "strategies": {
     "default": {
       "name": "Base Rebalance",
@@ -89,6 +97,9 @@ Trecho relevante de `config/default.json`:
 | `PORTFOLIO_REBALANCE_INTERVAL`, `PORTFOLIO_REBALANCE_TOLERANCE` | Personalizam a cadência e a tolerância do rebalance. |
 | `PORTFOLIO_ALLOCATION` | Permite informar pesos customizados (`BTC:0.5,ETH:0.3,SOL:0.2`). |
 | `PORTFOLIO_REPORT_DIR` / `PORTFOLIO_CHART_DIR` | Sobrescrevem onde salvar JSONs e PNGs. |
+| `PORTFOLIO_DISCORD_ENABLED` / `PORTFOLIO_DISCORD_WEBHOOK` | Ativam o resumo diário no Discord e definem um webhook dedicado. |
+| `PORTFOLIO_DISCORD_CHANNEL` / `PORTFOLIO_DISCORD_MENTION` | Ajustam o canal para rate limiting e mencionam `@here`, cargos ou usuários. |
+| `PORTFOLIO_DISCORD_LOCALE` / `PORTFOLIO_DISCORD_INCLUDE_REPORTS` | Controlam o idioma e se links locais são anexados ao texto. |
 
 ## Artefatos gerados
 
@@ -100,6 +111,32 @@ Quando o módulo está ativo (`portfolioGrowth.enabled = true`):
 - `charts/growth/portfolio_growth_<timestamp>.png`: gráfico com valor do portfólio, capital investido, caixa e drawdown.
 
 Se `reporting.appendToUploads` estiver habilitado, o gráfico também é publicado no canal de charts configurado no Discord.
+
+## Resumo automático no Discord
+
+Configure o bloco `portfolioGrowth.discord` para que o bot envie um texto conciso com o andamento rumo aos €10 milhões. O resumo inclui valor atual, CAGR, retorno acumulado, aportes realizados, progresso percentual da meta e indicadores de risco.
+
+```text
+@here
+**Simulação 100€ → 10M€ · Base Rebalance**
+- Valor atual: €12 345,00 (+123,45% total | CAGR 47,20%)
+- Capital investido: €1 200,00 (aportes €1 100,00 em 12 contribuições)
+- Meta: €10 000 000,00 · progresso 0,12% · falta €9 987 655,00 · projeção 8,4 anos
+- Risco: drawdown máx 32,00% · vol anual 54,00% · Sharpe 1,20
+- Janela analisada: 3,0 anos (1 095 dias)
+- Relatórios salvos (0,12% da meta): `reports/growth/latest.json`, `charts/growth/portfolio_growth_2024-02-01.png`
+```
+
+Ative o fluxo com as variáveis:
+
+```bash
+export PORTFOLIO_GROWTH_ENABLED=true
+export PORTFOLIO_DISCORD_ENABLED=true
+export PORTFOLIO_DISCORD_WEBHOOK="https://discord.com/api/webhooks/..."
+export PORTFOLIO_DISCORD_MENTION="@here"
+```
+
+O módulo respeita o rate limit do canal informado e reutiliza `CFG.webhook` como fallback quando o webhook dedicado não é definido.
 
 ## Próximos passos sugeridos
 
