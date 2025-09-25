@@ -1,6 +1,6 @@
 # Wish List
 
-[] on discord user can see binance account (assets, positions, etc)
+[x] on discord user can see binance account (assets, positions, etc) — comando `/binance` entrega saldos spot/margin/futuros com logs estruturados e respostas ephemerais.
 [x] on discord user can set minimum profit value
 [x] on "alerts" you should consider the variation for each timeframe
 [x] on "alerts" you should sort by asset
