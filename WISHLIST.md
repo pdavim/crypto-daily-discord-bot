@@ -9,3 +9,4 @@
 [x] the bot should predict next timeframe close price and keep that values and create a chart for each asset with the values for each timeframe
 [x] the bot should consider 100euros initial value and wants to tuner it to 10Million
 [x] cross cutting quality tasks (style enforcement, docs e limpeza de artefatos)
+

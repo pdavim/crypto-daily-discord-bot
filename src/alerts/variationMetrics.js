@@ -12,6 +12,7 @@ const KPI_KEY_BY_LABEL = Object.freeze({
 
 /** @typedef {Object.<string, TimeframeSnapshot>} SnapshotMap */
 
+
 function isFiniteNumber(value) {
     return typeof value === "number" && Number.isFinite(value);
 }

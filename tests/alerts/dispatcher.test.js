@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+
 async function importDispatcher({ assets } = {}) {
   vi.resetModules();
   if (assets) {
@@ -8,6 +9,7 @@ async function importDispatcher({ assets } = {}) {
     vi.unmock('../../src/assets.js');
   }
   const module = await import("../../src/alerts/dispatcher.js");
+
   return module;
 }
 

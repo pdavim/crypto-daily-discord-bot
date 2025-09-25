@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildAssetAlertMessage, __private__ } from "../../src/alerts/messageBuilder.js";
 import { ALERT_LEVELS, ALERT_CATEGORIES } from "../../src/alerts/shared.js";
 
+
 describe('buildAssetAlertMessage', () => {
   it('includes variation overview and guidance for each timeframe', () => {
     const message = buildAssetAlertMessage({
@@ -30,6 +31,7 @@ describe('buildAssetAlertMessage', () => {
               directionHit: true
             }
           },
+
           alerts: [
             { msg: '📈 Breakout', level: ALERT_LEVELS.HIGH, category: ALERT_CATEGORIES.TREND, count: 2 }
           ]

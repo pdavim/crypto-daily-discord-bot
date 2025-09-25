@@ -120,3 +120,4 @@ O job `runPortfolioGrowthSimulation` (em `src/portfolio/growth.js`) roda diariam
 - Ative `portfolioGrowth.discord.enabled` para receber um resumo no Discord com menção opcional (`@here`, cargos ou usuários), progresso percentual, capital investido e os links locais dos relatórios gerados.
 
 O módulo respeita diretórios e webhooks definidos em variáveis `PORTFOLIO_*`, garantindo que nenhum arquivo temporário seja versionado e que as notificações possam ser direcionadas a canais específicos do servidor.
+

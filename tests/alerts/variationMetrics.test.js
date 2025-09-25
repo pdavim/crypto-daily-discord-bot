@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { collectVariationMetrics, __private__ } from "../../src/alerts/variationMetrics.js";
 
+
 describe('collectVariationMetrics', () => {
   it('builds a consolidated variation map across timeframes and horizons', () => {
     const snapshots = {

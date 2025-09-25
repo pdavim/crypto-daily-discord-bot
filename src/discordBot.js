@@ -18,6 +18,7 @@ import {
 } from "./minimumProfit.js";
 import { getAccountOverview } from "./trading/binance.js";
 
+
 const startTime = Date.now();
 
 function getWatchlist(userId) {

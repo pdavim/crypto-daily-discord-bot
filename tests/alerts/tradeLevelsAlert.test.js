@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+
 const settingsStore = {};
 
 const getSettingMock = vi.fn((key, fallback) => (key in settingsStore ? settingsStore[key] : fallback));
@@ -33,6 +34,7 @@ describe('tradeLevelsAlert minimum profit integration', () => {
     it('includes profit details when the ATR target meets the minimum threshold', async () => {
         settingsStore.minimumProfitThreshold = { default: 0.02, users: {} };
         const module = await import("../../src/alerts/tradeLevelsAlert.js");
+
         const tradeLevelsAlert = module.default;
 
         const alerts = tradeLevelsAlert({
@@ -50,6 +52,7 @@ describe('tradeLevelsAlert minimum profit integration', () => {
     it('warns when the projected profit is below the configured threshold', async () => {
         settingsStore.minimumProfitThreshold = { default: 0.05, users: {} };
         const module = await import("../../src/alerts/tradeLevelsAlert.js");
+
         const tradeLevelsAlert = module.default;
 
         const alerts = tradeLevelsAlert({
