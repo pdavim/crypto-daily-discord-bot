@@ -231,7 +231,92 @@ describe('discord bot interactions', () => {
     expect(message).toContain('• USDT: Livre 500,00 | Empréstimo 100,00 | Juros 2,00 | Líquido 398,00');
     expect(message).toContain('BTCUSDT (cross)');
     expect(message).toContain('Qtde: 0,0100 | Entrada: 25.000,00 | Marca: 26.000,00 | PnL: 100,00 | Liq.: 20.000,00');
-    expect(message).toContain('... e mais 1 ativos');
+    expect(message).toContain('... e mais 1 ativo');
+  });
+
+  it('limita seções extensas do /binance com indicação de overflow', async () => {
+    getAccountOverview.mockResolvedValue({
+      assets: Array.from({ length: 8 }, (_, index) => ({
+        coin: `ASSET${index + 1}`,
+        depositAllEnable: true,
+        withdrawAllEnable: true,
+      })),
+      spotBalances: Array.from({ length: 9 }, (_, index) => ({
+        asset: `COIN${index + 1}`,
+        total: 1000 + index,
+        free: 500 + index,
+        locked: 100 + index,
+      })),
+      marginAccount: {
+        totalAssetOfBtc: 1.25,
+        totalLiabilityOfBtc: 0.2,
+        userAssets: Array.from({ length: 8 }, (_, index) => ({
+          asset: `MARGIN${index + 1}`,
+          free: 10 + index,
+          borrowed: 5 + index,
+          interest: 0.5 + index,
+          netAsset: 20 + index,
+        })),
+      },
+      marginPositions: Array.from({ length: 7 }, (_, index) => ({
+        symbol: `PAIR${index + 1}`,
+        marginType: 'isolated',
+        positionAmt: 0.001 * (index + 1),
+        entryPrice: 1000 + index,
+        markPrice: 1100 + index,
+        unrealizedProfit: 50 + index,
+      })),
+    });
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    const message = interaction.editReply.mock.calls[0][0];
+    expect(message).toContain('... e mais 3 ativos');
+    expect(message).toContain('... e mais 3 saldos');
+    expect(message).toContain('... e mais 2 ativos');
+    expect(message).toContain('... e mais 2 posições');
+  });
+
+  it('mantém mensagens amigáveis com dados parciais no /binance', async () => {
+    getAccountOverview.mockResolvedValue({
+      assets: [{ coin: 'BTC', depositAllEnable: true }],
+      spotBalances: [
+        { asset: 'BTC', total: 0.5, free: 0.4 },
+        { asset: 'BUSD', total: undefined, free: undefined, locked: undefined },
+      ],
+      marginAccount: {
+        totalAssetOfBtc: 0.25,
+        userAssets: undefined,
+      },
+      marginPositions: [
+        { symbol: 'ETHUSDT', marginType: 'cross', positionAmt: undefined, entryPrice: undefined, markPrice: undefined, unrealizedProfit: undefined },
+      ],
+    });
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'binance',
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    const message = interaction.editReply.mock.calls[0][0];
+    expect(message).toContain('BTC: 0,50 (Livre 0,40 | Travado 0,00)');
+    expect(message).toContain('BUSD: 0,00 (Livre 0,00 | Travado 0,00)');
+    expect(message).toContain('• Ativos: 0,2500 BTC | Passivos: 0,00 BTC');
+    expect(message).toContain('Sem ativos na conta de margem.');
+    expect(message).toContain('ETHUSDT (cross)');
   });
 
   it('handles /binance command when overview lacks sections', async () => {
