@@ -157,6 +157,12 @@ Comandos comuns:
 
 Todos os comandos são registrados automaticamente quando o bot inicia e exigem permissões de aplicação no servidor configurado.
 
+### Ajuda paginada no Discord
+
+- O comando `/help` agora fraciona a resposta em múltiplas mensagens efêmeras sempre que a listagem completa ultrapassar o limite de 2 000 caracteres imposto pelo Discord.
+- A primeira página chega como resposta direta ao slash command e páginas adicionais são entregues como *follow-ups* efêmeros — percorra-as na ordem em que aparecem para consultar detalhes de subcomandos extensos como `/settings`.
+- Cada página mantém a mesma formatação hierárquica (indentação e bullets) para facilitar a leitura, mesmo quando uma seção é dividida em mais de um bloco.
+
 ## Indicadores calculados
 
 Os módulos de indicadores (`src/indicators.js`) oferecem cálculos reutilizados em relatórios, gráficos e alertas. Entre eles:

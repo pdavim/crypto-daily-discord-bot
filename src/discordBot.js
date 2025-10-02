@@ -43,6 +43,8 @@ const amountFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 
 const quantityFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 8 });
 const priceFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const DISCORD_MESSAGE_LIMIT = 2000;
+
 const MAX_LIST_ITEMS = {
     assets: 5,
     spotBalances: 6,
@@ -234,34 +236,155 @@ function buildSlashCommands() {
     return getAvailableCommandBlueprints().map(({ enabled, helpDetails, ...command }) => command);
 }
 
-function buildOptionHelpLines(options = [], depth = 1) {
-    if (!Array.isArray(options) || options.length === 0) return [];
-    const indent = "    ".repeat(depth);
-    const lines = [];
-    for (const option of options) {
-        if (option.type === ApplicationCommandOptionType.SubcommandGroup) {
-            lines.push(`${indent}• Grupo ${option.name} — ${option.description}`);
-            lines.push(...buildOptionHelpLines(option.options, depth + 1));
-        } else if (option.type === ApplicationCommandOptionType.Subcommand) {
-            lines.push(`${indent}• Subcomando ${option.name} — ${option.description}`);
-            lines.push(...buildOptionHelpLines(option.options, depth + 1));
+function splitLinePreservingIndent(line, maxLength) {
+    if (!line || line.length <= maxLength) {
+        return [line];
+    }
+    const indentMatch = line.match(/^(\s*)/);
+    const indent = indentMatch ? indentMatch[1] : "";
+    const available = maxLength - indent.length;
+    if (available <= 0) {
+        return [line];
+    }
+    const words = line.slice(indent.length).split(" ").filter(Boolean);
+    const parts = [];
+    let current = "";
+    for (const word of words) {
+        if (word.length > available) {
+            if (current) {
+                parts.push(`${indent}${current}`);
+                current = "";
+            }
+            let remaining = word;
+            while (remaining.length > available) {
+                parts.push(`${indent}${remaining.slice(0, available)}`);
+                remaining = remaining.slice(available);
+            }
+            current = remaining;
+            continue;
+        }
+        const appended = current ? `${current} ${word}` : word;
+        if (appended.length > available) {
+            if (current) {
+                parts.push(`${indent}${current}`);
+            }
+            current = word;
         } else {
-            const requirement = option.required ? " (obrigatório)" : "";
-            lines.push(`${indent}• ${option.name}${requirement} — ${option.description}`);
+            current = appended;
         }
     }
-    return lines;
+    if (current) {
+        parts.push(`${indent}${current}`);
+    }
+    return parts;
 }
 
-function buildHelpMessage() {
-    const sections = getAvailableCommandBlueprints().map(command => {
-        const header = `• /${command.name} — ${command.description}`;
-        const extra = Array.isArray(command.helpDetails) ? command.helpDetails.map(detail => `    ${detail}`) : [];
-        const optionLines = buildOptionHelpLines(command.options, 1);
-        const lines = [header, ...extra, ...optionLines];
-        return lines.join("\n");
-    });
-    return sections.join("\n\n");
+function createChunkBuilder(maxLength = DISCORD_MESSAGE_LIMIT) {
+    const chunks = [];
+    let currentLines = [];
+    let currentLength = 0;
+
+    function flush() {
+        if (!currentLines.length) return;
+        chunks.push(currentLines.join("\n"));
+        currentLines = [];
+        currentLength = 0;
+    }
+
+    function addLine(line) {
+        const safeLine = line ?? "";
+        if (safeLine.length > maxLength) {
+            const parts = splitLinePreservingIndent(safeLine, maxLength);
+            for (const part of parts) {
+                addLine(part);
+            }
+            return;
+        }
+        if (currentLines.length > 0 && currentLength + 1 + safeLine.length > maxLength) {
+            flush();
+        }
+        currentLines.push(safeLine);
+        currentLength = currentLines.length === 1 ? safeLine.length : currentLength + 1 + safeLine.length;
+    }
+
+    function addLines(lines = []) {
+        for (const line of lines) {
+            addLine(line);
+        }
+    }
+
+    function addBlock(block) {
+        if (!block) return;
+        addLines(String(block).split("\n"));
+    }
+
+    function addBlankLine() {
+        if (currentLines.length === 0 && chunks.length === 0) {
+            return;
+        }
+        addLine("");
+    }
+
+    function isEmpty() {
+        return currentLines.length === 0 && chunks.length === 0;
+    }
+
+    function getChunks() {
+        flush();
+        return chunks.slice();
+    }
+
+    return { addLine, addLines, addBlock, addBlankLine, getChunks, isEmpty };
+}
+
+function buildOptionHelpLines(options = [], depth = 1, maxChunkLength = DISCORD_MESSAGE_LIMIT) {
+    if (!Array.isArray(options) || options.length === 0) return [];
+    const indent = "    ".repeat(depth);
+    const builder = createChunkBuilder(maxChunkLength);
+    for (const option of options) {
+        if (!option) continue;
+        if (option.type === ApplicationCommandOptionType.SubcommandGroup) {
+            builder.addLine(`${indent}• Grupo ${option.name} — ${option.description}`);
+            const nestedChunks = buildOptionHelpLines(option.options, depth + 1, maxChunkLength);
+            for (const chunk of nestedChunks) {
+                builder.addBlock(chunk);
+            }
+        } else if (option.type === ApplicationCommandOptionType.Subcommand) {
+            builder.addLine(`${indent}• Subcomando ${option.name} — ${option.description}`);
+            const nestedChunks = buildOptionHelpLines(option.options, depth + 1, maxChunkLength);
+            for (const chunk of nestedChunks) {
+                builder.addBlock(chunk);
+            }
+        } else {
+            const requirement = option.required ? " (obrigatório)" : "";
+            builder.addLine(`${indent}• ${option.name}${requirement} — ${option.description}`);
+        }
+    }
+    return builder.getChunks();
+}
+
+export function buildHelpMessage({
+    commands = getAvailableCommandBlueprints(),
+    maxChunkLength = DISCORD_MESSAGE_LIMIT,
+} = {}) {
+    const builder = createChunkBuilder(maxChunkLength);
+    for (const command of commands) {
+        if (!command) continue;
+        if (!builder.isEmpty()) {
+            builder.addBlankLine();
+        }
+        builder.addLine(`• /${command.name} — ${command.description}`);
+        if (Array.isArray(command.helpDetails)) {
+            for (const detail of command.helpDetails) {
+                builder.addLine(`    ${detail}`);
+            }
+        }
+        const optionChunks = buildOptionHelpLines(command.options, 1, maxChunkLength);
+        for (const chunk of optionChunks) {
+            builder.addBlock(chunk);
+        }
+    }
+    return builder.getChunks();
 }
 
 function formatAmount(value, formatter = amountFormatter) {
@@ -399,7 +522,7 @@ function build45mCandles(candles15m) {
  * @param {Object} interaction - Discord interaction payload.
  * @returns {Promise} Resolves once the interaction response is handled.
  */
-export async function handleInteraction(interaction) {
+export async function handleInteraction(interaction, { helpMessageBuilder = buildHelpMessage } = {}) {
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName === 'chart') {
         const assetKey = interaction.options.getString('ativo', true).toUpperCase();
@@ -497,8 +620,23 @@ export async function handleInteraction(interaction) {
             await interaction.editReply(message);
         }
     } else if (interaction.commandName === 'help') {
-        const content = buildHelpMessage();
-        await interaction.reply({ content, ephemeral: true });
+        const chunks = helpMessageBuilder();
+        if (!Array.isArray(chunks) || chunks.length === 0) {
+            await interaction.reply({ content: 'Nenhum comando disponível no momento.', ephemeral: true });
+            return;
+        }
+        const [firstChunk, ...restChunks] = chunks;
+        await interaction.reply({ content: firstChunk, ephemeral: true });
+        for (const chunk of restChunks) {
+            if (!chunk) continue;
+            if (typeof interaction.followUp === 'function') {
+                // Discord limita mensagens a 2000 caracteres; os chunks já respeitam esse teto.
+                // eslint-disable-next-line no-await-in-loop
+                await interaction.followUp({ content: chunk, ephemeral: true });
+            } else {
+                break;
+            }
+        }
     } else if (interaction.commandName === 'settings') {
         const group = interaction.options.getSubcommandGroup(false);
         const sub = interaction.options.getSubcommand(false);

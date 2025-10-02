@@ -173,12 +173,14 @@ describe('discord bot interactions', () => {
   });
 
   it('lista comandos, subcomandos e argumentos no /help', async () => {
-    const { handleInteraction } = await loadBot();
+    const botModule = await loadBot();
+    const { handleInteraction } = botModule;
 
     const interaction = {
       isChatInputCommand: () => true,
       commandName: 'help',
       reply: vi.fn(),
+      followUp: vi.fn(),
     };
 
     await handleInteraction(interaction);
@@ -188,11 +190,65 @@ describe('discord bot interactions', () => {
       ephemeral: true,
     });
 
-    const message = interaction.reply.mock.calls[0][0].content;
+    const initialChunk = interaction.reply.mock.calls[0][0].content;
+    const followUpChunks = interaction.followUp.mock.calls.map((call) => call[0].content);
+    const allChunks = [initialChunk, ...followUpChunks];
+    allChunks.forEach((chunk) => {
+      expect(chunk.length).toBeLessThanOrEqual(2000);
+    });
+
+    const message = allChunks.join('\n\n');
     expect(message).toContain('/chart — Exibe um gráfico de preços com indicadores técnicos.');
     expect(message).toContain('Subcomando add — Adiciona um ativo à watchlist pessoal.');
     expect(message).toContain('value (obrigatório) — Percentual de lucro mínimo global (0 a 100).');
     expect(message).toContain('/help — Lista os comandos disponíveis e seus objetivos.');
+  });
+
+  it('pagina a resposta do /help quando excede o limite do Discord', async () => {
+    const botModule = await loadBot();
+    const longDescription = 'Descrição detalhada para testar paginação '.repeat(12);
+    const oversizedCommand = {
+      name: 'mega',
+      description: 'Comando com muitas opções para validar o fracionamento.',
+      helpDetails: ['Esta seção contém um volume grande de parâmetros e deve ser dividida em múltiplas páginas.'],
+      options: Array.from({ length: 120 }, (_, index) => ({
+        name: `option${index}`,
+        description: `${longDescription}${index}`,
+        type: 3,
+        required: true,
+      })),
+    };
+
+    const chunkLimit = 500;
+    const helpChunks = botModule.buildHelpMessage({ commands: [oversizedCommand], maxChunkLength: chunkLimit });
+
+    expect(helpChunks.length).toBeGreaterThan(1);
+    helpChunks.forEach((chunk) => {
+      expect(chunk.length).toBeLessThanOrEqual(chunkLimit);
+    });
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'help',
+      reply: vi.fn(),
+      followUp: vi.fn(),
+    };
+
+    await botModule.handleInteraction(interaction, { helpMessageBuilder: () => helpChunks });
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: helpChunks[0], ephemeral: true });
+    expect(interaction.followUp).toHaveBeenCalledTimes(helpChunks.length - 1);
+    helpChunks.slice(1).forEach((chunk, index) => {
+      expect(interaction.followUp).toHaveBeenNthCalledWith(index + 1, { content: chunk, ephemeral: true });
+    });
+
+    const deliveredChunks = [
+      interaction.reply.mock.calls[0][0].content,
+      ...interaction.followUp.mock.calls.map((call) => call[0].content),
+    ];
+    deliveredChunks.forEach((chunk) => {
+      expect(chunk.length).toBeLessThanOrEqual(2000);
+    });
   });
 
   it('handles /binance command and formats overview', async () => {
