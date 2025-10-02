@@ -240,3 +240,76 @@ export async function sendDiscordAlert(text, options = {}) {
         return false;
     }
 }
+
+const normalizeAttachment = (attachment, index = 0) => {
+    if (!attachment || typeof attachment !== "object") {
+        return null;
+    }
+    const filename = typeof attachment.filename === "string" && attachment.filename.trim() !== ""
+        ? attachment.filename.trim()
+        : `attachment-${index + 1}.txt`;
+    const contentType = typeof attachment.contentType === "string" && attachment.contentType.trim() !== ""
+        ? attachment.contentType
+        : "application/octet-stream";
+    const content = attachment.content instanceof Buffer
+        ? attachment.content
+        : Buffer.isBuffer(attachment.content)
+            ? attachment.content
+            : typeof attachment.content === "string"
+                ? Buffer.from(attachment.content, "utf8")
+                : null;
+    if (!content || content.length === 0) {
+        return null;
+    }
+    return {
+        filename,
+        contentType,
+        content,
+    };
+};
+
+export async function sendDiscordAlertWithAttachments({ content = "", attachments = [], webhookUrl, channelId } = {}) {
+    const url = webhookUrl ?? CFG.webhookAlerts ?? CFG.webhook;
+    const log = withContext(logger, { fn: "sendDiscordAlertWithAttachments" });
+    const providedChannelId = typeof channelId === "string" && channelId.trim() !== "" ? channelId : undefined;
+    const resolvedChannelId = providedChannelId ?? extractChannelId(url);
+
+    const normalizedAttachments = Array.isArray(attachments)
+        ? attachments.map((attachment, index) => normalizeAttachment(attachment, index)).filter(Boolean)
+        : [];
+
+    if (!url) {
+        log.warn({ attachments: normalizedAttachments.length }, "No Discord webhook configured for alert with attachments");
+        return false;
+    }
+
+    if (normalizedAttachments.length === 0) {
+        return sendDiscordAlert(content, { webhookUrl: url, channelId: resolvedChannelId });
+    }
+
+    alertCounter.inc();
+    const end = alertHistogram.startTimer();
+
+    try {
+        let isFirst = true;
+        for (const attachment of normalizedAttachments) {
+            await limit.consume(resolvedChannelId);
+            const payload = { content: isFirst ? content : "" };
+            const form = new FormData();
+            form.append("payload_json", JSON.stringify(payload));
+            form.append("files[0]", attachment.content, {
+                filename: attachment.filename,
+                contentType: attachment.contentType,
+            });
+            await fetchWithRetry(() => axios.post(url, form, { headers: form.getHeaders() }), { retries: 2 });
+            isFirst = false;
+        }
+        end();
+        return true;
+    } catch (err) {
+        end();
+        log.error({ err }, "Failed to send alert with attachments after retries");
+        await notifyOps(`Failed to send alert with attachments: ${err.message || err}`);
+        return false;
+    }
+}

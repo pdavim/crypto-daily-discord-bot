@@ -6,7 +6,7 @@ import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
 import { streamKlines } from "./data/binanceStream.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, adx, stochastic, williamsR, cci, obv, keltnerChannel } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
-import { postAnalysis, sendDiscordAlert, postMonthlyReport } from "./discord.js";
+import { postAnalysis, sendDiscordAlert, postMonthlyReport, sendDiscordAlertWithAttachments } from "./discord.js";
 import { postCharts, initBot } from "./discordBot.js";
 import { renderChartPNG, renderForecastChart } from "./chart.js";
 import { buildAlerts } from "./alerts.js";
@@ -655,16 +655,23 @@ async function runAll() {
                 }
             }
             if (CFG.portfolioGrowth?.discord?.enabled && growthSummary?.discord?.message) {
-                const options = {};
                 const webhook = CFG.portfolioGrowth.discord.webhookUrl?.trim();
                 const channelId = CFG.portfolioGrowth.discord.channelId?.trim();
-                if (webhook) {
-                    options.webhookUrl = webhook;
-                }
-                if (channelId) {
-                    options.channelId = channelId;
-                }
-                const delivered = await sendDiscordAlert(growthSummary.discord.message, options);
+                const attachments = Array.isArray(growthSummary.discord.attachments)
+                    ? growthSummary.discord.attachments
+                    : [];
+                const hasAttachments = attachments.length > 0;
+                const delivered = hasAttachments
+                    ? await sendDiscordAlertWithAttachments({
+                        content: growthSummary.discord.message,
+                        attachments,
+                        webhookUrl: webhook,
+                        channelId,
+                    })
+                    : await sendDiscordAlert(growthSummary.discord.message, {
+                        webhookUrl: webhook,
+                        channelId,
+                    });
                 if (!delivered) {
                     jobLog.warn('Failed to dispatch portfolio growth summary');
                 }

@@ -105,7 +105,7 @@ Trecho relevante de `config/default.json`:
 
 Quando o módulo está ativo (`portfolioGrowth.enabled = true`):
 
-- `reports/growth/latest.json`: resumo completo do último ciclo com métricas e histórico detalhado.
+- `reports/growth/latest.json`: resumo completo do último ciclo com métricas, histórico detalhado e o diário de trades executados (`summary.trades`).
 - `reports/growth/progression.json`: série temporal preparada para dashboards externos.
 - `reports/growth/runs.json`: arquivo acumulativo com os resultados das últimas execuções.
 - `charts/growth/portfolio_growth_<timestamp>.png`: gráfico com valor do portfólio, capital investido, caixa e drawdown.
@@ -114,7 +114,7 @@ Se `reporting.appendToUploads` estiver habilitado, o gráfico também é publica
 
 ## Resumo automático no Discord
 
-Configure o bloco `portfolioGrowth.discord` para que o bot envie um texto conciso com o andamento rumo aos €10 milhões. O resumo inclui valor atual, CAGR, retorno acumulado, aportes realizados, progresso percentual da meta e indicadores de risco.
+Configure o bloco `portfolioGrowth.discord` para que o bot envie um texto conciso com o andamento rumo aos €10 milhões. O resumo inclui valor atual, CAGR, retorno acumulado, aportes realizados, progresso percentual da meta, indicadores de risco e um digest das operações mais recentes por ativo. O diário completo é anexado em CSV/JSON sempre que houver negociações no ciclo.
 
 ```text
 @here
@@ -123,7 +123,9 @@ Configure o bloco `portfolioGrowth.discord` para que o bot envie um texto concis
 - Capital investido: €1 200,00 (aportes €1 100,00 em 12 contribuições)
 - Meta: €10 000 000,00 · progresso 0,12% · falta €9 987 655,00 · projeção 8,4 anos
 - Risco: drawdown máx 32,00% · vol anual 54,00% · Sharpe 1,20
+- Trades (24 ordens): BTC: B12=0,3450 · S5=0,2100 · Δ +0,1350 | ETH: B6=2,1000 · Δ +2,1000
 - Janela analisada: 3,0 anos (1 095 dias)
+- Diário de trades anexado (4 arquivos).
 - Relatórios salvos (0,12% da meta): `reports/growth/latest.json`, `charts/growth/portfolio_growth_2024-02-01.png`
 ```
 
