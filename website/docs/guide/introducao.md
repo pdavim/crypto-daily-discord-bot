@@ -102,6 +102,14 @@ A cada execução o bot também gera uma mensagem consolidada por ativo listando
 
 > 💡 Configure `webhookGeneral` ou `DISCORD_WEBHOOK_GENERAL` para enviar esse resumo a um canal dedicado; quando nenhum webhook geral estiver definido, o bot tenta usar `CFG.webhook` e registra um aviso caso ambos estejam vazios.
 
+### Mapeamento de webhooks do Discord
+
+- `webhookAlerts` concentra os alertas intradiários emitidos pelos módulos em `src/alerts/`, preservando `CFG.webhook` apenas como fallback.
+- `webhookAnalysis` recebe os relatórios técnicos de `postAnalysis`; para direcionar ativos específicos use chaves como `webhookAnalysis_BTC`, `webhookAnalysis_ETH` etc., que têm prioridade sobre o webhook global de análise.
+- `webhookReports` permanece como destino padrão para relatórios consolidados e para o PDF do resumo diário quando nenhum webhook de análise está disponível.
+- `webhookDaily` continua reservado para o resumo agregado do dia (`assetKey === "DAILY"`) quando não existirem canais de análise configurados.
+- `webhookMonthly` direciona o relatório mensal com gráficos anexados.
+
 ## Alertas organizados por ativo
 
 Para tornar o feed de alertas mais digerível, as notificações agregadas agora são ordenadas por ativo antes de chegarem ao Discord. O dispatcher reúne todos os payloads gerados durante o ciclo e aplica duas regras:

@@ -198,6 +198,16 @@ Além da listagem de alertas, o bot publica um resumo consolidado por ativo exib
 
 Configure o canal dedicado definindo `webhookGeneral` em `config/custom.json` ou exportando `DISCORD_WEBHOOK_GENERAL`. Caso nenhum webhook geral esteja disponível, o bot tenta usar `CFG.webhook` como fallback e registra um aviso quando também não estiver definido.
 
+### Webhooks dedicados por fluxo
+
+Para manter os canais organizados, configure webhooks específicos para cada tipo de entrega:
+
+- `webhookAlerts` concentra alertas intradiários e continua sendo a referência para `sendDiscordAlert`, reutilizando `CFG.webhook` apenas quando nenhum webhook dedicado estiver definido.
+- `webhookAnalysis` recebe os relatórios técnicos gerados por `postAnalysis`. É possível sobrescrever por ativo com chaves como `webhookAnalysis_BTC`, `webhookAnalysis_ETH` etc.; quando inexistentes, o bot recorre ao webhook global de análise antes de considerar os canais de relatório.
+- `webhookReports` agrega os relatórios consolidados (semanal, mensal e PDF do sumário diário) e é o fallback padrão para uploads quando nenhum webhook de análise está disponível.
+- `webhookDaily` permanece reservado para o resumo diário (`assetKey === 'DAILY'`) quando não há canais de análise configurados.
+- `webhookMonthly` direciona o relatório mensal com gráficos anexados.
+
 ## Monitoramento e relatórios
 
 - As entradas de deduplicação de alertas são expurgadas diariamente e também no start do processo, mantendo o cache coerente entre execuções longas e jobs efêmeros.

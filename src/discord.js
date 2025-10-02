@@ -49,13 +49,16 @@ export async function postAnalysis(assetKey, tf, text) {
     const normalizedAssetKey = typeof assetKey === 'string' ? assetKey.toUpperCase() : undefined;
     const candidateKeys = [];
     if (normalizedAssetKey) {
+        candidateKeys.push(`webhookAnalysis_${normalizedAssetKey}`);
+    }
+    candidateKeys.push('webhookAnalysis');
+    if (normalizedAssetKey) {
         candidateKeys.push(`webhookReports_${normalizedAssetKey}`);
         if (normalizedAssetKey === 'DAILY') {
             candidateKeys.push('webhookDaily');
         }
     }
     candidateKeys.push('webhookReports');
-    candidateKeys.push('webhookAnalysis');
     if (normalizedAssetKey !== 'DAILY') {
         candidateKeys.push('webhookDaily');
     }
@@ -79,7 +82,7 @@ export async function postAnalysis(assetKey, tf, text) {
     }
     if (!url) {
         log.warn({ fn: 'postAnalysis', tried: filteredCandidates }, 'No Discord webhook configured for analysis posts—skipping post.');
-        return { posted: false, path: savedReportPath };
+        return { posted: false, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
     }
 
     const payload = { content: text };
@@ -107,26 +110,26 @@ export async function postAnalysis(assetKey, tf, text) {
                 return axios.post(url, form, { headers: form.getHeaders() });
             };
             await fetchWithRetry(sendWithPdf, { retries: 2 });
-            return { posted: true, path: savedReportPath };
+            return { posted: true, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
         }
         await fetchWithRetry(() => axios.post(url, payload), { retries: 2 });
-        return { posted: true, path: savedReportPath };
+        return { posted: true, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
     } catch (err) {
         if (pdfBuffer) {
             log.error({ fn: 'postAnalysis', err }, 'Failed to post analysis with PDF, retrying with text only.');
             try {
                 await fetchWithRetry(() => axios.post(url, payload), { retries: 2 });
-                return { posted: true, path: savedReportPath };
+                return { posted: true, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
             } catch (fallbackErr) {
                 log.error({ fn: 'postAnalysis', err: fallbackErr }, 'Failed to post analysis after PDF fallback');
                 await notifyOps(`Failed to post analysis for ${assetKey} ${tf}: ${fallbackErr.message || fallbackErr}`);
-                return { posted: false, path: savedReportPath };
+                return { posted: false, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
             }
         }
 
         log.error({ fn: 'postAnalysis', err }, 'Failed to post analysis after retries');
         await notifyOps(`Failed to post analysis for ${assetKey} ${tf}: ${err.message || err}`);
-        return { posted: false, path: savedReportPath };
+        return { posted: false, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
     }
 }
 
