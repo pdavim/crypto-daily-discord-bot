@@ -144,6 +144,8 @@ const rebalancePortfolio = ({
     slippage,
     tolerance,
     maxPositionPct,
+    reason,
+    logTrade,
 }) => {
     const validAssets = Object.entries(prices).filter(([, price]) => Number.isFinite(price) && price > 0);
     if (validAssets.length === 0) {
@@ -199,6 +201,32 @@ const rebalancePortfolio = ({
     let investedValue = 0;
     let executed = false;
 
+    const rebalanceReason = typeof reason === "string" && reason.length > 0
+        ? reason
+        : (timestamp === null ? "initial_allocation" : "rebalance");
+
+    const recordTrade = ({ asset, action, quantity, price, reason: tradeReason }) => {
+        if (typeof logTrade !== "function") {
+            return;
+        }
+        const normalizedAsset = typeof asset === "string" ? asset.toUpperCase() : asset;
+        const normalizedAction = typeof action === "string" ? action.toUpperCase() : action;
+        const normalizedQuantity = Number(quantity);
+        const normalizedPrice = Number(price);
+        if (!normalizedAsset || !normalizedAction || !Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0 || !Number.isFinite(normalizedPrice) || normalizedPrice <= 0) {
+            return;
+        }
+        logTrade({
+            timestamp,
+            asset: normalizedAsset,
+            action: normalizedAction,
+            quantity: normalizedQuantity,
+            price: normalizedPrice,
+            value: normalizedQuantity * normalizedPrice,
+            reason: tradeReason ?? rebalanceReason,
+        });
+    };
+
     for (const [asset, price] of validAssets) {
         const targetValue = (normalized[asset] ?? 0) * totalValue;
         const existing = positions.get(asset) ?? {
@@ -250,6 +278,12 @@ const rebalancePortfolio = ({
                 nextCash -= spend;
                 investedValue += existing.lastValue;
                 executed = true;
+                recordTrade({
+                    asset,
+                    action: "buy",
+                    quantity: unitsToBuy,
+                    price: price * (1 + slippage),
+                });
             } else {
                 investedValue += currentValue;
             }
@@ -274,6 +308,12 @@ const rebalancePortfolio = ({
                     investedValue += existing.lastValue;
                 }
                 executed = true;
+                recordTrade({
+                    asset,
+                    action: "sell",
+                    quantity: unitsToSell,
+                    price: price * (1 - slippage),
+                });
             } else {
                 investedValue += currentValue;
                 existing.lastPrice = price;
@@ -297,7 +337,7 @@ const rebalancePortfolio = ({
         investedValue,
         totalValue: nextCash + investedValue,
         weights: normalized,
-        reason: timestamp === null ? "initial" : "rebalance",
+        reason: rebalanceReason,
     };
 };
 
@@ -420,6 +460,7 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
     const positions = new Map();
     const returnsHistory = new Map();
     const history = [];
+    const trades = [];
     const portfolioReturns = [];
     const rebalances = [];
     let cash = Math.max(0, Number(config.initialCapital) || 0);
@@ -440,6 +481,21 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
         name: typeof baseStrategy?.name === "string" ? baseStrategy.name : "Default",
         minAllocationPct: Number(baseStrategy?.minAllocationPct),
         maxAllocationPct: Number(baseStrategy?.maxAllocationPct),
+    };
+
+    const pushTrade = ({ timestamp: tradeTimestamp, asset, action, quantity, price, value, reason }) => {
+        const isoTimestamp = Number.isFinite(tradeTimestamp)
+            ? new Date(tradeTimestamp).toISOString()
+            : (tradeTimestamp instanceof Date ? tradeTimestamp.toISOString() : new Date().toISOString());
+        trades.push({
+            timestamp: isoTimestamp,
+            asset,
+            action,
+            quantity,
+            price,
+            value,
+            reason,
+        });
     };
 
     for (let idx = 0; idx < timeline.length; idx += 1) {
@@ -485,7 +541,20 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
                         ? 1 - (position.lastValue / position.peakValue)
                         : 0;
                     if (risk.stopLossPct > 0 && changePct <= -risk.stopLossPct) {
-                        cash += position.lastValue * (1 - slippage);
+                        const unitsToSell = position.units ?? 0;
+                        if (unitsToSell > 0) {
+                            const executedPrice = iterator.last.close * (1 - slippage);
+                            cash += position.lastValue * (1 - slippage);
+                            pushTrade({
+                                timestamp,
+                                asset: key,
+                                action: "SELL",
+                                quantity: unitsToSell,
+                                price: executedPrice,
+                                value: unitsToSell * executedPrice,
+                                reason: "stop_loss",
+                            });
+                        }
                         positions.delete(key);
                     } else if (risk.takeProfitPct > 0 && changePct >= risk.takeProfitPct && position.units > 0) {
                         const sellValue = position.lastValue * 0.5;
@@ -496,8 +565,33 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
                         position.lastValue = position.units * iterator.last.close;
                         position.peakValue = Math.max(position.peakValue, position.lastValue);
                         positions.set(key, position);
+                        if (unitsToSell > 0) {
+                            const executedPrice = iterator.last.close * (1 - slippage);
+                            pushTrade({
+                                timestamp,
+                                asset: key,
+                                action: "SELL",
+                                quantity: unitsToSell,
+                                price: executedPrice,
+                                value: unitsToSell * executedPrice,
+                                reason: "take_profit",
+                            });
+                        }
                     } else if (risk.maxDrawdownPct > 0 && drawdownPct >= risk.maxDrawdownPct) {
-                        cash += position.lastValue * (1 - slippage);
+                        const unitsToSell = position.units ?? 0;
+                        if (unitsToSell > 0) {
+                            const executedPrice = iterator.last.close * (1 - slippage);
+                            cash += position.lastValue * (1 - slippage);
+                            pushTrade({
+                                timestamp,
+                                asset: key,
+                                action: "SELL",
+                                quantity: unitsToSell,
+                                price: executedPrice,
+                                value: unitsToSell * executedPrice,
+                                reason: "max_drawdown",
+                            });
+                        }
                         positions.delete(key);
                     }
                 }
@@ -556,6 +650,9 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
         });
 
         if (idx === 0 || (rebalanceInterval > 0 && idx % rebalanceInterval === 0) || driftDetected) {
+            const rebalanceReason = idx === 0
+                ? "initial_allocation"
+                : (driftDetected ? "drift_rebalance" : "interval_rebalance");
             const result = rebalancePortfolio({
                 timestamp,
                 positions,
@@ -565,6 +662,8 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
                 slippage,
                 tolerance,
                 maxPositionPct: risk.maxPositionPct,
+                reason: rebalanceReason,
+                logTrade: pushTrade,
             });
             cash = result.cash;
             invested = result.investedValue;
@@ -659,15 +758,20 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
             : null,
     };
 
+    summary.trades = trades;
+
     const discordMessage = buildPortfolioGrowthDiscordMessage({
         summary,
         mention: config.discord?.mention,
         locale: config.discord?.locale,
         includeReportLinks: config.discord?.includeReportLinks !== false,
     });
-    if (discordMessage) {
-        summary.discord = { message: discordMessage };
-        summary.discordMessage = discordMessage;
+    if (discordMessage?.message) {
+        summary.discord = {
+            message: discordMessage.message,
+            attachments: discordMessage.attachments ?? [],
+        };
+        summary.discordMessage = discordMessage.message;
     }
 
     if (config.reporting?.enabled) {
@@ -677,7 +781,23 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
         const progressionPath = path.join(reportDir, "progression.json");
         const archivePath = path.join(reportDir, "runs.json");
 
-        fs.writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+        const persistedSummary = {
+            ...summary,
+            discord: summary.discord
+                ? {
+                    ...summary.discord,
+                    attachments: Array.isArray(summary.discord.attachments)
+                        ? summary.discord.attachments.map((attachment) => ({
+                            filename: attachment.filename,
+                            contentType: attachment.contentType,
+                            size: attachment.size,
+                        }))
+                        : [],
+                }
+                : undefined,
+        };
+
+        fs.writeFileSync(summaryPath, `${JSON.stringify(persistedSummary, null, 2)}\n`);
         fs.writeFileSync(progressionPath, `${JSON.stringify({ runAt: summary.runAt, history }, null, 2)}\n`);
 
         let archive = [];

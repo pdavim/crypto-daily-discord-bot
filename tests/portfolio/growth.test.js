@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -117,6 +118,29 @@ describe("portfolio growth simulation", () => {
         expect(result?.progress?.pct).toBeGreaterThan(0);
         expect(result?.discord?.message).toContain("Simulação 100€ → 10M€");
         expect(result?.discordMessage).toBe(result?.discord?.message);
+        expect(Array.isArray(result?.trades)).toBe(true);
+        expect(result.trades.length).toBeGreaterThan(0);
+        const sampleTrade = result.trades[0];
+        expect(sampleTrade).toMatchObject({
+            asset: expect.any(String),
+            action: expect.any(String),
+            quantity: expect.any(Number),
+            price: expect.any(Number),
+            reason: expect.any(String),
+        });
+        expect(sampleTrade).toHaveProperty("timestamp");
+        expect(sampleTrade).toHaveProperty("value");
+        expect(Array.isArray(result.discord.attachments)).toBe(true);
+        expect(result.discord.attachments.length).toBeGreaterThan(0);
+        expect(result.discord.attachments[0].content).toBeInstanceOf(Buffer);
+        const persisted = JSON.parse(fs.readFileSync(result.reports.summaryPath, "utf8"));
+        expect(Array.isArray(persisted.trades)).toBe(true);
+        expect(persisted.discord.attachments[0]).toMatchObject({
+            filename: expect.any(String),
+            contentType: expect.any(String),
+            size: expect.any(Number),
+        });
+        expect(persisted.discord.attachments[0]).not.toHaveProperty("content");
     });
 
     it("retorna null quando o módulo está desativado", async () => {
