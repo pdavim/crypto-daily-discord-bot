@@ -629,46 +629,56 @@ async function runOnceForAsset(asset, options = {}) {
  * @returns {Promise}
  */
 async function runAll() {
-    await runAssetsSafely({
-        assets: ASSETS,
-        limitFactory: () => pLimit(calcConcurrency()),
-        runAsset: runOnceForAsset,
-        logger,
-    });
-    await flushAlertQueue({
-        sender: async ({ message, options }) => {
-            await sendDiscordAlert(message, options);
-        },
-        timeframeOrder: TIMEFRAMES
-    });
+    const jobLog = withContext(logger, { fn: 'runAll' });
+    const startedAt = Date.now();
+    let status = 'success';
+    jobLog.info('Starting runAll job');
     try {
-        const growthSummary = await runPortfolioGrowthSimulation();
-        if (growthSummary?.uploads?.length) {
-            const uploaded = await postCharts(growthSummary.uploads);
-            if (!uploaded) {
-                const log = withContext(logger, { fn: "runAll" });
-                log.warn({ uploads: growthSummary.uploads }, "Failed to post portfolio growth chart");
+        await runAssetsSafely({
+            assets: ASSETS,
+            limitFactory: () => pLimit(calcConcurrency()),
+            runAsset: runOnceForAsset,
+            logger,
+        });
+        await flushAlertQueue({
+            sender: async ({ message, options }) => {
+                await sendDiscordAlert(message, options);
+            },
+            timeframeOrder: TIMEFRAMES
+        });
+        try {
+            const growthSummary = await runPortfolioGrowthSimulation();
+            if (growthSummary?.uploads?.length) {
+                const uploaded = await postCharts(growthSummary.uploads);
+                if (!uploaded) {
+                    jobLog.warn({ uploads: growthSummary.uploads }, 'Failed to post portfolio growth chart');
+                }
             }
-        }
-        if (CFG.portfolioGrowth?.discord?.enabled && growthSummary?.discord?.message) {
-            const log = withContext(logger, { fn: "runAll" });
-            const options = {};
-            const webhook = CFG.portfolioGrowth.discord.webhookUrl?.trim();
-            const channelId = CFG.portfolioGrowth.discord.channelId?.trim();
-            if (webhook) {
-                options.webhookUrl = webhook;
+            if (CFG.portfolioGrowth?.discord?.enabled && growthSummary?.discord?.message) {
+                const options = {};
+                const webhook = CFG.portfolioGrowth.discord.webhookUrl?.trim();
+                const channelId = CFG.portfolioGrowth.discord.channelId?.trim();
+                if (webhook) {
+                    options.webhookUrl = webhook;
+                }
+                if (channelId) {
+                    options.channelId = channelId;
+                }
+                const delivered = await sendDiscordAlert(growthSummary.discord.message, options);
+                if (!delivered) {
+                    jobLog.warn('Failed to dispatch portfolio growth summary');
+                }
             }
-            if (channelId) {
-                options.channelId = channelId;
-            }
-            const delivered = await sendDiscordAlert(growthSummary.discord.message, options);
-            if (!delivered) {
-                log.warn({ fn: "runAll" }, 'Failed to dispatch portfolio growth summary');
-            }
+        } catch (error) {
+            jobLog.warn({ err: error }, 'Portfolio growth simulation failed');
         }
     } catch (error) {
-        const log = withContext(logger, { fn: "runAll" });
-        log.warn({ err: error }, "Portfolio growth simulation failed");
+        status = 'failed';
+        jobLog.error({ err: error }, 'runAll job failed');
+        throw error;
+    } finally {
+        const durationMs = Date.now() - startedAt;
+        jobLog.info({ durationMs, status }, 'Finished runAll job');
     }
 }
 
@@ -680,12 +690,16 @@ const DAILY_ALERT_KEY = 'analysis';
  * @returns {Promise}
  */
 async function runDailyAnalysis() {
-    const log = withContext(logger, { asset: 'DAILY', timeframe: '1d' });
+    const log = withContext(logger, { fn: 'runDailyAnalysis', asset: 'DAILY', timeframe: '1d' });
+    const startedAt = Date.now();
+    let status = 'success';
+    log.info('Starting daily analysis job');
     try {
         const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 2);
         const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
         const key = "DAILY:1d";
         if (lastTime != null && getSignature(key) === lastTime) {
+            log.debug({ key }, 'Daily analysis already processed for latest candle');
             return;
         }
         if (lastTime != null) {
@@ -704,7 +718,7 @@ async function runDailyAnalysis() {
         if (CFG.enableReports) {
             const hash = buildHash(finalReport);
             if (getAlertHash(DAILY_ALERT_SCOPE, DAILY_ALERT_KEY) === hash) {
-                log.info({ fn: 'runDailyAnalysis' }, 'Skipping daily analysis post (duplicate hash)');
+                log.info({ reason: 'duplicateHash' }, 'Skipping daily analysis post');
                 return;
             }
             const analysisResult = await postAnalysis("DAILY", "1d", finalReport);
@@ -712,12 +726,16 @@ async function runDailyAnalysis() {
                 updateAlertHash(DAILY_ALERT_SCOPE, DAILY_ALERT_KEY, hash);
                 saveStore();
             } else {
-                log.warn({ fn: 'runDailyAnalysis', reportPath: analysisResult?.path }, 'report upload failed');
+                log.warn({ reportPath: analysisResult?.path }, 'Report upload failed');
             }
         }
     } catch (e) {
-        log.error({ fn: 'runDailyAnalysis', err: e }, 'Error in daily analysis');
+        status = 'failed';
+        log.error({ err: e }, 'Error in daily analysis');
         await notifyOps(`Error in daily analysis: ${e.message || e}`);
+    } finally {
+        const durationMs = Date.now() - startedAt;
+        log.info({ durationMs, status }, 'Finished daily analysis job');
     }
 }
 
@@ -778,6 +796,9 @@ function previousMonthKey(referenceDate, timeZone) {
  */
 async function generateWeeklySnapshot() {
     const log = withContext(logger, { fn: 'generateWeeklySnapshot' });
+    const startedAt = Date.now();
+    let status = 'success';
+    log.info('Starting weekly snapshot job');
     try {
         const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 8);
         const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
@@ -824,8 +845,12 @@ async function generateWeeklySnapshot() {
         }
         log.info({ weekSignature }, 'Saved weekly performance snapshot.');
     } catch (err) {
+        status = 'failed';
         log.error({ err }, 'Error generating weekly snapshot');
         await notifyOps(`Error generating weekly snapshot: ${err.message || err}`);
+    } finally {
+        const durationMs = Date.now() - startedAt;
+        log.info({ durationMs, status }, 'Finished weekly snapshot job');
     }
 }
 
@@ -835,6 +860,9 @@ async function generateWeeklySnapshot() {
  */
 async function compileMonthlyPerformanceReport() {
     const log = withContext(logger, { fn: 'compileMonthlyPerformanceReport' });
+    const startedAt = Date.now();
+    let status = 'success';
+    log.info('Starting monthly performance report job');
     try {
         const now = new Date();
         const monthKey = previousMonthKey(now, CFG.tz);
@@ -923,8 +951,12 @@ async function compileMonthlyPerformanceReport() {
             log.warn({ monthKey }, 'Monthly performance report was not sent.');
         }
     } catch (err) {
+        status = 'failed';
         log.error({ err }, 'Error compiling monthly performance report');
         await notifyOps(`Error compiling monthly performance report: ${err.message || err}`);
+    } finally {
+        const durationMs = Date.now() - startedAt;
+        log.info({ durationMs, status }, 'Finished monthly performance report job');
     }
 }
 

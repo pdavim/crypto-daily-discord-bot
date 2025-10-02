@@ -11,6 +11,7 @@ import crypto from "crypto";
 import WebSocket from "ws";
 import { logTrade } from "./tradeLog.js";
 import { logger, withContext } from "../logger.js";
+import { fetchWithRetry } from "../utils.js";
 
 const BASE = "https://api.binance.com";
 const FUTURES_BASE = "https://fapi.binance.com";
@@ -44,12 +45,27 @@ async function privateRequest(method, path, params = {}, { context, baseUrl = BA
 
     const qs = sign(payload, secret);
     const url = `${baseUrl}${path}?${qs}`;
+    const log = withContext(logger, { ...context, exchange: "binance", path, fn: "privateRequest" });
+    let attempt = 0;
     try {
-        const { data } = await axios({ method, url, headers: { "X-MBX-APIKEY": key } });
+        const { data } = await fetchWithRetry(async () => {
+            attempt += 1;
+            log.info({ method, attempt }, 'Dispatching Binance private request');
+            const startedAt = Date.now();
+            try {
+                const response = await axios({ method, url, headers: { "X-MBX-APIKEY": key } });
+                const durationMs = Date.now() - startedAt;
+                log.debug({ method, attempt, status: response?.status, durationMs }, 'Binance private request completed');
+                return response;
+            } catch (err) {
+                const durationMs = Date.now() - startedAt;
+                log.debug({ method, attempt, status: err?.response?.status, durationMs }, 'Binance private request failed');
+                throw err;
+            }
+        });
         return data;
     } catch (err) {
-        const errorLogger = withContext(logger, { ...context, exchange: "binance", path });
-        errorLogger.error({ fn: "privateRequest", method, status: err?.response?.status }, "Binance request failed");
+        log.error({ method, status: err?.response?.status }, 'Binance request failed');
         throw err;
     }
 }
