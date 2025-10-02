@@ -23,7 +23,7 @@ import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
 import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
-import { buildAssetAlertMessage } from "./alerts/messageBuilder.js";
+import { buildAssetAlertMessage, buildAssetGuidanceMessage } from "./alerts/messageBuilder.js";
 import { deriveDecisionDetails } from "./alerts/decision.js";
 import { collectVariationMetrics } from "./alerts/variationMetrics.js";
 import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/posture.js";
@@ -517,8 +517,9 @@ async function runOnceForAsset(asset, options = {}) {
 
     await Promise.all(timeframeTasks);
 
+    const variationByTimeframe = collectVariationMetrics({ snapshots });
+
     if (enableAlerts) {
-        const variationByTimeframe = collectVariationMetrics({ snapshots });
 
         const timeframeSummaries = TIMEFRAMES.map(tf => {
             const meta = timeframeMeta.get(tf);
@@ -562,6 +563,48 @@ async function runOnceForAsset(asset, options = {}) {
             if (!analysisResult?.posted) {
                 const log = withContext(logger, { asset: asset.key, timeframe: '4h' });
                 log.warn({ fn: 'runOnceForAsset', reportPath: analysisResult?.path }, 'report upload failed');
+            }
+        }
+    }
+
+    const guidanceSummaries = TIMEFRAMES.map(tf => {
+        const meta = timeframeMeta.get(tf);
+        if (!meta) {
+            return null;
+        }
+        return {
+            timeframe: tf,
+            guidance: meta.guidance,
+            decision: meta.decision,
+            forecast: meta.forecast,
+            variation: meta.variation,
+        };
+    }).filter(Boolean);
+
+    if (guidanceSummaries.length > 0) {
+        const guidanceMessage = buildAssetGuidanceMessage({
+            assetKey: asset.key,
+            timeframeSummaries: guidanceSummaries,
+            variationByTimeframe,
+            timeframeOrder: TIMEFRAMES,
+        });
+        if (guidanceMessage) {
+            const webhookUrl = CFG.webhookGeneral ?? CFG.webhook ?? null;
+            if (!webhookUrl) {
+                const log = withContext(logger, { asset: asset.key });
+                log.warn({ fn: 'runOnceForAsset', scope: 'guidance' }, 'Skipping guidance message due to missing webhook');
+            } else {
+                const hash = buildHash(guidanceMessage);
+                const windowMs = CFG.alertDedupMinutes * 60 * 1000;
+                const scope = "guidance";
+                if (shouldSend({ asset: asset.key, tf: scope, hash }, windowMs)) {
+                    enqueueAlertPayload({
+                        asset: asset.key,
+                        timeframe: scope,
+                        message: guidanceMessage,
+                        options: { webhookUrl },
+                    });
+                }
             }
         }
     }

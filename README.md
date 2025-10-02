@@ -54,7 +54,7 @@ npm install
    - `MAX_CONCURRENCY` limita quantas análises paralelas podem ocorrer (defina `1` para execução sequencial).
    - `BINANCE_CACHE_TTL_MINUTES` controla a validade do cache de preços compartilhado.
    - Variáveis `INDICATOR_*` permitem sobrescrever períodos de médias, configurações do MACD, multiplicadores de bandas de Bollinger/Keltner, etc.
-4. Revise os IDs dos canais/servidores onde os conteúdos serão publicados (`DISCORD_GUILD_ID`, `DISCORD_CHANNEL_CHARTS_ID`, `DISCORD_WEBHOOK_ALERTS`, ...).
+4. Revise os IDs dos canais/servidores onde os conteúdos serão publicados (`DISCORD_GUILD_ID`, `DISCORD_CHANNEL_CHARTS_ID`, `DISCORD_WEBHOOK_GENERAL`, `DISCORD_WEBHOOK_ALERTS`, ...).
 
 > 📌 Consulte `.env.example` para descrições completas e exemplos de cada variável disponível.
 
@@ -178,6 +178,16 @@ A pasta `src/alerts/` centraliza os módulos responsáveis por disparar notifica
 - **Heurísticas compostas**: `heuristicAlert` combina múltiplos sinais para priorizar eventos relevantes.
 
 Todos os módulos utilizam `alertCache` para evitar duplicidade e respeitam configurações de intensidade, canais e horários definidas em `config/*.json`.
+
+### Resumo diário com recomendações
+
+Além da listagem de alertas, o bot publica um resumo consolidado por ativo exibindo:
+
+- A decisão `buy/sell/hold` mais recente calculada pelo avaliador de postura, mesmo na ausência de novos alertas.
+- A recomendação textual (`guidance`) e a variação percentual por timeframe.
+- Um tamanho de posição estimado a partir de `CFG.accountEquity` combinado com `CFG.riskPerTrade`, ajudando a dimensionar a exposição.
+
+Configure o canal dedicado definindo `webhookGeneral` em `config/custom.json` ou exportando `DISCORD_WEBHOOK_GENERAL`. Caso nenhum webhook geral esteja disponível, o bot tenta usar `CFG.webhook` como fallback e registra um aviso quando também não estiver definido.
 
 ## Monitoramento e relatórios
 

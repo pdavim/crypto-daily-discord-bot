@@ -29,6 +29,7 @@ O projeto é dividido em módulos que coletam dados de exchanges, calculam indic
    cp .env.example .env
    ```
 3. Atualize tokens, webhooks e parâmetros extras conforme necessidade.
+4. Defina `DISCORD_WEBHOOK_GENERAL` (ou `webhookGeneral` via `config-cli`) para direcionar o resumo com recomendações de posição.
 
 ## Executando localmente
 
@@ -90,6 +91,12 @@ Cada bloco de alertas agora inclui uma linha explícita de decisão (`Decisão: 
 - **Hold (🟡)** se o cenário estiver neutro ou com convicção insuficiente.
 
 Além do rótulo, a linha de decisão mostra a postura dominante (alta, baixa ou neutra), o nível de confiança e os principais motivos calculados pelo motor de postura. Isso facilita validar rapidamente o racional por trás de cada alerta sem abrir relatórios adicionais.
+
+## Resumo geral com recomendações de posição
+
+A cada execução o bot também gera uma mensagem consolidada por ativo listando guidance, decisão atual e variação percentual de cada timeframe acompanhado de um tamanho de posição sugerido. O cálculo usa `CFG.accountEquity` multiplicado por `CFG.riskPerTrade` para estimar o capital exposto e aparece mesmo quando nenhum alerta específico é disparado, ajudando times de investimento a manter disciplina de sizing.
+
+> 💡 Configure `webhookGeneral` ou `DISCORD_WEBHOOK_GENERAL` para enviar esse resumo a um canal dedicado; quando nenhum webhook geral estiver definido, o bot tenta usar `CFG.webhook` e registra um aviso caso ambos estejam vazios.
 
 ## Alertas organizados por ativo
 

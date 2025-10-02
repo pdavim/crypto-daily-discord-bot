@@ -868,6 +868,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     const nextCFG = clone(mergedConfig);
 
     nextCFG.webhook = process.env.DISCORD_WEBHOOK_URL ?? nextCFG.webhook ?? null;
+    nextCFG.webhookGeneral = process.env.DISCORD_WEBHOOK_GENERAL ?? nextCFG.webhookGeneral ?? null;
     nextCFG.webhookAlerts = process.env.DISCORD_WEBHOOK_ALERTS_URL ?? nextCFG.webhookAlerts ?? null;
     nextCFG.webhookReports = process.env.DISCORD_WEBHOOK_REPORTS_URL ?? nextCFG.webhookReports ?? null;
     nextCFG.webhookDaily = process.env.DISCORD_WEBHOOK_DAILY ?? nextCFG.webhookDaily ?? null;

@@ -1,5 +1,6 @@
 {
   "webhook": null,
+  "webhookGeneral": null,
   "webhookAlerts": null,
   "webhookReports": null,
   "webhookDaily": null,

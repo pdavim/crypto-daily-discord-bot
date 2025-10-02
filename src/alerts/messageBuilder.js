@@ -1,4 +1,5 @@
 import { formatAlertMessage } from "../alerts.js";
+import { CFG } from "../config.js";
 import { formatDecisionLine } from "./decision.js";
 
 function formatPercent(value) {
@@ -33,6 +34,41 @@ function formatVariationOverview(variationByTimeframe = {}, timeframeOrder = [])
     }
 
     return `_Variações: ${entries.join(" • ")}_`;
+}
+
+function formatCurrency(value, { currency = "USD", locale = "pt-BR" } = {}) {
+    if (!Number.isFinite(value)) {
+        return null;
+    }
+
+    try {
+        const formatter = new Intl.NumberFormat(locale, {
+            style: "currency",
+            currency,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+        return formatter.format(value);
+    } catch (_) {
+        return `$${value.toFixed(2)}`;
+    }
+}
+
+function buildPositionSizeLine({ accountEquity, riskPerTrade }) {
+    const equity = Number.isFinite(accountEquity) ? accountEquity : null;
+    const risk = Number.isFinite(riskPerTrade) ? riskPerTrade : null;
+
+    if (!equity || equity <= 0 || !risk || risk <= 0) {
+        return "Posição estimada: defina accountEquity/riskPerTrade";
+    }
+
+    const positionNotional = equity * risk;
+    const formattedNotional = formatCurrency(positionNotional);
+    const riskPct = (risk * 100).toFixed(2);
+    if (!formattedNotional) {
+        return `Posição estimada: ${positionNotional.toFixed(2)} (${riskPct}% do capital)`;
+    }
+    return `Posição estimada: ${formattedNotional} (${riskPct}% do capital)`;
 }
 
 function formatForecastTimestamp(isoString, timeZone) {
@@ -140,6 +176,43 @@ function buildTimeframeSection(summary, variationByTimeframe) {
     return lines;
 }
 
+function buildTimeframeGuidanceSection(summary, variationByTimeframe, options = {}) {
+    const { timeframe, guidance, decision, forecast, variation } = summary;
+    const { positionLine } = options;
+
+    if (!timeframe) {
+        return [];
+    }
+
+    const headerSegments = [`> **${timeframe}**`];
+    const label = guidance || "Sem recomendação";
+    headerSegments.push(`Recomendação: ${label}`);
+
+    const formattedVariation = formatPercent(
+        Number.isFinite(variation) ? variation : variationByTimeframe?.[timeframe]
+    );
+    headerSegments.push(`Variação: ${formattedVariation ?? "n/d"}`);
+
+    const lines = [headerSegments.join(" — ")];
+    const decisionLine = formatDecisionLine(decision);
+    if (decisionLine) {
+        lines.push(`    ↳ Decisão: ${decisionLine}`);
+    } else {
+        lines.push("    ↳ Decisão: dados insuficientes");
+    }
+
+    if (positionLine) {
+        lines.push(`    ↳ ${positionLine}`);
+    }
+
+    const forecastLine = formatForecastLine(forecast);
+    if (forecastLine) {
+        lines.push(forecastLine);
+    }
+
+    return lines;
+}
+
 export function buildAssetAlertMessage({
     assetKey,
     mention,
@@ -175,10 +248,50 @@ export function buildAssetAlertMessage({
     return lines.join("\n");
 }
 
+export function buildAssetGuidanceMessage({
+    assetKey,
+    mention,
+    timeframeSummaries,
+    variationByTimeframe = {},
+    timeframeOrder = [],
+    accountEquity = CFG.accountEquity,
+    riskPerTrade = CFG.riskPerTrade,
+}) {
+    if (!Array.isArray(timeframeSummaries) || timeframeSummaries.length === 0) {
+        return null;
+    }
+
+    const lines = [];
+    const headerParts = [`**🧭 Resumo — ${assetKey}**`];
+    if (mention) {
+        headerParts.push(mention);
+    }
+    lines.push(headerParts.join(" "));
+
+    const variationLine = formatVariationOverview(variationByTimeframe, timeframeOrder);
+    if (variationLine) {
+        lines.push(variationLine);
+    }
+
+    const positionLine = buildPositionSizeLine({ accountEquity, riskPerTrade });
+
+    for (const summary of timeframeSummaries) {
+        if (!summary) {
+            continue;
+        }
+        lines.push(...buildTimeframeGuidanceSection(summary, variationByTimeframe, { positionLine }));
+    }
+
+    return lines.join("\n");
+}
+
 export const __private__ = {
     formatPercent,
     formatVariationOverview,
     formatForecastTimestamp,
     formatForecastLine,
-    buildTimeframeSection
+    buildTimeframeSection,
+    buildTimeframeGuidanceSection,
+    buildPositionSizeLine,
+    formatCurrency,
 };
