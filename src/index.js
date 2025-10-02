@@ -146,7 +146,8 @@ async function runOnceForAsset(asset, options = {}) {
         enableAlerts = CFG.enableAlerts,
         enableAnalysis = CFG.enableAnalysis,
         postAnalysis: shouldPostAnalysis = enableAnalysis,
-        postCharts: shouldPostCharts = enableCharts
+        postCharts: shouldPostCharts = enableCharts,
+        forceFreshRun = false
     } = options;
     const assetLog = withContext(logger, { asset: asset.key });
     const dailyPromise = fetchDailyCloses(asset.binance, 32).catch(err => {
@@ -179,6 +180,8 @@ async function runOnceForAsset(asset, options = {}) {
     let cached45mCandles;
     const indicatorCache = new Map();
 
+    const deferredSignatureWrites = [];
+
     const timeframeTasks = TIMEFRAMES.map(async tf => {
         const log = withContext(logger, { asset: asset.key, timeframe: tf });
         try {
@@ -200,11 +203,17 @@ async function runOnceForAsset(asset, options = {}) {
             if (!candles || candles.length < min) return;
             const lastCandleTime = candles.at(-1)?.t?.getTime?.();
             const key = `${asset.key}:${tf}`;
-            if (lastCandleTime != null && getSignature(key) === lastCandleTime) {
-                return;
-            }
             if (lastCandleTime != null) {
-                updateSignature(key, lastCandleTime);
+                const signatureMatches = getSignature(key) === lastCandleTime;
+                if (!forceFreshRun && signatureMatches) {
+                    return;
+                }
+                const writeSignature = () => updateSignature(key, lastCandleTime);
+                if (forceFreshRun) {
+                    deferredSignatureWrites.push(writeSignature);
+                } else {
+                    writeSignature();
+                }
             }
             const close = candles.map(c => c.c);
             const vol = candles.map(c => c.v);
@@ -515,7 +524,15 @@ async function runOnceForAsset(asset, options = {}) {
         }
     });
 
-    await Promise.all(timeframeTasks);
+    try {
+        await Promise.all(timeframeTasks);
+    } finally {
+        if (forceFreshRun) {
+            for (const writeSignature of deferredSignatureWrites) {
+                writeSignature();
+            }
+        }
+    }
 
     const variationByTimeframe = collectVariationMetrics({ snapshots });
 
@@ -992,7 +1009,8 @@ async function handleAnalysisSlashCommand({ asset, timeframe }) {
         postCharts: false,
         enableAlerts: false,
         enableAnalysis: true,
-        postAnalysis: false
+        postAnalysis: false,
+        forceFreshRun: true
     });
     return summary;
 }
@@ -1073,3 +1091,4 @@ if (!ONCE) {
         process.exit(0);
     }
 }
+export { runOnceForAsset, handleAnalysisSlashCommand };

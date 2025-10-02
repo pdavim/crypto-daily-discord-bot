@@ -73,6 +73,10 @@ O bot permite ajustar um alvo mínimo de lucro para filtrar oportunidades de tra
 
 Os valores ficam persistidos em `data/settings.json` e influenciam recomendações como o alerta de níveis de trade, que agora sinaliza quando o alvo projetado está abaixo do limite configurado.
 
+## Reexecutando análises manualmente
+
+Quando um analista dispara o comando `/analysis`, o bot ignora o cache de assinaturas utilizado nos jobs agendados e recalcula todos os snapshots antes de responder. Isso garante que a coleta manual reflita o estado mais recente dos indicadores, mesmo que os candles já tenham sido processados anteriormente. Os agendamentos continuam respeitando a deduplicação por assinatura, então rodar o comando manualmente não interfere na rotina automática nem gera duplicidade de alertas.
+
 ## Variação por timeframe nos alertas
 
 Os alertas consolidados passaram a incluir uma linha dedicada às variações de preço por timeframe. Sempre que novas métricas são calculadas, o bot combina os movimentos recentes (5m, 15m, 30m, 45m, 1h, 4h) com janelas mais longas (24h, 7d e 30d) para oferecer contexto imediato sobre o momentum do ativo.

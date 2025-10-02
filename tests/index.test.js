@@ -12,6 +12,21 @@ const cfgMock = {
     enableReports: false,
     forecasting: { charts: { appendToUploads: false } },
     portfolioGrowth: { discord: { enabled: false } },
+    indicators: {
+        smaPeriods: { ma20: 20, ma50: 50, ma100: 100, ma200: 200 },
+        rsiPeriod: 14,
+        macd: { fast: 12, slow: 26, signal: 9 },
+        bollinger: { period: 20, multiplier: 2 },
+        keltner: { period: 20, multiplier: 1.5 },
+        adxPeriod: 14,
+        atrPeriod: 14,
+        bollWidth: 1,
+        stochastic: { kPeriod: 14, dPeriod: 3 },
+        williamsPeriod: 14,
+        cciPeriod: 20,
+        emaPeriods: { ema9: 9, ema21: 21 },
+    },
+    marketPosture: {},
 };
 
 const runAssetsSafelyMock = vi.fn(() => Promise.resolve());
@@ -23,6 +38,7 @@ const postAnalysisMock = vi.fn(() => Promise.resolve({ posted: true }));
 const postMonthlyReportMock = vi.fn(() => Promise.resolve(true));
 const notifyOpsMock = vi.fn(() => Promise.resolve());
 const fetchDailyClosesMock = vi.fn(() => Promise.resolve([{ t: new Date(), o: 1, h: 1, l: 1, c: 1, v: 1 }]));
+const fetchOHLCVMock = vi.fn(() => Promise.resolve([]));
 const streamKlinesMock = vi.fn();
 const registerMock = {
     contentType: "text/plain",
@@ -43,6 +59,8 @@ const getAlertHashMock = vi.fn(() => "prev");
 const updateAlertHashMock = vi.fn();
 const forecastNextCloseMock = vi.fn();
 const persistForecastEntryMock = vi.fn();
+const buildSnapshotForReportMock = vi.fn(() => ({}));
+const buildSummaryMock = vi.fn(() => "summary");
 
 const createLogger = (context = {}) => ({
     info: vi.fn((metaOrMessage, maybeMessage) => {
@@ -87,11 +105,11 @@ vi.mock("http", () => ({ createServer: vi.fn(() => ({ listen: listenMock })), de
 vi.mock("../src/config.js", () => ({ CFG: cfgMock }));
 vi.mock("../src/assets.js", () => ({
     ASSETS: [{ key: "BTC", binance: "BTCUSDT" }],
-    TIMEFRAMES: ["1h"],
-    BINANCE_INTERVALS: { "1h": "1h" },
+    TIMEFRAMES: ["1h", "4h"],
+    BINANCE_INTERVALS: { "1h": "1h", "4h": "4h" },
 }));
 vi.mock("../src/data/binance.js", () => ({
-    fetchOHLCV: vi.fn(() => Promise.resolve([])),
+    fetchOHLCV: fetchOHLCVMock,
     fetchDailyCloses: fetchDailyClosesMock,
 }));
 vi.mock("../src/data/binanceStream.js", () => ({ streamKlines: streamKlinesMock }));
@@ -112,8 +130,8 @@ vi.mock("../src/indicators.js", () => ({
     keltnerChannel: vi.fn(() => ({ upper: [], lower: [], mid: [] })),
 }));
 vi.mock("../src/reporter.js", () => ({
-    buildSnapshotForReport: vi.fn(() => ({})),
-    buildSummary: vi.fn(() => "summary"),
+    buildSnapshotForReport: buildSnapshotForReportMock,
+    buildSummary: buildSummaryMock,
 }));
 vi.mock("../src/discord.js", () => ({
     postAnalysis: postAnalysisMock,
@@ -170,7 +188,10 @@ vi.mock("../src/alerts/dispatcher.js", () => ({
     enqueueAlertPayload: vi.fn(),
     flushAlertQueue: flushAlertQueueMock,
 }));
-vi.mock("../src/alerts/messageBuilder.js", () => ({ buildAssetAlertMessage: vi.fn(() => ({})) }));
+vi.mock("../src/alerts/messageBuilder.js", () => ({
+    buildAssetAlertMessage: vi.fn(() => ({})),
+    buildAssetGuidanceMessage: vi.fn(() => ({})),
+}));
 vi.mock("../src/alerts/decision.js", () => ({ deriveDecisionDetails: vi.fn(() => ({})) }));
 vi.mock("../src/alerts/variationMetrics.js", () => ({ collectVariationMetrics: vi.fn(() => ({})) }));
 vi.mock("../src/trading/posture.js", () => ({
@@ -203,6 +224,7 @@ describe("analysis scheduler", () => {
         postMonthlyReportMock.mockClear();
         notifyOpsMock.mockClear();
         fetchDailyClosesMock.mockClear();
+        fetchOHLCVMock.mockClear();
         streamKlinesMock.mockClear();
         registerMock.metrics.mockClear();
         reportWeeklyPerfMock.mockClear();
@@ -220,6 +242,9 @@ describe("analysis scheduler", () => {
         updateAlertHashMock.mockClear();
         forecastNextCloseMock.mockClear();
         persistForecastEntryMock.mockClear();
+        buildSnapshotForReportMock.mockClear();
+        buildSummaryMock.mockClear();
+        fetchOHLCVMock.mockImplementation(() => Promise.resolve([]));
         process.env.NODE_ENV = "test";
         process.argv = ["/usr/bin/node", "index.js"];
         cfgMock.analysisFrequency = "hourly";
@@ -284,10 +309,14 @@ describe("job logging", () => {
         scheduledTasks.length = 0;
         logStore.length = 0;
         scheduleMock.mockClear();
+        fetchOHLCVMock.mockClear();
         process.env.NODE_ENV = "test";
         process.argv = ["/usr/bin/node", "index.js"];
         cfgMock.analysisFrequency = "hourly";
         cfgMock.dailyReportHour = "8";
+        fetchOHLCVMock.mockImplementation(() => Promise.resolve([]));
+        buildSnapshotForReportMock.mockClear();
+        buildSummaryMock.mockClear();
     });
 
     afterEach(() => {
@@ -323,5 +352,97 @@ describe("job logging", () => {
         const monthlyFinish = monthlyEntries.find((entry) => entry.context?.fn === "compileMonthlyPerformanceReport" && entry.message === "Finished monthly performance report job");
         expect(monthlyStart).toBeDefined();
         expect(monthlyFinish?.meta).toEqual(expect.objectContaining({ status: "success", durationMs: expect.any(Number) }));
+    });
+});
+
+describe("handleAnalysisSlashCommand", () => {
+
+    beforeEach(() => {
+        vi.resetModules();
+        scheduledTasks.length = 0;
+        logStore.length = 0;
+        process.env.NODE_ENV = "test";
+        process.argv = ["/usr/bin/node", "index.js"];
+        cfgMock.analysisFrequency = "hourly";
+        cfgMock.dailyReportHour = "8";
+        fetchOHLCVMock.mockClear();
+        fetchOHLCVMock.mockImplementation(() => Promise.resolve([]));
+        getSignatureMock.mockClear();
+        updateSignatureMock.mockClear();
+        buildSnapshotForReportMock.mockClear();
+        buildSummaryMock.mockClear();
+        fetchDailyClosesMock.mockClear();
+        notifyOpsMock.mockClear();
+    });
+
+    afterEach(() => {
+        process.argv = originalArgv.slice();
+    });
+
+    it("returns a summary even when signatures already match", async () => {
+        const now = Date.now();
+        const oneHourCandles = Array.from({ length: 120 }, (_, index) => ({
+            t: new Date(now - (119 - index) * 60 * 60 * 1000),
+            o: 1,
+            h: 1.5,
+            l: 0.5,
+            c: 100 + index,
+            v: 10,
+        }));
+        const fourHourCandles = Array.from({ length: 120 }, (_, index) => ({
+            t: new Date(now - (119 - index) * 4 * 60 * 60 * 1000),
+            o: 1,
+            h: 1.5,
+            l: 0.5,
+            c: 200 + index,
+            v: 15,
+        }));
+        const lastOneHour = oneHourCandles.at(-1)?.t?.getTime?.() ?? now;
+        const lastFourHour = fourHourCandles.at(-1)?.t?.getTime?.() ?? now;
+
+        fetchOHLCVMock.mockImplementation((_, interval) => {
+            if (interval === "1h") {
+                return Promise.resolve(oneHourCandles);
+            }
+            if (interval === "4h") {
+                return Promise.resolve(fourHourCandles);
+            }
+            return Promise.resolve([]);
+        });
+        getSignatureMock.mockImplementation((key) => {
+            if (key === "BTC:1h") {
+                return lastOneHour;
+            }
+            if (key === "BTC:4h") {
+                return lastFourHour;
+            }
+            return null;
+        });
+
+        const module = await import("../src/index.js");
+        const { handleAnalysisSlashCommand } = module;
+
+        getSignatureMock.mockClear();
+        updateSignatureMock.mockClear();
+        fetchOHLCVMock.mockClear();
+        buildSnapshotForReportMock.mockClear();
+        buildSummaryMock.mockClear();
+        fetchDailyClosesMock.mockClear();
+
+        const summary = await handleAnalysisSlashCommand({
+            asset: { key: "BTC", binance: "BTCUSDT" },
+            timeframe: "4h",
+        });
+
+        expect(fetchDailyClosesMock).toHaveBeenCalled();
+        expect(fetchOHLCVMock).toHaveBeenCalledTimes(2);
+        expect(notifyOpsMock).not.toHaveBeenCalled();
+        expect(buildSnapshotForReportMock).toHaveBeenCalledTimes(2);
+        expect(buildSummaryMock).toHaveBeenCalledTimes(1);
+        expect(summary).toBe("summary");
+        expect(getSignatureMock).toHaveBeenCalledWith("BTC:1h");
+        expect(getSignatureMock).toHaveBeenCalledWith("BTC:4h");
+        expect(updateSignatureMock).toHaveBeenCalledWith("BTC:1h", lastOneHour);
+        expect(updateSignatureMock).toHaveBeenCalledWith("BTC:4h", lastFourHour);
     });
 });
