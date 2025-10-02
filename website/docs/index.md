@@ -27,6 +27,7 @@ description: Visão geral do Crypto Daily Discord Bot com destaques das funciona
 - **Módulo de forecasting** que persiste previsões e gráficos comparativos de tendência.
 - **Testes de qualidade automatizados** validando estilo, semicolons e limpeza de diretórios gerados.
 - **Notas de versão dedicadas** documentando funcionalidades concluídas, cobertura de testes e links úteis de auditoria.
+- **Resumo geral com sizing sugerido** alinhando guidance, variação por timeframe e exposição recomendada por ativo.
 
 ## Como começar
 

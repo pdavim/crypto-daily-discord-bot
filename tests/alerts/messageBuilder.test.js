@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { buildAssetAlertMessage, __private__ } from "../../src/alerts/messageBuilder.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { buildAssetAlertMessage, buildAssetGuidanceMessage, __private__ } from "../../src/alerts/messageBuilder.js";
 import { ALERT_LEVELS, ALERT_CATEGORIES } from "../../src/alerts/shared.js";
+import { CFG } from "../../src/config.js";
 
 
 describe('buildAssetAlertMessage', () => {
@@ -82,6 +83,78 @@ describe('buildAssetAlertMessage', () => {
     });
 
     expect(message).toBeNull();
+  });
+});
+
+describe('buildAssetGuidanceMessage', () => {
+  const originalEquity = CFG.accountEquity;
+  const originalRisk = CFG.riskPerTrade;
+
+  afterEach(() => {
+    CFG.accountEquity = originalEquity;
+    CFG.riskPerTrade = originalRisk;
+  });
+
+  it('creates sections with decision, guidance, variation and position size even without alerts', () => {
+    CFG.accountEquity = 12500;
+    CFG.riskPerTrade = 0.02;
+
+    const message = buildAssetGuidanceMessage({
+      assetKey: 'BTC',
+      timeframeSummaries: [
+        {
+          timeframe: '4h',
+          guidance: 'Comprar (📈)',
+          decision: {
+            decision: 'buy',
+            emoji: '🟢',
+            posture: 'bullish',
+            confidence: 0.68,
+            reasons: ['tendência de alta confirmada']
+          },
+          variation: 0.0185,
+          forecast: {
+            forecastClose: 106,
+            lastClose: 105,
+            delta: 1,
+            confidence: 0.72,
+            predictedAt: '2024-01-01T12:00:00Z'
+          }
+        },
+        {
+          timeframe: '1h',
+          guidance: null,
+          decision: null,
+          variation: -0.004
+        }
+      ],
+      variationByTimeframe: { '4h': 0.0185, '1h': -0.004 },
+      timeframeOrder: ['4h', '1h']
+    });
+
+    expect(message).toContain('**🧭 Resumo — BTC**');
+    expect(message).toContain('_Variações: 4h +1.85% • 1h -0.40%_');
+    expect(message).toContain('> **4h** — Recomendação: Comprar (📈) — Variação: +1.85%');
+    expect(message).toContain('↳ Decisão: 🟢 BUY');
+    expect(message).toContain('↳ Posição estimada:');
+    expect(message).toContain('(2.00% do capital)');
+    expect(message).toContain('> **1h** — Recomendação: Sem recomendação — Variação: -0.40%');
+    expect(message).toContain('↳ Decisão: dados insuficientes');
+  });
+
+  it('pede configuração quando não há dados de risco', () => {
+    CFG.accountEquity = 0;
+    CFG.riskPerTrade = 0;
+
+    const message = buildAssetGuidanceMessage({
+      assetKey: 'ETH',
+      timeframeSummaries: [
+        { timeframe: '4h', guidance: null, decision: null }
+      ],
+      variationByTimeframe: {}
+    });
+
+    expect(message).toContain('Posição estimada: defina accountEquity/riskPerTrade');
   });
 });
 
