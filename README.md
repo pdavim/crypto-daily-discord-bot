@@ -143,13 +143,16 @@ Comandos comuns:
 
 | Comando | Argumentos | O que faz |
 |---------|------------|-----------|
+| `/help` | — | Lista todos os comandos disponíveis diretamente no Discord. |
 | `/chart ativo:<ticker> tf:<timeframe>` | `ativo` (lista de chaves suportadas), `tf` (timeframes como `15m`, `1h`, `4h`, `1d`, `45m`, etc.) | Renderiza um gráfico de candles com indicadores sobrepostos e devolve a imagem no canal/DM. |
 | `/watch add ativo:<ticker>` | — | Adiciona o ativo à watchlist pessoal do usuário. |
 | `/watch remove ativo:<ticker>` | — | Remove o ativo da watchlist pessoal. |
 | `/status` | — | Mostra uptime do bot e a watchlist do solicitante. |
 | `/analysis ativo:<ticker> tf:<timeframe>` | — | Executa a mesma análise automática usada nos alertas, retornando um resumo textual. |
 | `/settings risk percent value:<0-5>` | `value` (percentual) | Atualiza o risco por trade aplicado na estratégia automática. |
-| `/settings profit percent value:<0-20>` | `value` (percentual) | Define o lucro mínimo global ou pessoal antes que sinais de venda sejam destacados. |
+| `/settings profit view` | — | Mostra o lucro mínimo padrão, o pessoal (quando configurado) e o valor aplicado nas análises. |
+| `/settings profit default value:<0-100>` | `value` (percentual) | Define o lucro mínimo global aplicado aos relatórios e análises. |
+| `/settings profit personal value:<0-100>` | `value` (percentual) | Define o seu lucro mínimo pessoal aplicado às suas interações. |
 | `/binance` | — | Exibe saldo spot, métricas de margem e posições agregadas com base nas credenciais configuradas. |
 
 Todos os comandos são registrados automaticamente quando o bot inicia e exigem permissões de aplicação no servidor configurado.

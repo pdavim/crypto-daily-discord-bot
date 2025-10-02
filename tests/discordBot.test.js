@@ -172,6 +172,29 @@ describe('discord bot interactions', () => {
     });
   });
 
+  it('lista comandos, subcomandos e argumentos no /help', async () => {
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'help',
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: expect.any(String),
+      ephemeral: true,
+    });
+
+    const message = interaction.reply.mock.calls[0][0].content;
+    expect(message).toContain('/chart — Exibe um gráfico de preços com indicadores técnicos.');
+    expect(message).toContain('Subcomando add — Adiciona um ativo à watchlist pessoal.');
+    expect(message).toContain('value (obrigatório) — Percentual de lucro mínimo global (0 a 100).');
+    expect(message).toContain('/help — Lista os comandos disponíveis e seus objetivos.');
+  });
+
   it('handles /binance command and formats overview', async () => {
     getAccountOverview.mockResolvedValue({
       assets: [

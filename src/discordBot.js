@@ -53,6 +53,217 @@ const MAX_LIST_ITEMS = {
 const MIN_PROFIT_PERCENT_MIN = 0;
 const MIN_PROFIT_PERCENT_MAX = 100;
 
+const COMMAND_BLUEPRINTS = [
+    {
+        name: "chart",
+        description: "Exibe um gráfico de preços com indicadores técnicos.",
+        options: () => [
+            {
+                name: "ativo",
+                description: "Ativo a ser analisado.",
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: ASSETS.map(asset => ({ name: asset.key, value: asset.key }))
+            },
+            {
+                name: "tf",
+                description: "Timeframe desejado.",
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: TIMEFRAMES.map(timeframe => ({ name: timeframe, value: timeframe }))
+            }
+        ],
+        helpDetails: ["Retorna uma imagem com candles e indicadores sobrepostos."]
+    },
+    {
+        name: "watch",
+        description: "Gerencia sua lista pessoal de ativos monitorados.",
+        options: () => [
+            {
+                name: "add",
+                description: "Adiciona um ativo à watchlist pessoal.",
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: "ativo",
+                        description: "Ativo que será incluído na watchlist.",
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        choices: ASSETS.map(asset => ({ name: asset.key, value: asset.key }))
+                    }
+                ]
+            },
+            {
+                name: "remove",
+                description: "Remove um ativo da watchlist pessoal.",
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: "ativo",
+                        description: "Ativo que será removido da watchlist.",
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                        choices: ASSETS.map(asset => ({ name: asset.key, value: asset.key }))
+                    }
+                ]
+            }
+        ],
+        helpDetails: ["Utilize os subcomandos add/remove para manter a sua lista personalizada."]
+    },
+    {
+        name: "status",
+        description: "Mostra o uptime do bot e os ativos monitorados pelo usuário.",
+        helpDetails: ["Útil para confirmar se o bot está rodando e quais ativos estão na sua watchlist."]
+    },
+    {
+        name: "analysis",
+        description: "Executa uma análise técnica resumida para um ativo e timeframe.",
+        options: () => [
+            {
+                name: "ativo",
+                description: "Ativo a ser analisado.",
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: ASSETS.map(asset => ({ name: asset.key, value: asset.key }))
+            },
+            {
+                name: "tf",
+                description: "Timeframe desejado para a análise.",
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                choices: TIMEFRAMES.map(timeframe => ({ name: timeframe, value: timeframe }))
+            }
+        ],
+        helpDetails: ["Retorna o mesmo resumo utilizado pelos alertas automáticos."]
+    },
+    {
+        name: "settings",
+        description: "Atualiza configurações do bot, como risco e lucro mínimo.",
+        options: () => [
+            {
+                name: "risk",
+                description: "Configurações de risco por trade.",
+                type: ApplicationCommandOptionType.SubcommandGroup,
+                options: [
+                    {
+                        name: "percent",
+                        description: "Define o risco por trade (0 a 5%).",
+                        type: ApplicationCommandOptionType.Subcommand,
+                        options: [
+                            {
+                                name: "value",
+                                description: "Percentual de risco permitido (0 a 5).",
+                                type: ApplicationCommandOptionType.Number,
+                                required: true
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                name: "profit",
+                description: "Configurações de lucro mínimo das análises.",
+                type: ApplicationCommandOptionType.SubcommandGroup,
+                options: [
+                    {
+                        name: "view",
+                        description: "Mostra os valores configurados de lucro mínimo.",
+                        type: ApplicationCommandOptionType.Subcommand
+                    },
+                    {
+                        name: "default",
+                        description: "Define o lucro mínimo padrão (0 a 100%).",
+                        type: ApplicationCommandOptionType.Subcommand,
+                        options: [
+                            {
+                                name: "value",
+                                description: "Percentual de lucro mínimo global (0 a 100).",
+                                type: ApplicationCommandOptionType.Number,
+                                required: true
+                            }
+                        ]
+                    },
+                    {
+                        name: "personal",
+                        description: "Define o seu lucro mínimo pessoal (0 a 100%).",
+                        type: ApplicationCommandOptionType.Subcommand,
+                        options: [
+                            {
+                                name: "value",
+                                description: "Percentual de lucro mínimo pessoal (0 a 100).",
+                                type: ApplicationCommandOptionType.Number,
+                                required: true
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        helpDetails: [
+            "Combine subcomandos para ajustar risco ou personalizar o lucro mínimo aplicado nas análises."
+        ]
+    },
+    {
+        name: "binance",
+        description: "Mostra saldos, posições e métricas da conta Binance configurada.",
+        enabled: () => CFG.enableBinanceCommand,
+        helpDetails: ["Disponível apenas quando as credenciais e a flag enableBinanceCommand estão ativas."]
+    },
+    {
+        name: "help",
+        description: "Lista os comandos disponíveis e seus objetivos.",
+        helpDetails: ["Inclui subcomandos e argumentos obrigatórios para facilitar o uso diário."]
+    }
+];
+
+function resolveCommandBlueprints() {
+    return COMMAND_BLUEPRINTS.map(blueprint => {
+        const options = typeof blueprint.options === "function" ? blueprint.options() : blueprint.options;
+        return {
+            ...blueprint,
+            options
+        };
+    });
+}
+
+function getAvailableCommandBlueprints() {
+    return resolveCommandBlueprints().filter(blueprint => !blueprint.enabled || blueprint.enabled());
+}
+
+function buildSlashCommands() {
+    return getAvailableCommandBlueprints().map(({ enabled, helpDetails, ...command }) => command);
+}
+
+function buildOptionHelpLines(options = [], depth = 1) {
+    if (!Array.isArray(options) || options.length === 0) return [];
+    const indent = "    ".repeat(depth);
+    const lines = [];
+    for (const option of options) {
+        if (option.type === ApplicationCommandOptionType.SubcommandGroup) {
+            lines.push(`${indent}• Grupo ${option.name} — ${option.description}`);
+            lines.push(...buildOptionHelpLines(option.options, depth + 1));
+        } else if (option.type === ApplicationCommandOptionType.Subcommand) {
+            lines.push(`${indent}• Subcomando ${option.name} — ${option.description}`);
+            lines.push(...buildOptionHelpLines(option.options, depth + 1));
+        } else {
+            const requirement = option.required ? " (obrigatório)" : "";
+            lines.push(`${indent}• ${option.name}${requirement} — ${option.description}`);
+        }
+    }
+    return lines;
+}
+
+function buildHelpMessage() {
+    const sections = getAvailableCommandBlueprints().map(command => {
+        const header = `• /${command.name} — ${command.description}`;
+        const extra = Array.isArray(command.helpDetails) ? command.helpDetails.map(detail => `    ${detail}`) : [];
+        const optionLines = buildOptionHelpLines(command.options, 1);
+        const lines = [header, ...extra, ...optionLines];
+        return lines.join("\n");
+    });
+    return sections.join("\n\n");
+}
+
 function formatAmount(value, formatter = amountFormatter) {
     return Number.isFinite(value) ? formatter.format(value) : '0,00';
 }
@@ -285,6 +496,9 @@ export async function handleInteraction(interaction) {
                 : 'Não foi possível carregar dados da Binance no momento.';
             await interaction.editReply(message);
         }
+    } else if (interaction.commandName === 'help') {
+        const content = buildHelpMessage();
+        await interaction.reply({ content, ephemeral: true });
     } else if (interaction.commandName === 'settings') {
         const group = interaction.options.getSubcommandGroup(false);
         const sub = interaction.options.getSubcommand(false);
@@ -384,156 +598,7 @@ function getClient() {
     if (!clientPromise) {
         const client = new Client({ intents: [GatewayIntentBits.Guilds] });
         clientPromise = client.login(CFG.botToken).then(async () => {
-            const commands = [
-                {
-                    name: 'chart',
-                    description: 'Show price chart',
-                    options: [
-                        {
-                            name: 'ativo',
-                            description: 'Ativo',
-                            type: ApplicationCommandOptionType.String,
-                            required: true,
-                            choices: ASSETS.map(a => ({ name: a.key, value: a.key }))
-                        },
-                        {
-                            name: 'tf',
-                            description: 'Timeframe',
-                            type: ApplicationCommandOptionType.String,
-                            required: true,
-                            choices: TIMEFRAMES.map(t => ({ name: t, value: t }))
-                        }
-                    ]
-                },
-                {
-                    name: 'watch',
-                    description: 'Manage watchlist',
-                    options: [
-                        {
-                            name: 'add',
-                            description: 'Add asset to watchlist',
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                {
-                                    name: 'ativo',
-                                    description: 'Ativo',
-                                    type: ApplicationCommandOptionType.String,
-                                    required: true,
-                                    choices: ASSETS.map(a => ({ name: a.key, value: a.key }))
-                                }
-                            ]
-                        },
-                        {
-                            name: 'remove',
-                            description: 'Remove asset from watchlist',
-                            type: ApplicationCommandOptionType.Subcommand,
-                            options: [
-                                {
-                                    name: 'ativo',
-                                    description: 'Ativo',
-                                    type: ApplicationCommandOptionType.String,
-                                    required: true,
-                                    choices: ASSETS.map(a => ({ name: a.key, value: a.key }))
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    name: 'status',
-                    description: 'Show watchlist and uptime'
-                },
-                {
-                    name: 'analysis',
-                    description: 'Executa análise resumida para um ativo',
-                    options: [
-                        {
-                            name: 'ativo',
-                            description: 'Ativo',
-                            type: ApplicationCommandOptionType.String,
-                            required: true,
-                            choices: ASSETS.map(a => ({ name: a.key, value: a.key }))
-                        },
-                        {
-                            name: 'tf',
-                            description: 'Timeframe',
-                            type: ApplicationCommandOptionType.String,
-                            required: true,
-                            choices: TIMEFRAMES.map(t => ({ name: t, value: t }))
-                        }
-                    ]
-                },
-                {
-                    name: 'settings',
-                    description: 'Atualiza configurações do bot',
-                    options: [
-                        {
-                            name: 'risk',
-                            description: 'Configurações de risco',
-                            type: ApplicationCommandOptionType.SubcommandGroup,
-                            options: [
-                                {
-                                    name: 'percent',
-                                    description: 'Define o risco por trade (0 a 5%)',
-                                    type: ApplicationCommandOptionType.Subcommand,
-                                    options: [
-                                        {
-                                            name: 'value',
-                                            description: 'Percentual de risco permitido (0 a 5)',
-                                            type: ApplicationCommandOptionType.Number,
-                                            required: true
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            name: 'profit',
-                            description: 'Configurações de lucro mínimo',
-                            type: ApplicationCommandOptionType.SubcommandGroup,
-                            options: [
-                                {
-                                    name: 'view',
-                                    description: 'Mostra os valores configurados de lucro mínimo',
-                                    type: ApplicationCommandOptionType.Subcommand,
-                                },
-                                {
-                                    name: 'default',
-                                    description: 'Define o lucro mínimo padrão (0 a 100%)',
-                                    type: ApplicationCommandOptionType.Subcommand,
-                                    options: [
-                                        {
-                                            name: 'value',
-                                            description: 'Percentual de lucro mínimo global (0 a 100)',
-                                            type: ApplicationCommandOptionType.Number,
-                                            required: true
-                                        }
-                                    ]
-                                },
-                                {
-                                    name: 'personal',
-                                    description: 'Define o seu lucro mínimo pessoal (0 a 100%)',
-                                    type: ApplicationCommandOptionType.Subcommand,
-                                    options: [
-                                        {
-                                            name: 'value',
-                                            description: 'Percentual de lucro mínimo pessoal (0 a 100)',
-                                            type: ApplicationCommandOptionType.Number,
-                                            required: true
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ];
-            if (CFG.enableBinanceCommand) {
-                commands.splice(4, 0, {
-                    name: 'binance',
-                    description: 'Mostra saldos, posições e margem da conta Binance'
-                });
-            }
+            const commands = buildSlashCommands();
             await client.application.commands.set(commands);
             client.on('interactionCreate', handleInteraction);
             return client;
