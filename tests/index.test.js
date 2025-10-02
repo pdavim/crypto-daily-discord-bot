@@ -184,8 +184,9 @@ vi.mock("../src/forecasting.js", () => ({
 }));
 vi.mock("../src/portfolio/growth.js", () => ({ runPortfolioGrowthSimulation: runPortfolioGrowthSimulationMock }));
 
+const originalArgv = [...process.argv];
+
 describe("analysis scheduler", () => {
-    const originalArgv = [...process.argv];
 
     beforeEach(() => {
         vi.resetModules();
@@ -248,6 +249,12 @@ describe("analysis scheduler", () => {
         expect(startLog).toBeDefined();
         expect(completedLog).toBeDefined();
         expect(completedLog?.meta?.durationMs).toBeGreaterThanOrEqual(0);
+
+        const runAllStart = logStore.find((entry) => entry.context?.fn === "runAll" && entry.message === "Starting runAll job");
+        const runAllFinish = logStore.find((entry) => entry.context?.fn === "runAll" && entry.message === "Finished runAll job");
+        expect(runAllStart).toBeDefined();
+        expect(runAllFinish).toBeDefined();
+        expect(runAllFinish?.meta).toEqual(expect.objectContaining({ status: "success", durationMs: expect.any(Number) }));
     });
 
     it("falls back to hourly when the frequency is invalid", async () => {
@@ -268,5 +275,53 @@ describe("analysis scheduler", () => {
         await import("../src/index.js");
 
         expect(scheduleMock).not.toHaveBeenCalled();
+    });
+});
+
+describe("job logging", () => {
+    beforeEach(() => {
+        vi.resetModules();
+        scheduledTasks.length = 0;
+        logStore.length = 0;
+        scheduleMock.mockClear();
+        process.env.NODE_ENV = "test";
+        process.argv = ["/usr/bin/node", "index.js"];
+        cfgMock.analysisFrequency = "hourly";
+        cfgMock.dailyReportHour = "8";
+    });
+
+    afterEach(() => {
+        process.argv = originalArgv.slice();
+    });
+
+    it("emits start and finish logs for cron handlers", async () => {
+        await import("../src/index.js");
+
+        const findTask = (expression) => scheduledTasks.find((task) => task.expression === expression);
+        const runTaskAndCollect = async (expression) => {
+            const task = findTask(expression);
+            expect(task).toBeDefined();
+            const startIdx = logStore.length;
+            await task.handler();
+            return logStore.slice(startIdx);
+        };
+
+        const dailyEntries = await runTaskAndCollect(`0 ${cfgMock.dailyReportHour} * * *`);
+        const dailyStart = dailyEntries.find((entry) => entry.context?.fn === "runDailyAnalysis" && entry.message === "Starting daily analysis job");
+        const dailyFinish = dailyEntries.find((entry) => entry.context?.fn === "runDailyAnalysis" && entry.message === "Finished daily analysis job");
+        expect(dailyStart).toBeDefined();
+        expect(dailyFinish?.meta).toEqual(expect.objectContaining({ status: "success", durationMs: expect.any(Number) }));
+
+        const weeklyEntries = await runTaskAndCollect("0 18 * * 0");
+        const weeklyStart = weeklyEntries.find((entry) => entry.context?.fn === "generateWeeklySnapshot" && entry.message === "Starting weekly snapshot job");
+        const weeklyFinish = weeklyEntries.find((entry) => entry.context?.fn === "generateWeeklySnapshot" && entry.message === "Finished weekly snapshot job");
+        expect(weeklyStart).toBeDefined();
+        expect(weeklyFinish?.meta).toEqual(expect.objectContaining({ status: "success", durationMs: expect.any(Number) }));
+
+        const monthlyEntries = await runTaskAndCollect("0 1 1 * *");
+        const monthlyStart = monthlyEntries.find((entry) => entry.context?.fn === "compileMonthlyPerformanceReport" && entry.message === "Starting monthly performance report job");
+        const monthlyFinish = monthlyEntries.find((entry) => entry.context?.fn === "compileMonthlyPerformanceReport" && entry.message === "Finished monthly performance report job");
+        expect(monthlyStart).toBeDefined();
+        expect(monthlyFinish?.meta).toEqual(expect.objectContaining({ status: "success", durationMs: expect.any(Number) }));
     });
 });

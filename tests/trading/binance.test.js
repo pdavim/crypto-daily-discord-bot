@@ -8,6 +8,8 @@ vi.mock("axios", () => {
 
 const logTradeMock = vi.fn();
 
+const fetchWithRetry = vi.fn(async (fn) => fn());
+
 const loggerMock = {
     info: vi.fn(),
     debug: vi.fn(),
@@ -22,6 +24,10 @@ vi.mock("../../src/logger.js", () => ({
     logger: loggerMock,
     default: loggerMock,
     withContext: withContextMock,
+}));
+
+vi.mock("../../src/utils.js", () => ({
+    fetchWithRetry,
 }));
 
 vi.mock("../../src/trading/tradeLog.js", () => ({
@@ -44,6 +50,7 @@ describe("Binance trading integration", () => {
         process.env = { ...originalEnv, BINANCE_API_KEY: "test-key", BINANCE_SECRET: "test-secret" };
         axios.mockReset();
         logTradeMock.mockReset();
+        fetchWithRetry.mockClear();
         withContextMock.mockClear();
         loggerMock.info.mockClear();
         loggerMock.debug.mockClear();
@@ -91,6 +98,17 @@ describe("Binance trading integration", () => {
         expect(balances).toEqual([
             { asset: "BTC", free: 1.5, locked: 0.5, total: 2 }
         ]);
+    });
+
+    it("logs attempt and completion for private requests", async () => {
+        axios.mockResolvedValueOnce({ status: 200, data: { balances: [] } });
+
+        const { getSpotBalances } = await import("../../src/trading/binance.js");
+        await getSpotBalances();
+
+        expect(fetchWithRetry).toHaveBeenCalledTimes(1);
+        expect(loggerMock.info).toHaveBeenCalledWith({ method: "GET", attempt: 1 }, 'Dispatching Binance private request');
+        expect(loggerMock.debug).toHaveBeenCalledWith({ method: "GET", attempt: 1, status: 200, durationMs: expect.any(Number) }, 'Binance private request completed');
     });
 
     it("fetches margin account information with normalization", async () => {
