@@ -1,0 +1,272 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+const scheduledTasks = [];
+const logStore = [];
+const cfgMock = {
+    analysisFrequency: "hourly",
+    dailyReportHour: "8",
+    tz: "UTC",
+    enableCharts: false,
+    enableAlerts: false,
+    enableAnalysis: false,
+    enableReports: false,
+    forecasting: { charts: { appendToUploads: false } },
+    portfolioGrowth: { discord: { enabled: false } },
+};
+
+const runAssetsSafelyMock = vi.fn(() => Promise.resolve());
+const flushAlertQueueMock = vi.fn(() => Promise.resolve());
+const runPortfolioGrowthSimulationMock = vi.fn(() => Promise.resolve(null));
+const postChartsMock = vi.fn(() => Promise.resolve(true));
+const sendDiscordAlertMock = vi.fn(() => Promise.resolve(true));
+const postAnalysisMock = vi.fn(() => Promise.resolve({ posted: true }));
+const postMonthlyReportMock = vi.fn(() => Promise.resolve(true));
+const notifyOpsMock = vi.fn(() => Promise.resolve());
+const fetchDailyClosesMock = vi.fn(() => Promise.resolve([{ t: new Date(), o: 1, h: 1, l: 1, c: 1, v: 1 }]));
+const streamKlinesMock = vi.fn();
+const registerMock = {
+    contentType: "text/plain",
+    metrics: vi.fn(() => Promise.resolve("metrics")),
+};
+const reportWeeklyPerfMock = vi.fn(() => ({}));
+const saveWeeklySnapshotMock = vi.fn(() => Promise.resolve());
+const renderMonthlyPerformanceChartMock = vi.fn(() => Promise.resolve(null));
+const fetchEconomicEventsMock = vi.fn(() => Promise.resolve([]));
+const runAgentMock = vi.fn(() => Promise.resolve("report"));
+const pruneOlderThanMock = vi.fn();
+const resetAlertHashesMock = vi.fn();
+const saveStoreMock = vi.fn();
+const updateSignatureMock = vi.fn();
+const getSignatureMock = vi.fn(() => null);
+const buildHashMock = vi.fn(() => "hash");
+const getAlertHashMock = vi.fn(() => "prev");
+const updateAlertHashMock = vi.fn();
+const forecastNextCloseMock = vi.fn();
+const persistForecastEntryMock = vi.fn();
+
+const createLogger = (context = {}) => ({
+    info: vi.fn((metaOrMessage, maybeMessage) => {
+        if (typeof metaOrMessage === "string") {
+            logStore.push({ level: "info", context, message: metaOrMessage, meta: undefined });
+            return;
+        }
+        logStore.push({ level: "info", context, message: maybeMessage, meta: metaOrMessage });
+    }),
+    warn: vi.fn((metaOrMessage, maybeMessage) => {
+        if (typeof metaOrMessage === "string") {
+            logStore.push({ level: "warn", context, message: metaOrMessage, meta: undefined });
+            return;
+        }
+        logStore.push({ level: "warn", context, message: maybeMessage, meta: metaOrMessage });
+    }),
+    error: vi.fn((metaOrMessage, maybeMessage) => {
+        if (typeof metaOrMessage === "string") {
+            logStore.push({ level: "error", context, message: metaOrMessage, meta: undefined });
+            return;
+        }
+        logStore.push({ level: "error", context, message: maybeMessage, meta: metaOrMessage });
+    }),
+    debug: vi.fn(),
+});
+
+const baseLogger = createLogger();
+
+const scheduleMock = vi.fn((expression, handler, options) => {
+    scheduledTasks.push({ expression, handler, options });
+    return { stop: vi.fn() };
+});
+
+const listenMock = vi.fn((_, callback) => {
+    if (typeof callback === "function") {
+        callback();
+    }
+});
+
+vi.mock("node-cron", () => ({ default: { schedule: scheduleMock } }));
+vi.mock("http", () => ({ createServer: vi.fn(() => ({ listen: listenMock })), default: { createServer: vi.fn(() => ({ listen: listenMock })) } }));
+vi.mock("../src/config.js", () => ({ CFG: cfgMock }));
+vi.mock("../src/assets.js", () => ({
+    ASSETS: [{ key: "BTC", binance: "BTCUSDT" }],
+    TIMEFRAMES: ["1h"],
+    BINANCE_INTERVALS: { "1h": "1h" },
+}));
+vi.mock("../src/data/binance.js", () => ({
+    fetchOHLCV: vi.fn(() => Promise.resolve([])),
+    fetchDailyCloses: fetchDailyClosesMock,
+}));
+vi.mock("../src/data/binanceStream.js", () => ({ streamKlines: streamKlinesMock }));
+vi.mock("../src/indicators.js", () => ({
+    sma: vi.fn(() => []),
+    rsi: vi.fn(() => []),
+    macd: vi.fn(() => ({ macd: [], signal: [], histogram: [] })),
+    bollinger: vi.fn(() => ({ upper: [], lower: [], mid: [] })),
+    atr14: vi.fn(() => []),
+    bollWidth: vi.fn(() => []),
+    vwap: vi.fn(() => []),
+    ema: vi.fn(() => []),
+    adx: vi.fn(() => []),
+    stochastic: vi.fn(() => ({ k: [], d: [] })),
+    williamsR: vi.fn(() => []),
+    cci: vi.fn(() => []),
+    obv: vi.fn(() => []),
+    keltnerChannel: vi.fn(() => ({ upper: [], lower: [], mid: [] })),
+}));
+vi.mock("../src/reporter.js", () => ({
+    buildSnapshotForReport: vi.fn(() => ({})),
+    buildSummary: vi.fn(() => "summary"),
+}));
+vi.mock("../src/discord.js", () => ({
+    postAnalysis: postAnalysisMock,
+    sendDiscordAlert: sendDiscordAlertMock,
+    postMonthlyReport: postMonthlyReportMock,
+}));
+vi.mock("../src/discordBot.js", () => ({
+    initBot: vi.fn(),
+    postCharts: postChartsMock,
+}));
+vi.mock("../src/chart.js", () => ({
+    renderChartPNG: vi.fn(() => Promise.resolve("chart.png")),
+    renderForecastChart: vi.fn(() => Promise.resolve("forecast.png")),
+}));
+vi.mock("../src/alerts.js", () => ({ buildAlerts: vi.fn(() => []) }));
+vi.mock("../src/ai.js", () => ({ runAgent: runAgentMock }));
+vi.mock("../src/store.js", () => ({
+    getSignature: getSignatureMock,
+    updateSignature: updateSignatureMock,
+    saveStore: saveStoreMock,
+    getAlertHash: getAlertHashMock,
+    updateAlertHash: updateAlertHashMock,
+    resetAlertHashes: resetAlertHashesMock,
+}));
+vi.mock("../src/data/economic.js", () => ({ fetchEconomicEvents: fetchEconomicEventsMock }));
+vi.mock("../src/logger.js", () => ({
+    logger: baseLogger,
+    withContext: vi.fn((_, context = {}) => createLogger(context)),
+}));
+vi.mock("../src/limit.js", () => ({
+    default: vi.fn(() => vi.fn()),
+    calcConcurrency: vi.fn(() => 2),
+}));
+vi.mock("../src/alertCache.js", () => ({
+    buildHash: buildHashMock,
+    shouldSend: vi.fn(() => true),
+    pruneOlderThan: pruneOlderThanMock,
+}));
+vi.mock("../src/metrics.js", () => ({
+    register: registerMock,
+    forecastConfidenceHistogram: vi.fn(),
+    forecastDirectionCounter: vi.fn(),
+    forecastErrorHistogram: vi.fn(),
+}));
+vi.mock("../src/monitor.js", () => ({ notifyOps: notifyOpsMock }));
+vi.mock("../src/perf.js", () => ({ reportWeeklyPerf: reportWeeklyPerfMock }));
+vi.mock("../src/weeklySnapshots.js", () => ({
+    saveWeeklySnapshot: saveWeeklySnapshotMock,
+    loadWeeklySnapshots: vi.fn(() => Promise.resolve([])),
+}));
+vi.mock("../src/monthlyReport.js", () => ({ renderMonthlyPerformanceChart: renderMonthlyPerformanceChartMock }));
+vi.mock("../src/runner.js", () => ({ runAssetsSafely: runAssetsSafelyMock }));
+vi.mock("../src/alerts/dispatcher.js", () => ({
+    enqueueAlertPayload: vi.fn(),
+    flushAlertQueue: flushAlertQueueMock,
+}));
+vi.mock("../src/alerts/messageBuilder.js", () => ({ buildAssetAlertMessage: vi.fn(() => ({})) }));
+vi.mock("../src/alerts/decision.js", () => ({ deriveDecisionDetails: vi.fn(() => ({})) }));
+vi.mock("../src/alerts/variationMetrics.js", () => ({ collectVariationMetrics: vi.fn(() => ({})) }));
+vi.mock("../src/trading/posture.js", () => ({
+    evaluateMarketPosture: vi.fn(() => ({})),
+    deriveStrategyFromPosture: vi.fn(() => ({})),
+}));
+vi.mock("../src/trading/automation.js", () => ({ automateTrading: vi.fn(() => Promise.resolve()) }));
+vi.mock("../src/forecasting.js", () => ({
+    forecastNextClose: forecastNextCloseMock,
+    persistForecastEntry: persistForecastEntryMock,
+}));
+vi.mock("../src/portfolio/growth.js", () => ({ runPortfolioGrowthSimulation: runPortfolioGrowthSimulationMock }));
+
+describe("analysis scheduler", () => {
+    const originalArgv = [...process.argv];
+
+    beforeEach(() => {
+        vi.resetModules();
+        scheduledTasks.length = 0;
+        logStore.length = 0;
+        scheduleMock.mockClear();
+        listenMock.mockClear();
+        runAssetsSafelyMock.mockClear();
+        flushAlertQueueMock.mockClear();
+        runPortfolioGrowthSimulationMock.mockClear();
+        postChartsMock.mockClear();
+        sendDiscordAlertMock.mockClear();
+        postAnalysisMock.mockClear();
+        postMonthlyReportMock.mockClear();
+        notifyOpsMock.mockClear();
+        fetchDailyClosesMock.mockClear();
+        streamKlinesMock.mockClear();
+        registerMock.metrics.mockClear();
+        reportWeeklyPerfMock.mockClear();
+        saveWeeklySnapshotMock.mockClear();
+        renderMonthlyPerformanceChartMock.mockClear();
+        fetchEconomicEventsMock.mockClear();
+        runAgentMock.mockClear();
+        pruneOlderThanMock.mockClear();
+        resetAlertHashesMock.mockClear();
+        saveStoreMock.mockClear();
+        updateSignatureMock.mockClear();
+        getSignatureMock.mockClear();
+        buildHashMock.mockClear();
+        getAlertHashMock.mockClear();
+        updateAlertHashMock.mockClear();
+        forecastNextCloseMock.mockClear();
+        persistForecastEntryMock.mockClear();
+        process.env.NODE_ENV = "test";
+        process.argv = ["/usr/bin/node", "index.js"];
+        cfgMock.analysisFrequency = "hourly";
+        cfgMock.tz = "UTC";
+        cfgMock.dailyReportHour = "8";
+    });
+
+    afterEach(() => {
+        process.argv = originalArgv.slice();
+    });
+
+    it("schedules runAll according to analysisFrequency", async () => {
+        cfgMock.analysisFrequency = "15m";
+
+        await import("../src/index.js");
+
+        const analysisTask = scheduledTasks.find((task) => task.expression === "*/15 * * * *");
+        expect(analysisTask).toBeDefined();
+        expect(analysisTask?.options).toEqual(expect.objectContaining({ timezone: cfgMock.tz }));
+
+        expect(runAssetsSafelyMock).toHaveBeenCalledTimes(1);
+        await analysisTask?.handler();
+        expect(runAssetsSafelyMock).toHaveBeenCalledTimes(2);
+
+        const startLog = logStore.find((entry) => entry.context?.fn === "analysisSchedule" && entry.message === "Starting scheduled runAll");
+        const completedLog = logStore.find((entry) => entry.context?.fn === "analysisSchedule" && entry.message === "Completed scheduled runAll");
+        expect(startLog).toBeDefined();
+        expect(completedLog).toBeDefined();
+        expect(completedLog?.meta?.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it("falls back to hourly when the frequency is invalid", async () => {
+        cfgMock.analysisFrequency = "weird";
+
+        await import("../src/index.js");
+
+        const analysisTask = scheduledTasks.find((task) => task.expression === "0 * * * *");
+        expect(analysisTask).toBeDefined();
+
+        const fallbackLog = logStore.find((entry) => entry.level === "warn" && entry.message === "Unknown analysis frequency \"weird\"; falling back to hourly cadence.");
+        expect(fallbackLog).toBeDefined();
+    });
+
+    it("does not register the cron job when running in once mode", async () => {
+        process.argv.push("--once");
+
+        await import("../src/index.js");
+
+        expect(scheduleMock).not.toHaveBeenCalled();
+    });
+});

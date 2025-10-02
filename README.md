@@ -67,6 +67,12 @@ npm install
 - Credenciais sensíveis continuam exclusivamente no `.env`. Combine `npm exec config-cli secrets check` com ferramentas de CI/CD para validar se as variáveis obrigatórias foram definidas antes do deploy.
 - Em ambientes temporários, exporte variáveis em linha (`ENABLE_BINANCE_COMMAND=false npm run once`) sem alterar arquivos locais.
 
+### Frequência das análises automáticas (`analysisFrequency`)
+
+- Controle o agendamento do pipeline principal (`runAll`) via `analysisFrequency` em `config/default.json` ou por `ANALYSIS_FREQUENCY` no ambiente.
+- Valores aceites: `15m`, `30m`, `hourly`, `2h`, `4h`, `6h`, `12h` e `daily`. Aliases como `1h`, `60m`, `24h` e `1d` são normalizados para os equivalentes mais próximos.
+- Quando um valor inválido for fornecido, o bot regista um aviso nos logs e faz fallback para o modo horário (`hourly`).
+
 ## Boas práticas para credenciais da Binance
 
 - Gere chaves **apenas com permissões necessárias**: leitura para alertas e dashboards; ativar "Enable Spot & Margin Trading" somente quando o executor automático for utilizado.

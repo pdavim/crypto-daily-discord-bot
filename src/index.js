@@ -33,6 +33,48 @@ import { runPortfolioGrowthSimulation } from "./portfolio/growth.js";
 
 const ONCE = process.argv.includes("--once");
 
+const DEFAULT_ANALYSIS_FREQUENCY_KEY = "hourly";
+const ANALYSIS_FREQUENCY_SCHEDULES = new Map([
+    ["15m", { cron: "*/15 * * * *", label: "every 15 minutes" }],
+    ["30m", { cron: "*/30 * * * *", label: "every 30 minutes" }],
+    ["hourly", { cron: "0 * * * *", label: "hourly at minute 0" }],
+    ["2h", { cron: "0 */2 * * *", label: "every 2 hours" }],
+    ["4h", { cron: "0 */4 * * *", label: "every 4 hours" }],
+    ["6h", { cron: "0 */6 * * *", label: "every 6 hours" }],
+    ["12h", { cron: "0 */12 * * *", label: "every 12 hours" }],
+    ["daily", { cron: "0 0 * * *", label: "daily at midnight" }],
+]);
+const ANALYSIS_FREQUENCY_ALIASES = new Map([
+    ["1h", "hourly"],
+    ["60m", "hourly"],
+    ["120m", "2h"],
+    ["240m", "4h"],
+    ["360m", "6h"],
+    ["720m", "12h"],
+    ["24h", "daily"],
+    ["1d", "daily"],
+]);
+
+/**
+ * Resolves the configured analysis frequency into a cron expression.
+ * @param {string} value - Configured frequency value.
+ * @returns {{ cron: string, label: string, key: string, alias: string|null, isFallback: boolean, input: string }}
+ */
+function resolveAnalysisSchedule(value) {
+    const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+    if (ANALYSIS_FREQUENCY_SCHEDULES.has(normalized)) {
+        const schedule = ANALYSIS_FREQUENCY_SCHEDULES.get(normalized);
+        return { ...schedule, key: normalized, alias: null, isFallback: false, input: normalized };
+    }
+    const aliasTarget = ANALYSIS_FREQUENCY_ALIASES.get(normalized);
+    if (aliasTarget && ANALYSIS_FREQUENCY_SCHEDULES.has(aliasTarget)) {
+        const schedule = ANALYSIS_FREQUENCY_SCHEDULES.get(aliasTarget);
+        return { ...schedule, key: aliasTarget, alias: normalized, isFallback: false, input: normalized };
+    }
+    const fallback = ANALYSIS_FREQUENCY_SCHEDULES.get(DEFAULT_ANALYSIS_FREQUENCY_KEY);
+    return { ...fallback, key: DEFAULT_ANALYSIS_FREQUENCY_KEY, alias: null, isFallback: true, input: normalized };
+}
+
 process.on('unhandledRejection', (err) => {
     const log = withContext(logger, { fn: 'unhandledRejection' });
     log.error({ err }, 'Unhandled promise rejection');
@@ -885,6 +927,27 @@ if (!ONCE) {
     });
     const scheduleLog = withContext(logger);
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const analysisSchedule = resolveAnalysisSchedule(CFG.analysisFrequency);
+    if (analysisSchedule.alias) {
+        scheduleLog.info({ fn: 'schedule', provided: analysisSchedule.alias, normalized: analysisSchedule.key }, `ℹ️ Normalized analysis frequency "${analysisSchedule.alias}" to "${analysisSchedule.key}".`);
+    }
+    if (analysisSchedule.isFallback) {
+        const provided = CFG.analysisFrequency;
+        scheduleLog.warn({ fn: 'schedule', provided }, `Unknown analysis frequency "${provided}"; falling back to hourly cadence.`);
+    }
+    cron.schedule(analysisSchedule.cron, async () => {
+        const log = withContext(logger, { fn: 'analysisSchedule', frequency: analysisSchedule.key });
+        const startedAt = Date.now();
+        log.info({ cadence: analysisSchedule.label, cron: analysisSchedule.cron }, 'Starting scheduled runAll');
+        try {
+            await runAll();
+            const durationMs = Date.now() - startedAt;
+            log.info({ cadence: analysisSchedule.label, cron: analysisSchedule.cron, durationMs }, 'Completed scheduled runAll');
+        } catch (err) {
+            log.error({ cadence: analysisSchedule.label, cron: analysisSchedule.cron, err }, 'Scheduled runAll failed');
+        }
+    }, { timezone: CFG.tz });
+    scheduleLog.info({ fn: 'schedule', channel: 'analysis', frequency: analysisSchedule.key }, `🕒 Scheduled analysis ${analysisSchedule.label} (cron=${analysisSchedule.cron}, TZ=${CFG.tz})`);
     const rawDailyReportHours = Array.isArray(CFG.dailyReportHours)
         ? CFG.dailyReportHours
         : Array.isArray(CFG.dailyReportHour)
