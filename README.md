@@ -164,7 +164,7 @@ Comandos comuns:
 | `/chart ativo:<ticker> tf:<timeframe>` | `ativo` (lista de chaves suportadas), `tf` (timeframes como `15m`, `1h`, `4h`, `1d`, `45m`, etc.) | Renderiza um gráfico de candles com indicadores sobrepostos e devolve a imagem no canal/DM. |
 | `/watch add ativo:<ticker>` | — | Adiciona o ativo à watchlist pessoal do usuário. |
 | `/watch remove ativo:<ticker>` | — | Remove o ativo da watchlist pessoal. |
-| `/status` | — | Mostra uptime do bot e a watchlist do solicitante. |
+| `/status` | — | Mostra uptime, watchlist pessoal e previsões bull/bear recentes para cada ativo monitorado. |
 | `/analysis ativo:<ticker> tf:<timeframe>` | — | Executa a mesma análise automática usada nos alertas, retornando um resumo textual. |
 | `/settings risk percent value:<0-5>` | `value` (percentual) | Atualiza o risco por trade aplicado na estratégia automática. |
 | `/settings profit view` | — | Mostra o lucro mínimo padrão, o pessoal (quando configurado) e o valor aplicado nas análises. |
@@ -174,6 +174,16 @@ Comandos comuns:
 | `/binance` | — | Exibe saldo spot, métricas de margem e posições agregadas com base nas credenciais configuradas. |
 
 Todos os comandos são registrados automaticamente quando o bot inicia e exigem permissões de aplicação no servidor configurado.
+
+### Previsões em tempo real no `/status`
+
+O comando `/status` agora adiciona uma seção `🔮` para cada ativo da sua watchlist, listando as previsões mais recentes nos timeframes de 5m, 15m, 30m, 1h e 4h. Cada linha traz:
+
+- **Direção prevista**: o emoji 🐂 indica cenário de alta (delta positivo) e 🐻 sinaliza pressão de baixa (delta negativo). Quando o modelo está neutro, o rótulo aparece como ➖.
+- **Preço estimado**: o valor previsto para o próximo fechamento naquele timeframe, já formatado em reais/dólares conforme a localidade configurada.
+- **Delta percentual**: variação proporcional em relação ao último fechamento conhecido, útil para contextualizar a magnitude do movimento projetado.
+
+Quando ainda não há histórico para um timeframe específico, o bot mostra `—`, reforçando que nenhuma previsão foi persistida para aquele horizonte.
 
 ### Ajuda paginada no Discord
 

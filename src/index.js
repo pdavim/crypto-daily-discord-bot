@@ -11,7 +11,15 @@ import { postCharts, initBot } from "./discordBot.js";
 import { renderChartPNG, renderForecastChart } from "./chart.js";
 import { buildAlerts } from "./alerts.js";
 import { runAgent } from "./ai.js";
-import { getSignature, updateSignature, saveStore, getAlertHash, updateAlertHash, resetAlertHashes } from "./store.js";
+import {
+    getSignature,
+    updateSignature,
+    saveStore,
+    getAlertHash,
+    updateAlertHash,
+    resetAlertHashes,
+    updateForecastSnapshot,
+} from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
 import { logger, withContext } from "./logger.js";
 import pLimit, { calcConcurrency } from "./limit.js";
@@ -400,6 +408,7 @@ async function runOnceForAsset(asset, options = {}) {
                             historyPath: persistence?.filePath ?? null,
                             timeZone: CFG.tz,
                         };
+                        updateForecastSnapshot(asset.key, tf, meta.forecast);
 
                         if (Number.isFinite(forecastResult.confidence)) {
                             forecastConfidenceHistogram.observe(forecastResult.confidence);

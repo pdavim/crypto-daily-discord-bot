@@ -28,6 +28,7 @@ const renderChartPNG = vi.fn();
 const addAssetToWatch = vi.fn();
 const removeAssetFromWatch = vi.fn();
 const getWatchlist = vi.fn(() => []);
+const getForecastSnapshot = vi.fn(() => ({}));
 const getAccountOverview = vi.fn();
 const submitOrder = vi.fn();
 const openPosition = vi.fn();
@@ -54,6 +55,7 @@ const setSettingMock = vi.fn((key, value) => {
 vi.mock('../src/data/binance.js', () => ({ fetchOHLCV }));
 vi.mock('../src/chart.js', () => ({ renderChartPNG }));
 vi.mock('../src/watchlist.js', () => ({ addAssetToWatch, removeAssetFromWatch, getWatchlist }));
+vi.mock('../src/store.js', () => ({ getForecastSnapshot }));
 vi.mock('../src/trading/binance.js', () => ({ getAccountOverview, submitOrder }));
 vi.mock('../src/trading/executor.js', () => ({ openPosition, adjustMargin }));
 vi.mock('../src/settings.js', () => ({
@@ -76,6 +78,8 @@ beforeEach(() => {
   submitOrder.mockReset();
   openPosition.mockReset();
   adjustMargin.mockReset();
+  getForecastSnapshot.mockReset();
+  getForecastSnapshot.mockReturnValue({});
   for (const key of Object.keys(settingsStore)) {
     delete settingsStore[key];
   }
@@ -160,8 +164,26 @@ describe('discord bot interactions', () => {
     });
   });
 
-  it('handles /status command', async () => {
-    getWatchlist.mockReturnValue(['BTC', 'ETH']);
+  it('handles /status command with watchlist forecasts', async () => {
+    getWatchlist.mockReturnValue(['btc', 'ETH', 'BTC']);
+    getForecastSnapshot.mockImplementation((asset) => {
+      if (asset === 'BTC') {
+        return {
+          '5m': { forecastClose: 101, lastClose: 100, delta: 1 },
+          '15m': { forecastClose: 99, lastClose: 100, delta: -1 },
+          '30m': { forecastClose: 100, lastClose: 100, delta: 0 },
+          '1h': { forecastClose: 102, lastClose: 100, delta: 2 },
+          '4h': { forecastClose: 98, lastClose: 100, delta: -2 },
+        };
+      }
+      if (asset === 'ETH') {
+        return {
+          '5m': { forecastClose: 2010, lastClose: 2000, delta: 10 },
+          '15m': { forecastClose: 1990, lastClose: 2000, delta: -10 },
+        };
+      }
+      return {};
+    });
     const { handleInteraction } = await loadBot();
 
     const interaction = {
@@ -174,10 +196,43 @@ describe('discord bot interactions', () => {
     await handleInteraction(interaction);
 
     expect(getWatchlist).toHaveBeenCalledWith('user-5');
-    expect(interaction.reply).toHaveBeenCalledWith({
-      content: expect.stringContaining('BTC, ETH'),
-      ephemeral: true,
-    });
+    expect(getForecastSnapshot).toHaveBeenCalledWith('BTC');
+    expect(getForecastSnapshot).toHaveBeenCalledWith('ETH');
+    const payload = interaction.reply.mock.calls[0][0];
+    expect(payload.ephemeral).toBe(true);
+    expect(payload.content).toContain('👀 Watchlist: BTC, ETH');
+    expect(payload.content).toContain('🔮 BTC');
+    expect(payload.content).toContain('5m: 🐂 Alta 101,00 (+1,00%)');
+    expect(payload.content).toContain('15m: 🐻 Baixa 99,00 (-1,00%)');
+    expect(payload.content).toContain('30m: ➖ Neutro 100,00 (0,00%)');
+    expect(payload.content).toContain('1h: 🐂 Alta 102,00 (+2,00%)');
+    expect(payload.content).toContain('4h: 🐻 Baixa 98,00 (-2,00%)');
+    expect(payload.content).toContain('🔮 ETH');
+    expect(payload.content).toContain('30m: —');
+  });
+
+  it('handles /status command when no forecasts are stored', async () => {
+    getWatchlist.mockReturnValue(['SOL']);
+    getForecastSnapshot.mockReturnValue({});
+    const { handleInteraction } = await loadBot();
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'status',
+      user: { id: 'user-6' },
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(getWatchlist).toHaveBeenCalledWith('user-6');
+    const payload = interaction.reply.mock.calls[0][0];
+    expect(payload.content).toContain('SOL');
+    expect(payload.content).toContain('5m: —');
+    expect(payload.content).toContain('15m: —');
+    expect(payload.content).toContain('30m: —');
+    expect(payload.content).toContain('1h: —');
+    expect(payload.content).toContain('4h: —');
   });
 
   it('lista comandos, subcomandos e argumentos no /help', async () => {

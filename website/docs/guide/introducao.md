@@ -130,6 +130,16 @@ O módulo de forecasting (em `src/forecasting.js`) calcula uma projeção do pr�
 
 Os parâmetros padrão (lookback, histórico mínimo, limite de retenção e diretórios) podem ser ajustados em `config/default.json` ou sobrescritos via variáveis de ambiente (`FORECASTING_*`). Isso facilita calibrar a janela de análise conforme a volatilidade de cada exchange e manter os artefatos fora do versionamento.
 
+## Previsões rápidas via `/status`
+
+As previsões armazenadas agora ficam disponíveis diretamente no comando `/status`. Para cada ativo da sua watchlist o bot acrescenta uma seção `🔮` com os horizontes de 5m, 15m, 30m, 1h e 4h, destacando:
+
+- **Direção projetada**: 🐂 representa cenário de alta (delta positivo) e 🐻 sinaliza queda (delta negativo). Quando o modelo indica estabilidade, o rótulo aparece como ➖.
+- **Preço previsto**: valor estimado para o próximo fechamento naquele timeframe, usando o formato monetário configurado.
+- **Delta percentual**: variação proporcional em relação ao último fechamento conhecido.
+
+Caso não exista histórico para algum timeframe, o campo correspondente mostra `—`, evidenciando que nenhuma projeção foi persistida ainda.
+
 ## Simulador 100€ → 10M€ com resumos automáticos
 
 O job `runPortfolioGrowthSimulation` (em `src/portfolio/growth.js`) roda diariamente um backtest de longo prazo para acompanhar a jornada de €100 até €10 milhões. O simulador considera alocações configuráveis, aportes periódicos, controles de risco (drawdown, stop loss, take profit) e rebalanceamentos automáticos, salvando JSONs em `reports/growth/` e gráficos em `charts/growth/`.
