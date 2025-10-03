@@ -10,6 +10,7 @@ import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
 import { fetchOHLCV } from "./data/binance.js";
 import { renderChartPNG } from "./chart.js";
 import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from "./watchlist.js";
+import { getForecastSnapshot } from "./store.js";
 import { setSetting } from "./settings.js";
 import {
     getMinimumProfitSettings,
@@ -43,6 +44,7 @@ function formatUptime(ms) {
 const amountFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
 const quantityFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 8 });
 const priceFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const percentFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const DISCORD_MESSAGE_LIMIT = 2000;
 
@@ -52,6 +54,8 @@ const MAX_LIST_ITEMS = {
     marginAssets: 6,
     marginPositions: 5,
 };
+
+const STATUS_TIMEFRAMES = ["5m", "15m", "30m", "1h", "4h"];
 
 const MIN_PROFIT_PERCENT_MIN = 0;
 const MIN_PROFIT_PERCENT_MAX = 100;
@@ -82,6 +86,40 @@ function formatQuantity(value) {
 
 function formatPrice(value) {
     return Number.isFinite(value) ? priceFormatter.format(value) : "—";
+}
+
+function resolveForecastDirection(delta) {
+    if (!Number.isFinite(delta) || Math.abs(delta) < 1e-8) {
+        return { emoji: "➖", label: "Neutro" };
+    }
+    return delta > 0 ? { emoji: "🐂", label: "Alta" } : { emoji: "🐻", label: "Baixa" };
+}
+
+function formatForecastPercent(delta, lastClose) {
+    if (!Number.isFinite(delta) || !Number.isFinite(lastClose) || lastClose === 0) {
+        return "";
+    }
+    const pct = (delta / lastClose) * 100;
+    const sign = pct > 0 ? "+" : "";
+    return ` (${sign}${percentFormatter.format(pct)}%)`;
+}
+
+function buildForecastSection(assetKey) {
+    const snapshot = getForecastSnapshot(assetKey);
+    if (!snapshot || typeof snapshot !== "object") {
+        return null;
+    }
+    const lines = STATUS_TIMEFRAMES.map(timeframe => {
+        const forecast = snapshot[timeframe];
+        if (!forecast) {
+            return `${timeframe}: —`;
+        }
+        const direction = resolveForecastDirection(forecast.delta);
+        const priceText = formatPrice(forecast.forecastClose);
+        const pctText = formatForecastPercent(forecast.delta, forecast.lastClose);
+        return `${timeframe}: ${direction.emoji} ${direction.label} ${priceText}${pctText}`;
+    });
+    return `🔮 ${assetKey}\n${lines.map(line => `• ${line}`).join('\n')}`;
 }
 
 function resolveTradeAbortMessage(reason, details = {}) {
@@ -176,8 +214,10 @@ const COMMAND_BLUEPRINTS = [
     },
     {
         name: "status",
-        description: "Mostra o uptime do bot e os ativos monitorados pelo usuário.",
-        helpDetails: ["Útil para confirmar se o bot está rodando e quais ativos estão na sua watchlist."]
+        description: "Mostra uptime, watchlist e previsões recentes para seus ativos.",
+        helpDetails: [
+            "Exibe o uptime do bot, a watchlist atual e as previsões bull/bear mais recentes para 5m, 15m, 30m, 1h e 4h.",
+        ]
     },
     {
         name: "analysis",
@@ -744,9 +784,21 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
         await interaction.reply({ content: msg, ephemeral: true });
     } else if (interaction.commandName === 'status') {
         const list = getWatchlist(interaction.user?.id);
-        const watchlistText = list.length ? list.join(', ') : 'Nenhum ativo monitorado';
+        const normalized = Array.isArray(list)
+            ? Array.from(new Set(list
+                .map(item => (typeof item === 'string' ? item.toUpperCase() : item))
+                .filter(Boolean)))
+            : [];
+        const watchlistText = normalized.length ? normalized.join(', ') : 'Nenhum ativo monitorado';
         const uptimeText = formatUptime(Date.now() - startTime);
-        const content = `⏱️ Uptime: ${uptimeText}\n👀 Watchlist: ${watchlistText}`;
+        const forecastSections = normalized
+            .map(assetKey => buildForecastSection(assetKey))
+            .filter(section => typeof section === 'string' && section.length > 0);
+        const contentParts = [`⏱️ Uptime: ${uptimeText}`, `👀 Watchlist: ${watchlistText}`];
+        if (forecastSections.length) {
+            contentParts.push('', ...forecastSections);
+        }
+        const content = contentParts.join('\n');
         await interaction.reply({ content, ephemeral: true });
     } else if (interaction.commandName === 'analysis') {
         const assetKey = interaction.options.getString('ativo', true).toUpperCase();
