@@ -18,6 +18,7 @@ vi.mock('discord.js', () => ({
     Subcommand: 1,
     SubcommandGroup: 2,
     Number: 10,
+    Boolean: 5,
   },
 }));
 
@@ -28,6 +29,9 @@ const addAssetToWatch = vi.fn();
 const removeAssetFromWatch = vi.fn();
 const getWatchlist = vi.fn(() => []);
 const getAccountOverview = vi.fn();
+const submitOrder = vi.fn();
+const openPosition = vi.fn();
+const adjustMargin = vi.fn();
 const settingsStore = {};
 const loadSettingsMock = vi.fn((defaults = {}) => {
   for (const [key, value] of Object.entries(defaults)) {
@@ -50,7 +54,8 @@ const setSettingMock = vi.fn((key, value) => {
 vi.mock('../src/data/binance.js', () => ({ fetchOHLCV }));
 vi.mock('../src/chart.js', () => ({ renderChartPNG }));
 vi.mock('../src/watchlist.js', () => ({ addAssetToWatch, removeAssetFromWatch, getWatchlist }));
-vi.mock('../src/trading/binance.js', () => ({ getAccountOverview }));
+vi.mock('../src/trading/binance.js', () => ({ getAccountOverview, submitOrder }));
+vi.mock('../src/trading/executor.js', () => ({ openPosition, adjustMargin }));
 vi.mock('../src/settings.js', () => ({
   loadSettings: loadSettingsMock,
   getSetting: getSettingMock,
@@ -68,6 +73,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
   getAccountOverview.mockReset();
+  submitOrder.mockReset();
+  openPosition.mockReset();
+  adjustMargin.mockReset();
   for (const key of Object.keys(settingsStore)) {
     delete settingsStore[key];
   }
@@ -631,5 +639,141 @@ describe('discord bot interactions', () => {
       ephemeral: true,
     });
     expect(setSettingMock).not.toHaveBeenCalled();
+  });
+
+  it('envia ordens spot respeitando limites de notional e risco', async () => {
+    const { handleInteraction } = await loadBot();
+    const { CFG } = await import("../src/config.js");
+    CFG.accountEquity = 1000;
+    CFG.trading = {
+      enabled: true,
+      minNotional: 50,
+      maxPositionPct: 0.5,
+      maxLeverage: 1,
+    };
+
+    submitOrder.mockResolvedValue({ orderId: 42, fillPrice: 25000 });
+
+    const options = {
+      getSubcommand: () => 'buy',
+      getString: vi.fn((name) => (name === 'symbol' ? 'BTCUSDT' : null)),
+      getNumber: vi.fn((name) => {
+        if (name === 'quantity') return 0.01;
+        if (name === 'price') return 25000;
+        return null;
+      }),
+      getBoolean: vi.fn(() => false),
+    };
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'trade',
+      options,
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(submitOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        type: 'MARKET',
+        quantity: 0.01,
+        price: undefined,
+      }),
+      expect.any(Object),
+    );
+    expect(openPosition).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    const message = interaction.reply.mock.calls[0][0].content;
+    expect(message).toContain('Operação BUY BTCUSDT confirmada');
+    expect(message).toContain('spot');
+  });
+
+  it('executa ordens de margem e realiza transferências automáticas', async () => {
+    const { handleInteraction } = await loadBot();
+    const { CFG } = await import("../src/config.js");
+    CFG.accountEquity = 2000;
+    CFG.trading = {
+      enabled: true,
+      minNotional: 100,
+      maxPositionPct: 0.3,
+      maxLeverage: 2,
+    };
+
+    adjustMargin.mockResolvedValue({ adjusted: true });
+    openPosition.mockResolvedValue({ executed: true, order: { orderId: '789', fillPrice: 1600 } });
+
+    const options = {
+      getSubcommand: () => 'sell',
+      getString: vi.fn((name) => (name === 'symbol' ? 'ETHUSDT' : null)),
+      getNumber: vi.fn((name) => {
+        if (name === 'quantity') return 0.5;
+        if (name === 'price') return 1600;
+        return null;
+      }),
+      getBoolean: vi.fn((name) => name === 'margin'),
+    };
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'trade',
+      options,
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(adjustMargin).toHaveBeenCalledTimes(2);
+    expect(adjustMargin).toHaveBeenNthCalledWith(1, { operation: 'transferIn' });
+    expect(adjustMargin).toHaveBeenNthCalledWith(2, { operation: 'borrow' });
+    expect(openPosition).toHaveBeenCalledWith(expect.objectContaining({
+      symbol: 'ETHUSDT',
+      direction: 'short',
+      quantity: 0.5,
+      type: 'MARKET',
+    }));
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    const message = interaction.reply.mock.calls[0][0].content;
+    expect(message).toContain('margin');
+    expect(message).toContain('Operação SELL ETHUSDT confirmada');
+  });
+
+  it('valida o notional mínimo antes de enviar a ordem', async () => {
+    const { handleInteraction } = await loadBot();
+    const { CFG } = await import("../src/config.js");
+    CFG.accountEquity = 1000;
+    CFG.trading = {
+      enabled: true,
+      minNotional: 200,
+      maxPositionPct: 0.5,
+      maxLeverage: 1,
+    };
+
+    const options = {
+      getSubcommand: () => 'buy',
+      getString: vi.fn((name) => (name === 'symbol' ? 'SOLUSDT' : null)),
+      getNumber: vi.fn((name) => {
+        if (name === 'quantity') return 1;
+        if (name === 'price') return 50;
+        return null;
+      }),
+      getBoolean: vi.fn(() => false),
+    };
+
+    const interaction = {
+      isChatInputCommand: () => true,
+      commandName: 'trade',
+      options,
+      reply: vi.fn(),
+    };
+
+    await handleInteraction(interaction);
+
+    expect(submitOrder).not.toHaveBeenCalled();
+    expect(openPosition).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expect(interaction.reply.mock.calls[0][0].content).toContain('abaixo do notional mínimo');
   });
 });

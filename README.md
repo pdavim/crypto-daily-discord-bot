@@ -92,6 +92,23 @@ npm install
 - Logs com contexto `accountOverview` registram falhas nas seções individuais para facilitar auditorias sem expor dados sensíveis.
 - Ajuste o `binanceCacheTTL` se precisar reduzir chamadas ao endpoint; valores baixos (padrão 10 segundos) deixam o `/binance` mais responsivo durante testes interativos.
 
+## Fluxo do comando `/trade`
+
+1. **Habilite o módulo manualmente**: defina `trading.enabled: true` (via `config/custom.json` ou `npm exec config-cli set trading.enabled true`) e informe `accountEquity` para calcular o limite máximo de exposição.
+2. **Conceda permissões apropriadas na chave da Binance**: habilite "Enable Spot & Margin Trading" para operações spot/margem e marque "Enable Futures" quando pretender usar o flag `futures`. Sem essas permissões a API rejeitará as ordens.
+3. **Configure limites coerentes**: `trading.minNotional`, `trading.maxPositionPct` e `trading.maxLeverage` são usados para bloquear ordens fora do perfil de risco antes mesmo de chegarem à Binance.
+
+- As respostas são sempre efêmeras e retornam resumos como `Operação BUY BTCUSDT confirmada (MARKET • spot)` com quantidade, valor notional, preço de referência e ID da ordem (quando disponível).
+- Quando `margin: true` é informado, o bot invoca automaticamente `transferIn` e, para vendas/shorts, `borrow` no módulo de margem antes de abrir a posição.
+- Com `futures: true`, a ordem é encaminhada pelo executor (`openPosition`) compartilhando as mesmas salvaguardas (notional mínimo/máximo) aplicadas nas automações.
+- Informe pelo menos `notional` ou a combinação `quantity + price` para que o bot valide os limites — ordens abaixo de `trading.minNotional` ou acima do limite calculado (`accountEquity * maxPositionPct * maxLeverage`) são rejeitadas com mensagens orientativas.
+
+### Exemplos rápidos
+
+- **Spot**: `/trade buy symbol:BTCUSDT quantity:0.01 price:25000` — envia uma ordem MARKET de compra após verificar que o notional (~250) está acima do mínimo.
+- **Margem**: `/trade sell symbol:ETHUSDT quantity:0.5 price:1600 margin:true` — transfere fundos para a margem, realiza borrow automático para short e abre a posição via `openPosition`.
+- **Futures**: `/trade buy symbol:SOLUSDT quantity:5 price:110 futures:true order_type:LIMIT` — encaminha a ordem para o executor de futures validando o limite de exposição calculado.
+
 ## Execução
 
 | Tarefa | Comando | Descrição |
@@ -153,6 +170,7 @@ Comandos comuns:
 | `/settings profit view` | — | Mostra o lucro mínimo padrão, o pessoal (quando configurado) e o valor aplicado nas análises. |
 | `/settings profit default value:<0-100>` | `value` (percentual) | Define o lucro mínimo global aplicado aos relatórios e análises. |
 | `/settings profit personal value:<0-100>` | `value` (percentual) | Define o seu lucro mínimo pessoal aplicado às suas interações. |
+| `/trade buy symbol:<par> quantity/notional order_type price margin futures` | `symbol` (par Binance), `quantity` ou `notional`, `order_type` (`MARKET`/`LIMIT`), `price`, flags `margin` e `futures` | Envia ordens spot, margem ou futures após validar limites de risco/notional configurados. |
 | `/binance` | — | Exibe saldo spot, métricas de margem e posições agregadas com base nas credenciais configuradas. |
 
 Todos os comandos são registrados automaticamente quando o bot inicia e exigem permissões de aplicação no servidor configurado.

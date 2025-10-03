@@ -16,7 +16,8 @@ import {
     setDefaultMinimumProfit,
     setPersonalMinimumProfit,
 } from "./minimumProfit.js";
-import { getAccountOverview } from "./trading/binance.js";
+import { getAccountOverview, submitOrder } from "./trading/binance.js";
+import { openPosition, adjustMargin } from "./trading/executor.js";
 
 
 const startTime = Date.now();
@@ -54,6 +55,67 @@ const MAX_LIST_ITEMS = {
 
 const MIN_PROFIT_PERCENT_MIN = 0;
 const MIN_PROFIT_PERCENT_MAX = 100;
+
+function toFiniteNumber(value) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getTradingConfig() {
+    return typeof CFG.trading === "object" && CFG.trading !== null ? CFG.trading : { enabled: false };
+}
+
+function computeMaxNotionalLimit(tradingCfg) {
+    const equity = toFiniteNumber(CFG.accountEquity);
+    const maxPct = toFiniteNumber(tradingCfg.maxPositionPct);
+    const leverage = toFiniteNumber(tradingCfg.maxLeverage) ?? 1;
+    if (equity === null || equity <= 0 || maxPct === null || maxPct <= 0) {
+        return null;
+    }
+    const lev = leverage !== null && leverage > 0 ? leverage : 1;
+    return equity * maxPct * lev;
+}
+
+function formatQuantity(value) {
+    return Number.isFinite(value) ? quantityFormatter.format(value) : "—";
+}
+
+function formatPrice(value) {
+    return Number.isFinite(value) ? priceFormatter.format(value) : "—";
+}
+
+function resolveTradeAbortMessage(reason, details = {}) {
+    switch (reason) {
+        case 'disabled':
+            return 'Trading está desabilitado na configuração.';
+        case 'missingSymbol':
+            return 'Símbolo não informado para a operação.';
+        case 'invalidQuantity':
+            return 'Quantidade inválida para a operação solicitada.';
+        case 'invalidPrice':
+            return 'Preço inválido informado para a ordem.';
+        case 'missingPrice':
+            return 'Preço de referência obrigatório para validar o notional mínimo.';
+        case 'belowMinNotional': {
+            const min = Number.isFinite(details?.minNotional) ? formatAmount(details.minNotional) : undefined;
+            const provided = Number.isFinite(details?.notional) ? formatAmount(details.notional) : undefined;
+            if (min && provided) {
+                return `Valor informado (${provided}) está abaixo do notional mínimo (${min}).`;
+            }
+            return 'Valor abaixo do notional mínimo configurado.';
+        }
+        case 'exceedsRiskLimit': {
+            const max = Number.isFinite(details?.maxNotional) ? formatAmount(details.maxNotional) : undefined;
+            const provided = Number.isFinite(details?.notional) ? formatAmount(details.notional) : undefined;
+            if (max && provided) {
+                return `Valor informado (${provided}) excede o limite máximo (${max}).`;
+            }
+            return 'Valor informado excede o limite máximo permitido.';
+        }
+        default:
+            return 'Operação não pôde ser executada pelas salvaguardas configuradas.';
+    }
+}
 
 const COMMAND_BLUEPRINTS = [
     {
@@ -137,6 +199,121 @@ const COMMAND_BLUEPRINTS = [
             }
         ],
         helpDetails: ["Retorna o mesmo resumo utilizado pelos alertas automáticos."]
+    },
+    {
+        name: "trade",
+        description: "Envia ordens spot, margin ou futures respeitando os limites configurados.",
+        options: () => [
+            {
+                name: "buy",
+                description: "Envia uma ordem de compra para o símbolo informado.",
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: "symbol",
+                        description: "Par de negociação (ex: BTCUSDT).",
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                    },
+                    {
+                        name: "quantity",
+                        description: "Quantidade em unidades base.",
+                        type: ApplicationCommandOptionType.Number,
+                        required: false,
+                    },
+                    {
+                        name: "notional",
+                        description: "Valor em moeda cotada para validar limites.",
+                        type: ApplicationCommandOptionType.Number,
+                        required: false,
+                    },
+                    {
+                        name: "order_type",
+                        description: "Tipo de ordem (MARKET ou LIMIT).",
+                        type: ApplicationCommandOptionType.String,
+                        required: false,
+                        choices: [
+                            { name: "MARKET", value: "MARKET" },
+                            { name: "LIMIT", value: "LIMIT" },
+                        ],
+                    },
+                    {
+                        name: "price",
+                        description: "Preço para ordens LIMIT ou cálculo de notional.",
+                        type: ApplicationCommandOptionType.Number,
+                        required: false,
+                    },
+                    {
+                        name: "margin",
+                        description: "Ativa fluxo de margem com transfer e borrow automáticos.",
+                        type: ApplicationCommandOptionType.Boolean,
+                        required: false,
+                    },
+                    {
+                        name: "futures",
+                        description: "Ativa execução via openPosition em modo futures.",
+                        type: ApplicationCommandOptionType.Boolean,
+                        required: false,
+                    },
+                ]
+            },
+            {
+                name: "sell",
+                description: "Envia uma ordem de venda para o símbolo informado.",
+                type: ApplicationCommandOptionType.Subcommand,
+                options: [
+                    {
+                        name: "symbol",
+                        description: "Par de negociação (ex: BTCUSDT).",
+                        type: ApplicationCommandOptionType.String,
+                        required: true,
+                    },
+                    {
+                        name: "quantity",
+                        description: "Quantidade em unidades base.",
+                        type: ApplicationCommandOptionType.Number,
+                        required: false,
+                    },
+                    {
+                        name: "notional",
+                        description: "Valor em moeda cotada para validar limites.",
+                        type: ApplicationCommandOptionType.Number,
+                        required: false,
+                    },
+                    {
+                        name: "order_type",
+                        description: "Tipo de ordem (MARKET ou LIMIT).",
+                        type: ApplicationCommandOptionType.String,
+                        required: false,
+                        choices: [
+                            { name: "MARKET", value: "MARKET" },
+                            { name: "LIMIT", value: "LIMIT" },
+                        ],
+                    },
+                    {
+                        name: "price",
+                        description: "Preço para ordens LIMIT ou cálculo de notional.",
+                        type: ApplicationCommandOptionType.Number,
+                        required: false,
+                    },
+                    {
+                        name: "margin",
+                        description: "Ativa fluxo de margem com transfer e borrow automáticos.",
+                        type: ApplicationCommandOptionType.Boolean,
+                        required: false,
+                    },
+                    {
+                        name: "futures",
+                        description: "Ativa execução via openPosition em modo futures.",
+                        type: ApplicationCommandOptionType.Boolean,
+                        required: false,
+                    },
+                ]
+            }
+        ],
+        helpDetails: [
+            "Informe quantity e/ou notional para validar limites. O modo margin executa transferências automáticas antes da ordem.",
+        ]
     },
     {
         name: "settings",
@@ -595,6 +772,168 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
         } catch (err) {
             log.error({ fn: 'handleInteraction', err }, 'Failed to run manual analysis');
             await interaction.editReply('Erro ao executar análise. Tente novamente mais tarde.');
+        }
+    } else if (interaction.commandName === 'trade') {
+        const tradingCfg = getTradingConfig();
+        if (!tradingCfg.enabled) {
+            await interaction.reply({ content: 'Trading está desabilitado na configuração.', ephemeral: true });
+            return;
+        }
+
+        const sub = interaction.options.getSubcommand();
+        const side = sub === 'sell' ? 'SELL' : 'BUY';
+        const direction = side === 'SELL' ? 'short' : 'long';
+        const rawSymbol = interaction.options.getString('symbol', true);
+        const symbol = rawSymbol ? rawSymbol.toUpperCase() : rawSymbol;
+        const quantityInput = interaction.options.getNumber('quantity');
+        const notionalInput = interaction.options.getNumber('notional');
+        const orderTypeRaw = interaction.options.getString('order_type');
+        const priceInput = interaction.options.getNumber('price');
+        const marginSelected = interaction.options.getBoolean('margin') ?? false;
+        const futuresSelected = interaction.options.getBoolean('futures') ?? false;
+
+        if (marginSelected && futuresSelected) {
+            await interaction.reply({ content: 'Escolha apenas um modo entre margem e futures.', ephemeral: true });
+            return;
+        }
+
+        if (!symbol) {
+            await interaction.reply({ content: 'Informe um símbolo válido para negociar.', ephemeral: true });
+            return;
+        }
+
+        const qty = toFiniteNumber(quantityInput);
+        const notionalProvided = toFiniteNumber(notionalInput);
+        const orderType = (orderTypeRaw ?? 'MARKET').toUpperCase();
+        const priceValue = toFiniteNumber(priceInput);
+
+        if (!['MARKET', 'LIMIT'].includes(orderType)) {
+            await interaction.reply({ content: 'Tipo de ordem inválido. Utilize MARKET ou LIMIT.', ephemeral: true });
+            return;
+        }
+
+        if (orderType !== 'MARKET' && (priceValue === null || priceValue <= 0)) {
+            await interaction.reply({ content: 'Informe um preço positivo para ordens LIMIT.', ephemeral: true });
+            return;
+        }
+
+        if (qty !== null && qty <= 0) {
+            await interaction.reply({ content: 'Informe uma quantidade positiva.', ephemeral: true });
+            return;
+        }
+
+        if (notionalProvided !== null && notionalProvided <= 0) {
+            await interaction.reply({ content: 'O valor notional deve ser positivo.', ephemeral: true });
+            return;
+        }
+
+        let derivedQuantity = qty;
+        if ((derivedQuantity === null || derivedQuantity <= 0) && notionalProvided !== null && priceValue !== null && priceValue > 0) {
+            derivedQuantity = notionalProvided / priceValue;
+        }
+
+        if ((marginSelected || futuresSelected) && (derivedQuantity === null || derivedQuantity <= 0)) {
+            await interaction.reply({ content: 'Forneça uma quantidade válida para operações de margem ou futures.', ephemeral: true });
+            return;
+        }
+
+        const referencePrice = priceValue ?? (notionalProvided !== null && derivedQuantity ? notionalProvided / derivedQuantity : null);
+        const computedNotional = notionalProvided ?? (derivedQuantity && referencePrice ? derivedQuantity * referencePrice : null);
+
+        if (computedNotional === null || computedNotional <= 0) {
+            await interaction.reply({ content: 'Forneça um notional ou preço para validar os limites configurados.', ephemeral: true });
+            return;
+        }
+
+        const minNotional = toFiniteNumber(tradingCfg.minNotional);
+        if (minNotional !== null && minNotional > 0 && computedNotional < minNotional) {
+            await interaction.reply({
+                content: `Valor informado (${formatAmount(computedNotional)}) está abaixo do notional mínimo (${formatAmount(minNotional)}).`,
+                ephemeral: true,
+            });
+            return;
+        }
+
+        const maxNotional = computeMaxNotionalLimit(tradingCfg);
+        if (maxNotional !== null && computedNotional > maxNotional) {
+            await interaction.reply({
+                content: `Valor informado (${formatAmount(computedNotional)}) excede o limite máximo (${formatAmount(maxNotional)}).`,
+                ephemeral: true,
+            });
+            return;
+        }
+
+        const params = {};
+        if (notionalProvided !== null && (!derivedQuantity || derivedQuantity <= 0)) {
+            params.quoteOrderQty = notionalProvided;
+        }
+
+        const modeLabel = marginSelected ? 'margin' : futuresSelected ? 'futures' : 'spot';
+        const marginNotes = [];
+
+        try {
+            let execution;
+            if (marginSelected || futuresSelected) {
+                const transfer = await adjustMargin({ operation: 'transferIn' });
+                if (!transfer?.adjusted) {
+                    marginNotes.push(`Transferência ignorada (${transfer?.reason ?? 'motivo desconhecido'})`);
+                }
+                if (marginSelected && side === 'SELL') {
+                    const borrow = await adjustMargin({ operation: 'borrow' });
+                    if (!borrow?.adjusted) {
+                        marginNotes.push(`Borrow ignorado (${borrow?.reason ?? 'motivo desconhecido'})`);
+                    }
+                }
+
+                const metadata = referencePrice ? { referencePrice } : {};
+                execution = await openPosition({
+                    symbol,
+                    direction,
+                    quantity: derivedQuantity ?? undefined,
+                    price: orderType === 'MARKET' ? undefined : priceValue ?? undefined,
+                    type: orderType,
+                    params: Object.keys(params).length ? params : undefined,
+                    metadata,
+                });
+
+                if (!execution?.executed) {
+                    const reason = execution?.reason ?? 'unknown';
+                    const details = execution?.details;
+                    const message = resolveTradeAbortMessage(reason, details);
+                    await interaction.reply({ content: message, ephemeral: true });
+                    return;
+                }
+            } else {
+                const order = await submitOrder({
+                    symbol,
+                    side,
+                    type: orderType,
+                    quantity: derivedQuantity ?? undefined,
+                    price: orderType === 'MARKET' ? undefined : priceValue ?? undefined,
+                    params: Object.keys(params).length ? params : undefined,
+                }, { context: { symbol, intent: 'manualTrade', side } });
+                execution = { executed: true, order };
+            }
+
+            const order = execution?.order ?? {};
+            const rawFillPrice = toFiniteNumber(order.fillPrice) ?? toFiniteNumber(order.price) ?? referencePrice;
+            const lines = [
+                `Operação ${side} ${symbol} confirmada (${orderType} • ${modeLabel}).`,
+                `Quantidade: ${formatQuantity(derivedQuantity)}`,
+                `Notional: ${formatAmount(computedNotional)}`,
+                `Preço: ${formatPrice(rawFillPrice)}`,
+            ];
+            if (order.orderId) {
+                lines.push(`ID da ordem: ${order.orderId}`);
+            }
+            if (marginNotes.length) {
+                lines.push(`Observações: ${marginNotes.join('; ')}`);
+            }
+
+            await interaction.reply({ content: lines.join('\n'), ephemeral: true });
+        } catch (err) {
+            const message = err?.message ? `Falha ao enviar ordem: ${err.message}` : 'Falha ao enviar ordem.';
+            await interaction.reply({ content: message, ephemeral: true });
         }
     } else if (interaction.commandName === 'binance') {
         if (!CFG.enableBinanceCommand) {
