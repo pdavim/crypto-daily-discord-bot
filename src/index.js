@@ -43,6 +43,7 @@ const ONCE = process.argv.includes("--once");
 
 const DEFAULT_ANALYSIS_FREQUENCY_KEY = "hourly";
 const ANALYSIS_FREQUENCY_SCHEDULES = new Map([
+    ["5m", { cron: "*/5 * * * *", label: "every 5 minutes" }],
     ["15m", { cron: "*/15 * * * *", label: "every 15 minutes" }],
     ["30m", { cron: "*/30 * * * *", label: "every 30 minutes" }],
     ["hourly", { cron: "0 * * * *", label: "hourly at minute 0" }],
@@ -53,6 +54,8 @@ const ANALYSIS_FREQUENCY_SCHEDULES = new Map([
     ["daily", { cron: "0 0 * * *", label: "daily at midnight" }],
 ]);
 const ANALYSIS_FREQUENCY_ALIASES = new Map([
+    ["5min", "5m"],
+    ["300s", "5m"],
     ["1h", "hourly"],
     ["60m", "hourly"],
     ["120m", "2h"],

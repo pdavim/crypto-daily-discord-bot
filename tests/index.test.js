@@ -257,11 +257,11 @@ describe("analysis scheduler", () => {
     });
 
     it("schedules runAll according to analysisFrequency", async () => {
-        cfgMock.analysisFrequency = "15m";
+        cfgMock.analysisFrequency = "5m";
 
         await import("../src/index.js");
 
-        const analysisTask = scheduledTasks.find((task) => task.expression === "*/15 * * * *");
+        const analysisTask = scheduledTasks.find((task) => task.expression === "*/5 * * * *");
         expect(analysisTask).toBeDefined();
         expect(analysisTask?.options).toEqual(expect.objectContaining({ timezone: cfgMock.tz }));
 
