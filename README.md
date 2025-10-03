@@ -70,7 +70,7 @@ npm install
 ### Frequência das análises automáticas (`analysisFrequency`)
 
 - Controle o agendamento do pipeline principal (`runAll`) via `analysisFrequency` em `config/default.json` ou por `ANALYSIS_FREQUENCY` no ambiente.
-- Valores aceites: `15m`, `30m`, `hourly`, `2h`, `4h`, `6h`, `12h` e `daily`. Aliases como `1h`, `60m`, `24h` e `1d` são normalizados para os equivalentes mais próximos.
+- Valores aceites: `5m`, `15m`, `30m`, `hourly`, `2h`, `4h`, `6h`, `12h` e `daily`. Aliases como `5min`, `300s`, `1h`, `60m`, `24h` e `1d` são normalizados para os equivalentes mais próximos.
 - Quando um valor inválido for fornecido, o bot regista um aviso nos logs e faz fallback para o modo horário (`hourly`).
 
 ## Boas práticas para credenciais da Binance
