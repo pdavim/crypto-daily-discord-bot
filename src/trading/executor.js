@@ -3,6 +3,7 @@ import { logger, withContext } from "../logger.js";
 import { tradingExecutionCounter, tradingNotionalHistogram } from "../metrics.js";
 
 import { submitOrder, transferMargin, borrowMargin, repayMargin } from "./binance.js";
+import { reportTradingExecution, reportTradingMargin } from "./notifier.js";
 
 function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -43,10 +44,29 @@ function recordTradeOutcome(action, result, { notional } = {}) {
     }
 }
 
-function abortTrade(log, fn, reason, details = {}) {
+function abortTrade(log, fn, reason, details = {}, context = {}) {
     recordTradeOutcome(fn, 'skipped');
 
     log.warn({ fn, reason, ...details }, 'Skipped automated trade');
+    const action = context.action ?? (fn === 'openPosition' ? 'open' : fn === 'closePosition' ? 'close' : fn);
+    const maybeReport = reportTradingExecution({
+        assetKey: context.assetKey,
+        symbol: context.symbol,
+        timeframe: context.timeframe,
+        action,
+        status: 'skipped',
+        side: context.side,
+        quantity: context.quantity,
+        price: context.price,
+        notional: context.notional,
+        reason,
+        metadata: { ...details, ...(context.metadata ?? {}) },
+    });
+    if (maybeReport && typeof maybeReport.catch === 'function') {
+        maybeReport.catch((err) => {
+            log.debug({ fn, err }, 'Failed to report skipped trading execution');
+        });
+    }
     return { executed: false, reason, details };
 }
 
@@ -80,27 +100,45 @@ export async function openPosition({
     const log = withContext(logger, { asset: assetKey ?? symbol, symbol, action: 'openPosition' });
 
     if (!tradingCfg.enabled) {
-        return abortTrade(log, 'openPosition', 'disabled');
+        return abortTrade(log, 'openPosition', 'disabled', {}, { assetKey, symbol, action: 'open', direction });
     }
 
     if (!symbol) {
-        return abortTrade(log, 'openPosition', 'missingSymbol');
+        return abortTrade(log, 'openPosition', 'missingSymbol', {}, { assetKey, symbol, action: 'open', direction });
     }
 
     const qty = toFiniteNumber(quantity);
     if (qty === null || qty <= 0) {
-        return abortTrade(log, 'openPosition', 'invalidQuantity', { quantity });
+        return abortTrade(log, 'openPosition', 'invalidQuantity', { quantity }, {
+            assetKey,
+            symbol,
+            action: 'open',
+            direction,
+            quantity,
+        });
     }
 
     let referencePrice;
     try {
         referencePrice = ensureOrderPrice(price ?? metadata.referencePrice, type);
     } catch (err) {
-        return abortTrade(log, 'openPosition', 'invalidPrice', { message: err.message });
+        return abortTrade(log, 'openPosition', 'invalidPrice', { message: err.message }, {
+            assetKey,
+            symbol,
+            action: 'open',
+            direction,
+            quantity: qty,
+        });
     }
 
     if (referencePrice === null && tradingCfg.minNotional > 0) {
-        return abortTrade(log, 'openPosition', 'missingPrice');
+        return abortTrade(log, 'openPosition', 'missingPrice', {}, {
+            assetKey,
+            symbol,
+            action: 'open',
+            direction,
+            quantity: qty,
+        });
     }
 
     const notional = referencePrice !== null ? qty * referencePrice : null;
@@ -108,6 +146,14 @@ export async function openPosition({
         return abortTrade(log, 'openPosition', 'belowMinNotional', {
             notional,
             minNotional: tradingCfg.minNotional,
+        }, {
+            assetKey,
+            symbol,
+            action: 'open',
+            direction,
+            quantity: qty,
+            price: referencePrice,
+            notional,
         });
     }
 
@@ -116,6 +162,14 @@ export async function openPosition({
         return abortTrade(log, 'openPosition', 'exceedsRiskLimit', {
             notional,
             maxNotional,
+        }, {
+            assetKey,
+            symbol,
+            action: 'open',
+            direction,
+            quantity: qty,
+            price: referencePrice,
+            notional,
         });
     }
 
@@ -140,10 +194,40 @@ export async function openPosition({
             notional,
         };
         log.info(payload, 'Opened automated trade');
+        try {
+            await reportTradingExecution({
+                assetKey,
+                symbol,
+                action: 'open',
+                status: 'executed',
+                side,
+                quantity: qty,
+                price: order.fillPrice ?? referencePrice,
+                notional,
+                orderId: order.orderId,
+            });
+        } catch (notifyErr) {
+            log.debug({ fn: 'openPosition', err: notifyErr }, 'Failed to report trading execution success');
+        }
         recordTradeOutcome('openPosition', 'success', { notional });
         return { executed: true, order };
     } catch (err) {
         log.error({ fn: 'openPosition', err }, 'Failed to open position');
+        try {
+            await reportTradingExecution({
+                assetKey,
+                symbol,
+                action: 'open',
+                status: 'error',
+                side,
+                quantity: qty,
+                price: referencePrice,
+                notional,
+                reason: err.message,
+            });
+        } catch (notifyErr) {
+            log.debug({ fn: 'openPosition', err: notifyErr }, 'Failed to report trading execution error');
+        }
         recordTradeOutcome('openPosition', 'error');
         throw err;
     }
@@ -163,23 +247,35 @@ export async function closePosition({
     const log = withContext(logger, { asset: assetKey ?? symbol, symbol, action: 'closePosition' });
 
     if (!tradingCfg.enabled) {
-        return abortTrade(log, 'closePosition', 'disabled');
+        return abortTrade(log, 'closePosition', 'disabled', {}, { assetKey, symbol, action: 'close', direction });
     }
 
     if (!symbol) {
-        return abortTrade(log, 'closePosition', 'missingSymbol');
+        return abortTrade(log, 'closePosition', 'missingSymbol', {}, { assetKey, symbol, action: 'close', direction });
     }
 
     const qty = toFiniteNumber(quantity);
     if (qty === null || qty <= 0) {
-        return abortTrade(log, 'closePosition', 'invalidQuantity', { quantity });
+        return abortTrade(log, 'closePosition', 'invalidQuantity', { quantity }, {
+            assetKey,
+            symbol,
+            action: 'close',
+            direction,
+            quantity,
+        });
     }
 
     let referencePrice;
     try {
         referencePrice = ensureOrderPrice(price ?? metadata.referencePrice, type);
     } catch (err) {
-        return abortTrade(log, 'closePosition', 'invalidPrice', { message: err.message });
+        return abortTrade(log, 'closePosition', 'invalidPrice', { message: err.message }, {
+            assetKey,
+            symbol,
+            action: 'close',
+            direction,
+            quantity: qty,
+        });
     }
 
     const notional = referencePrice !== null ? qty * referencePrice : null;
@@ -188,6 +284,14 @@ export async function closePosition({
         return abortTrade(log, 'closePosition', 'exceedsCloseLimit', {
             notional,
             maxNotional,
+        }, {
+            assetKey,
+            symbol,
+            action: 'close',
+            direction,
+            quantity: qty,
+            price: referencePrice,
+            notional,
         });
     }
 
@@ -212,10 +316,40 @@ export async function closePosition({
             notional,
         };
         log.info(payload, 'Closed automated trade');
+        try {
+            await reportTradingExecution({
+                assetKey,
+                symbol,
+                action: 'close',
+                status: 'executed',
+                side,
+                quantity: qty,
+                price: order.fillPrice ?? referencePrice,
+                notional,
+                orderId: order.orderId,
+            });
+        } catch (notifyErr) {
+            log.debug({ fn: 'closePosition', err: notifyErr }, 'Failed to report trading execution success');
+        }
         recordTradeOutcome('closePosition', 'success', { notional });
         return { executed: true, order };
     } catch (err) {
         log.error({ fn: 'closePosition', err }, 'Failed to close position');
+        try {
+            await reportTradingExecution({
+                assetKey,
+                symbol,
+                action: 'close',
+                status: 'error',
+                side,
+                quantity: qty,
+                price: referencePrice,
+                notional,
+                reason: err.message,
+            });
+        } catch (notifyErr) {
+            log.debug({ fn: 'closePosition', err: notifyErr }, 'Failed to report trading execution error');
+        }
         recordTradeOutcome('closePosition', 'error');
         throw err;
     }
@@ -235,18 +369,47 @@ export async function adjustMargin({
 
     if (!tradingCfg.enabled) {
         recordTradeOutcome('adjustMargin', 'skipped');
+        try {
+            await reportTradingMargin({
+                asset: resolvedAsset,
+                amount: fallbackAmount,
+                operation,
+                status: 'skipped',
+                reason: 'disabled',
+            });
+        } catch (_) {
+            // ignore reporting failures during shutdown paths
+        }
         return { adjusted: false, reason: 'disabled' };
     }
 
     if (fallbackAmount === null || fallbackAmount <= 0) {
         log.warn({ fn: 'adjustMargin', amount }, 'Skipped margin adjustment due to invalid amount');
         recordTradeOutcome('adjustMargin', 'skipped');
+        try {
+            await reportTradingMargin({
+                asset: resolvedAsset,
+                amount: fallbackAmount ?? amount,
+                operation,
+                status: 'skipped',
+                reason: 'invalidAmount',
+            });
+        } catch (_) {}
         return { adjusted: false, reason: 'invalidAmount' };
     }
 
     if (operation === 'transferOut' && Number.isFinite(marginCfg.minFree) && fallbackAmount > marginCfg.minFree) {
         log.warn({ fn: 'adjustMargin', amount: fallbackAmount, minFree: marginCfg.minFree }, 'Skipped margin adjustment to preserve buffer');
         recordTradeOutcome('adjustMargin', 'skipped');
+        try {
+            await reportTradingMargin({
+                asset: resolvedAsset,
+                amount: fallbackAmount,
+                operation,
+                status: 'skipped',
+                reason: 'exceedsBuffer',
+            });
+        } catch (_) {}
         return { adjusted: false, reason: 'exceedsBuffer' };
     }
 
@@ -255,34 +418,84 @@ export async function adjustMargin({
             const response = await transferMargin({ asset: resolvedAsset, amount: fallbackAmount, direction: 'toMargin' });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Transferred funds to margin');
             recordTradeOutcome('adjustMargin', 'success');
+            try {
+                await reportTradingMargin({
+                    asset: resolvedAsset,
+                    amount: fallbackAmount,
+                    operation,
+                    status: 'success',
+                });
+            } catch (_) {}
             return { adjusted: true, response };
         }
         if (operation === 'transferOut') {
             const response = await transferMargin({ asset: resolvedAsset, amount: fallbackAmount, direction: 'toSpot' });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Transferred funds to spot');
             recordTradeOutcome('adjustMargin', 'success');
+            try {
+                await reportTradingMargin({
+                    asset: resolvedAsset,
+                    amount: fallbackAmount,
+                    operation,
+                    status: 'success',
+                });
+            } catch (_) {}
             return { adjusted: true, response };
         }
         if (operation === 'borrow') {
             const response = await borrowMargin({ asset: resolvedAsset, amount: fallbackAmount });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Borrowed margin asset');
             recordTradeOutcome('adjustMargin', 'success');
+            try {
+                await reportTradingMargin({
+                    asset: resolvedAsset,
+                    amount: fallbackAmount,
+                    operation,
+                    status: 'success',
+                });
+            } catch (_) {}
             return { adjusted: true, response };
         }
         if (operation === 'repay') {
             const response = await repayMargin({ asset: resolvedAsset, amount: fallbackAmount });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Repaid margin loan');
             recordTradeOutcome('adjustMargin', 'success');
+            try {
+                await reportTradingMargin({
+                    asset: resolvedAsset,
+                    amount: fallbackAmount,
+                    operation,
+                    status: 'success',
+                });
+            } catch (_) {}
             return { adjusted: true, response };
         }
     } catch (err) {
         log.error({ fn: 'adjustMargin', err, operation }, 'Margin adjustment failed');
         recordTradeOutcome('adjustMargin', 'error');
+        try {
+            await reportTradingMargin({
+                asset: resolvedAsset,
+                amount: fallbackAmount,
+                operation,
+                status: 'error',
+                reason: err.message,
+            });
+        } catch (_) {}
         throw err;
     }
 
     log.warn({ fn: 'adjustMargin', operation }, 'Skipped margin adjustment due to unsupported operation');
     recordTradeOutcome('adjustMargin', 'skipped');
+    try {
+        await reportTradingMargin({
+            asset: resolvedAsset,
+            amount: fallbackAmount,
+            operation,
+            status: 'skipped',
+            reason: 'unsupportedOperation',
+        });
+    } catch (_) {}
     return { adjusted: false, reason: 'unsupportedOperation' };
 }
 

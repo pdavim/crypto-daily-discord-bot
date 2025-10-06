@@ -4,12 +4,19 @@ const submitOrderMock = vi.fn();
 const transferMarginMock = vi.fn();
 const borrowMarginMock = vi.fn();
 const repayMarginMock = vi.fn();
+const reportTradingExecutionMock = vi.fn();
+const reportTradingMarginMock = vi.fn();
 
 vi.mock("../../src/trading/binance.js", () => ({
     submitOrder: submitOrderMock,
     transferMargin: transferMarginMock,
     borrowMargin: borrowMarginMock,
     repayMargin: repayMarginMock,
+}));
+
+vi.mock("../../src/trading/notifier.js", () => ({
+    reportTradingExecution: reportTradingExecutionMock,
+    reportTradingMargin: reportTradingMarginMock,
 }));
 
 const { CFG } = await import("../../src/config.js");
@@ -23,6 +30,10 @@ describe("trading executor", () => {
         transferMarginMock.mockReset();
         borrowMarginMock.mockReset();
         repayMarginMock.mockReset();
+        reportTradingExecutionMock.mockReset();
+        reportTradingMarginMock.mockReset();
+        reportTradingExecutionMock.mockResolvedValue(undefined);
+        reportTradingMarginMock.mockResolvedValue(undefined);
         register.resetMetrics();
 
         CFG.trading = {
@@ -47,6 +58,8 @@ describe("trading executor", () => {
         transferMarginMock.mockReset();
         borrowMarginMock.mockReset();
         repayMarginMock.mockReset();
+        reportTradingExecutionMock.mockReset();
+        reportTradingMarginMock.mockReset();
     });
 
     it("skips trading when disabled", async () => {
@@ -54,6 +67,7 @@ describe("trading executor", () => {
         const result = await openPosition({ symbol: "BTCUSDT", quantity: 0.1, price: 30000 });
         expect(result).toEqual({ executed: false, reason: 'disabled', details: {} });
         expect(submitOrderMock).not.toHaveBeenCalled();
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'skipped', reason: 'disabled' }));
         const metrics = await register.getMetricsAsJSON();
         const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
         const skipped = tradeMetric?.values.find(v => v.labels.action === 'openPosition' && v.labels.result === 'skipped');
@@ -64,6 +78,7 @@ describe("trading executor", () => {
         const result = await openPosition({ symbol: "BTCUSDT", quantity: 0.0001, price: 100 });
         expect(result.reason).toBe("belowMinNotional");
         expect(submitOrderMock).not.toHaveBeenCalled();
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ reason: 'belowMinNotional', status: 'skipped' }));
     });
 
     it("submits qualifying orders with safeguards", async () => {
@@ -90,6 +105,7 @@ describe("trading executor", () => {
         const notionalMetric = metrics.find(m => m.name === 'app_trading_notional_size');
         const sumEntry = notionalMetric?.values.find(v => v.metricName === 'app_trading_notional_size_sum');
         expect(sumEntry?.value).toBeCloseTo(0.005 * 30500, 6);
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'executed', action: 'open' }));
     });
 
     it("propagates submission failures", async () => {
@@ -99,6 +115,7 @@ describe("trading executor", () => {
         const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
         const errors = tradeMetric?.values.find(v => v.labels.action === 'openPosition' && v.labels.result === 'error');
         expect(errors?.value).toBe(1);
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', action: 'open' }));
     });
 
     it("closes positions using reduce only orders", async () => {
@@ -117,6 +134,7 @@ describe("trading executor", () => {
         const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
         const success = tradeMetric?.values.find(v => v.labels.action === 'closePosition' && v.labels.result === 'success');
         expect(success?.value).toBe(1);
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'executed', action: 'close' }));
     });
 
     it("avoids removing too much margin", async () => {
@@ -125,6 +143,7 @@ describe("trading executor", () => {
         expect(result.adjusted).toBe(false);
         expect(result.reason).toBe("exceedsBuffer");
         expect(transferMarginMock).not.toHaveBeenCalled();
+        expect(reportTradingMarginMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'skipped', reason: 'exceedsBuffer' }));
     });
 
     it("performs margin operations", async () => {
@@ -147,6 +166,7 @@ describe("trading executor", () => {
         const marginSuccess = tradeMetric?.values.filter(v => v.labels.action === 'adjustMargin' && v.labels.result === 'success');
         const totalSuccess = marginSuccess?.reduce((sum, entry) => sum + entry.value, 0);
         expect(totalSuccess).toBe(4);
+        expect(reportTradingMarginMock).toHaveBeenCalledTimes(4);
     });
 
     it("handles unsupported margin actions", async () => {
@@ -157,5 +177,6 @@ describe("trading executor", () => {
         const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
         const skipped = tradeMetric?.values.find(v => v.labels.action === 'adjustMargin' && v.labels.result === 'skipped');
         expect(skipped?.value).toBe(1);
+        expect(reportTradingMarginMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'skipped', reason: 'unsupportedOperation' }));
     });
 });

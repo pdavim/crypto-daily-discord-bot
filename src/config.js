@@ -247,6 +247,17 @@ const DEFAULT_TRADING_STRATEGY_CONFIG = {
     minimumConfidence: 0.35,
 };
 
+const DEFAULT_TRADING_DISCORD_CONFIG = {
+    enabled: false,
+    webhookUrl: null,
+    channelId: null,
+    mention: "",
+};
+
+const DEFAULT_TRADING_LOGGING_CONFIG = {
+    sheetKey: "trading_actions",
+};
+
 const DEFAULT_TRADING_CONFIG = {
     enabled: false,
     minNotional: 0,
@@ -255,6 +266,8 @@ const DEFAULT_TRADING_CONFIG = {
     maxSlippagePct: 0.005,
     margin: DEFAULT_TRADING_MARGIN_CONFIG,
     strategy: DEFAULT_TRADING_STRATEGY_CONFIG,
+    discord: DEFAULT_TRADING_DISCORD_CONFIG,
+    logging: DEFAULT_TRADING_LOGGING_CONFIG,
 };
 
 const DEFAULT_MARKET_POSTURE_CONFIG = {
@@ -414,6 +427,14 @@ const buildTradingConfig = (baseConfig = {}) => {
             ...DEFAULT_TRADING_STRATEGY_CONFIG,
             ...(isPlainObject(base.strategy) ? base.strategy : {}),
         },
+        discord: {
+            ...DEFAULT_TRADING_DISCORD_CONFIG,
+            ...(isPlainObject(base.discord) ? base.discord : {}),
+        },
+        logging: {
+            ...DEFAULT_TRADING_LOGGING_CONFIG,
+            ...(isPlainObject(base.logging) ? base.logging : {}),
+        },
     };
 
     config.enabled = toBoolean(process.env.TRADING_ENABLED, config.enabled);
@@ -454,6 +475,50 @@ const buildTradingConfig = (baseConfig = {}) => {
     config.margin.asset = typeof marginAsset === "string" && marginAsset.trim() !== ""
         ? marginAsset.trim().toUpperCase()
         : DEFAULT_TRADING_MARGIN_CONFIG.asset;
+
+    config.discord.enabled = toBoolean(process.env.TRADING_DISCORD_ENABLED, config.discord.enabled);
+
+    const tradingWebhookEnv = process.env.TRADING_DISCORD_WEBHOOK_URL;
+    if (typeof tradingWebhookEnv === "string") {
+        const trimmed = tradingWebhookEnv.trim();
+        config.discord.webhookUrl = trimmed === "" ? null : trimmed;
+    } else if (typeof config.discord.webhookUrl === "string") {
+        const trimmed = config.discord.webhookUrl.trim();
+        config.discord.webhookUrl = trimmed === "" ? null : trimmed;
+    } else {
+        config.discord.webhookUrl = null;
+    }
+
+    const tradingChannelEnv = process.env.TRADING_DISCORD_CHANNEL_ID;
+    if (typeof tradingChannelEnv === "string") {
+        const trimmed = tradingChannelEnv.trim();
+        config.discord.channelId = trimmed === "" ? null : trimmed;
+    } else if (typeof config.discord.channelId === "string") {
+        const trimmed = config.discord.channelId.trim();
+        config.discord.channelId = trimmed === "" ? null : trimmed;
+    } else {
+        config.discord.channelId = null;
+    }
+
+    const tradingMentionEnv = process.env.TRADING_DISCORD_MENTION;
+    if (typeof tradingMentionEnv === "string") {
+        config.discord.mention = tradingMentionEnv.trim();
+    } else if (typeof config.discord.mention === "string") {
+        config.discord.mention = config.discord.mention.trim();
+    } else {
+        config.discord.mention = "";
+    }
+
+    const sheetKeyEnv = process.env.TRADING_LOGGING_SHEET_KEY;
+    if (typeof sheetKeyEnv === "string") {
+        const trimmed = sheetKeyEnv.trim();
+        config.logging.sheetKey = trimmed === "" ? DEFAULT_TRADING_LOGGING_CONFIG.sheetKey : trimmed;
+    } else if (typeof config.logging.sheetKey === "string") {
+        const trimmed = config.logging.sheetKey.trim();
+        config.logging.sheetKey = trimmed === "" ? DEFAULT_TRADING_LOGGING_CONFIG.sheetKey : trimmed;
+    } else {
+        config.logging.sheetKey = DEFAULT_TRADING_LOGGING_CONFIG.sheetKey;
+    }
 
     return config;
 };

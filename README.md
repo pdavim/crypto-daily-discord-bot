@@ -105,6 +105,12 @@ npm install
 - Com `futures: true`, a ordem é encaminhada pelo executor (`openPosition`) compartilhando as mesmas salvaguardas (notional mínimo/máximo) aplicadas nas automações.
 - Informe pelo menos `notional` ou a combinação `quantity + price` para que o bot valide os limites — ordens abaixo de `trading.minNotional` ou acima do limite calculado (`accountEquity * maxPositionPct * maxLeverage`) são rejeitadas com mensagens orientativas.
 
+### Logs e auditoria automática
+
+- Ative `TRADING_DISCORD_ENABLED=true` e informe `TRADING_DISCORD_WEBHOOK_URL` para receber no Discord cada decisão da automação (execuções, skips e erros) com contexto de direção, quantidade e motivo.
+- Defina `TRADING_LOGGING_SHEET_KEY` (ou configure um `channelMap` no bloco `googleSheets`) para enviar os mesmos eventos para a planilha integrada; cada linha inclui `status`, `action`, `symbol`, `confidence`, `quantity`, `reason` e dados adicionais.
+- A menção opcional `TRADING_DISCORD_MENTION` permite sinalizar o time de operações (`@here`, `@risk`, etc.) sempre que uma ação for registrada.
+
 ### Exemplos rápidos
 
 - **Spot**: `/trade buy symbol:BTCUSDT quantity:0.01 price:25000` — envia uma ordem MARKET de compra após verificar que o notional (~250) está acima do mínimo.

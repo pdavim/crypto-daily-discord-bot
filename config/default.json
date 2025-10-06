@@ -63,10 +63,19 @@
     "strategy": {
       "minimumConfidence": 0.35
     },
+    "discord": {
+      "enabled": false,
+      "webhookUrl": null,
+      "channelId": null,
+      "mention": ""
+    },
     "margin": {
       "asset": "USDT",
       "minFree": 50,
       "transferAmount": 25
+    },
+    "logging": {
+      "sheetKey": "trading_actions"
     },
     "automation": {
       "enabled": false,
