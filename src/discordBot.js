@@ -3,7 +3,14 @@
  * recursos recentes como o resumo `/binance`, configurações de lucro mínimo e
  * gráficos com previsões/alertas enriquecidos.
  */
-import { Client, GatewayIntentBits, ApplicationCommandOptionType } from "discord.js";
+import {
+    Client,
+    GatewayIntentBits,
+    ApplicationCommandOptionType,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+} from "discord.js";
 import path from "path";
 import { CFG } from "./config.js";
 import { logger, withContext } from "./logger.js";
@@ -20,6 +27,7 @@ import {
 } from "./minimumProfit.js";
 import { getAccountOverview, submitOrder } from "./trading/binance.js";
 import { openPosition, adjustMargin } from "./trading/executor.js";
+import { answerWithRAG, recordFeedback } from "./rag.js";
 
 
 const startTime = Date.now();
@@ -48,6 +56,108 @@ const priceFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2
 const percentFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const DISCORD_MESSAGE_LIMIT = 2000;
+
+function truncateDiscordMessage(content) {
+    if (typeof content !== "string") {
+        return "";
+    }
+    if (content.length <= DISCORD_MESSAGE_LIMIT) {
+        return content;
+    }
+    return `${content.slice(0, DISCORD_MESSAGE_LIMIT - 1)}…`;
+}
+
+function formatAskSources(sources) {
+    if (!Array.isArray(sources)) {
+        return [];
+    }
+    return sources
+        .map(sourceEntry => {
+            if (!sourceEntry || typeof sourceEntry.source !== "string") {
+                return null;
+            }
+            const trimmed = sourceEntry.source.trim();
+            if (!trimmed) {
+                return null;
+            }
+            const label = trimmed;
+            const url = trimmed.startsWith("http://") || trimmed.startsWith("https://") ? trimmed : trimmed;
+            return { label, url };
+        })
+        .filter(Boolean);
+}
+
+function buildAskResponseContent(question, answer, sources) {
+    const parts = [];
+    if (question) {
+        parts.push(`❓ **Pergunta:** ${question}`);
+    }
+    const safeAnswer = answer && typeof answer === "string" ? answer.trim() : "";
+    const answerText = safeAnswer || "Não consegui gerar uma resposta agora.";
+    parts.push(`🧠 **Resposta:**\n${answerText}`);
+    const formattedSources = formatAskSources(sources);
+    if (formattedSources.length) {
+        const links = formattedSources.map(({ label, url }, index) => `${index + 1}. [${label}](${url})`);
+        parts.push(`🔗 **Fontes:**\n${links.join("\n")}`);
+    }
+    parts.push("💬 Gostou da resposta? Use os botões abaixo para deixar o seu feedback!");
+    return truncateDiscordMessage(parts.join("\n\n"));
+}
+
+function buildAskFeedbackComponents() {
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(ASK_FEEDBACK_CUSTOM_ID_UP)
+            .setStyle(ButtonStyle.Success)
+            .setEmoji("👍"),
+        new ButtonBuilder()
+            .setCustomId(ASK_FEEDBACK_CUSTOM_ID_DOWN)
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji("👎"),
+    );
+    return [row];
+}
+
+function extractAskMessageContext(content) {
+    if (typeof content !== "string") {
+        return { question: null, answer: null, sources: [] };
+    }
+    const questionMatch = content.match(/\*\*Pergunta:\*\* (.+)/);
+    const answerMatch = content.match(/🧠 \*\*Resposta:\*\*\n([\s\S]*?)(?:\n\n🔗|$)/);
+    const sourcesMatch = content.match(/🔗 \*\*Fontes:\*\*\n([\s\S]+)/);
+    const question = questionMatch ? questionMatch[1].trim() : null;
+    const answer = answerMatch ? answerMatch[1].trim() : null;
+    const sources = sourcesMatch
+        ? sourcesMatch[1]
+            .split("\n")
+            .map(line => {
+                const linkMatch = line.match(/\(([^)]+)\)/);
+                return linkMatch ? linkMatch[1] : null;
+            })
+            .filter(Boolean)
+        : [];
+    return { question, answer, sources };
+}
+
+async function handleAskFeedback(interaction) {
+    const log = withContext(logger, { fn: "handleInteraction", command: "askFeedback" });
+    const rating = interaction.customId === ASK_FEEDBACK_CUSTOM_ID_UP ? "up" : "down";
+    const { question, answer, sources } = extractAskMessageContext(interaction.message?.content ?? "");
+    try {
+        await recordFeedback({
+            rating,
+            messageId: interaction.message?.id ?? null,
+            userId: interaction.user?.id ?? null,
+            question,
+            answer,
+            sources,
+        });
+        await interaction.reply({ content: "🙏 Obrigado pelo feedback!", ephemeral: true });
+    } catch (error) {
+        log.error({ err: error }, "Failed to record feedback");
+        await interaction.reply({ content: "😔 Não consegui registar o feedback agora.", ephemeral: true });
+    }
+}
 
 const MAX_LIST_ITEMS = {
     assets: 5,
@@ -156,6 +266,9 @@ function resolveTradeAbortMessage(reason, details = {}) {
     }
 }
 
+const ASK_FEEDBACK_CUSTOM_ID_UP = "ask:feedback:up";
+const ASK_FEEDBACK_CUSTOM_ID_DOWN = "ask:feedback:down";
+
 const COMMAND_BLUEPRINTS = [
     {
         name: "chart",
@@ -218,6 +331,21 @@ const COMMAND_BLUEPRINTS = [
         description: "Mostra uptime, watchlist e previsões recentes para seus ativos.",
         helpDetails: [
             "Exibe o uptime do bot, a watchlist atual e as previsões bull/bear mais recentes para 5m, 15m, 30m, 1h e 4h.",
+        ]
+    },
+    {
+        name: "ask",
+        description: "Pergunte algo sobre o projeto e receba uma resposta com fontes.",
+        options: () => [
+            {
+                name: "question",
+                description: "Sua pergunta sobre a documentação ou o funcionamento do bot.",
+                type: ApplicationCommandOptionType.String,
+                required: true,
+            }
+        ],
+        helpDetails: [
+            "Utilize o `/ask` para dúvidas rápidas. A resposta sempre lista fontes numeradas em formato de link; confira-as antes de aplicar qualquer insight.",
         ]
     },
     {
@@ -741,6 +869,12 @@ function build45mCandles(candles15m) {
  * @returns {Promise} Resolves once the interaction response is handled.
  */
 export async function handleInteraction(interaction, { helpMessageBuilder = buildHelpMessage } = {}) {
+    if (typeof interaction.isButton === "function" && interaction.isButton()) {
+        if (interaction.customId === ASK_FEEDBACK_CUSTOM_ID_UP || interaction.customId === ASK_FEEDBACK_CUSTOM_ID_DOWN) {
+            await handleAskFeedback(interaction);
+        }
+        return;
+    }
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName === 'chart') {
         const assetKey = interaction.options.getString('ativo', true).toUpperCase();
@@ -801,6 +935,24 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
         }
         const content = contentParts.join('\n');
         await interaction.reply({ content, ephemeral: true });
+    } else if (interaction.commandName === 'ask') {
+        const rawQuestion = interaction.options.getString('question', true);
+        const question = typeof rawQuestion === 'string' ? rawQuestion.trim() : '';
+        const displayQuestion = question.replace(/\s+/g, ' ').trim();
+        await interaction.deferReply({ ephemeral: true });
+        if (!question) {
+            await interaction.editReply('🤔 Preciso de uma pergunta válida para ajudar.');
+            return;
+        }
+        const log = withContext(logger, { fn: 'handleInteraction', command: 'ask' });
+        try {
+            const { answer, sources } = await answerWithRAG(question);
+            const content = buildAskResponseContent(displayQuestion, answer, sources);
+            await interaction.editReply({ content, components: buildAskFeedbackComponents() });
+        } catch (error) {
+            log.error({ err: error }, 'Failed to answer ask command');
+            await interaction.editReply('😔 Não consegui gerar uma resposta agora. Tente novamente mais tarde.');
+        }
     } else if (interaction.commandName === 'analysis') {
         const assetKey = interaction.options.getString('ativo', true).toUpperCase();
         const tf = interaction.options.getString('tf', true);

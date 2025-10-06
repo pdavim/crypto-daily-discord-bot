@@ -226,6 +226,16 @@ export const answerWithRAG = async (question) => {
     }
 };
 
+export const recordFeedback = async ({ rating, messageId, userId, question, answer, sources } = {}) => {
+    const log = withContext(logger, { fn: "recordFeedback" });
+    try {
+        log.info({ rating, messageId, userId, question, answer, sources }, "Received RAG feedback");
+    } catch (error) {
+        log.error({ err: error }, "Failed to record feedback");
+        throw error;
+    }
+};
+
 export const resetRagClients = () => {
     openAiChatClient = undefined;
 };
