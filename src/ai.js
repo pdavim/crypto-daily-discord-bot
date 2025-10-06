@@ -62,20 +62,25 @@ const openrouter = CFG.openrouterApiKey
 /**
  * Requests a chat completion from OpenRouter using the configured model.
  * @param {Array<Object>} messages - Conversation history.
+ * @param {{ model?: string }} [options] - Optional overrides for the OpenRouter model.
  * @returns {Promise} Completion text returned by OpenRouter.
  */
-export async function callOpenRouter(messages) {
+export async function callOpenRouter(messages, options = {}) {
     const log = withContext(logger);
-    log.info({ fn: 'callOpenRouter' }, "Calling OpenRouter...");
+    const requestedModel = typeof options?.model === "string" && options.model.trim() !== ""
+        ? options.model.trim()
+        : null;
+    const model = requestedModel ?? CFG.openrouterModel;
+    log.info({ fn: 'callOpenRouter', model }, "Calling OpenRouter...");
     if (!openrouter) {
         throw new Error("OpenRouter API key missing");
     }
-    if (!CFG.openrouterModel) {
+    if (!model) {
         throw new Error("OpenRouter model missing");
     }
     try {
         const response = await openrouter.chat.completions.create({
-            model: CFG.openrouterModel,
+            model,
             messages,
         });
         return response.choices[0].message.content;
@@ -318,3 +323,5 @@ export async function runAgent() {
     const disclaimer = "_This report is for educational purposes only and not financial advice._";
     return [reports.join("\n\n"), macroSection, disclaimer].filter(Boolean).join("\n\n");
 }
+
+export { getEmbedding } from "./rag/embedding.js";
