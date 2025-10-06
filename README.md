@@ -291,8 +291,26 @@ O bloco `rag` de `config/default.json` organiza as integrações de busca vetori
 - `searchLimit` limita a quantidade de chunks retornados em buscas (`RAG_SEARCH_LIMIT`).
 - `activeModel` registra o modelo atual usado para responder consultas (`RAG_ACTIVE_MODEL`).
 - `candidateModel` guarda o modelo em avaliação para experimentos A/B (`RAG_CANDIDATE_MODEL`).
+- `modelRegistry` define onde registrar metadados de modelos fine-tunados (por padrão `public.rag_models`).
+- `fineTuneCron` controla o agendamento da rotina de fine-tuning quando habilitada (`RAG_FINE_TUNE_CRON`).
+- `enableFineTune` ativa o cron de fine-tuning — o job só é criado quando este valor for `true` ou `RAG_ENABLE_FINE_TUNE=true`.
 
 As mesmas chaves podem ser definidas por variáveis de ambiente `RAG_*`, que prevalecem sobre `config/custom.json` em tempo de execução.
+
+### Fine-tuning de modelos RAG
+
+1. Gere o dataset consolidado com feedback aprovado via `npm run build:fine-tune` (gera `data/fine-tune.jsonl`).
+2. Inicie o job de fine-tuning com `npm run fine-tune`; opcionalmente informe outro caminho com `npm run fine-tune -- --file ./custom.jsonl` e altere o modelo base com `--model`.
+3. O script `scripts/run-fine-tune.js` sobe o arquivo para a API da OpenAI, acompanha o status (`queued` → `running` → `succeeded/failed`) e, em caso de sucesso, registra o modelo em `CFG.rag.modelRegistry` usando o Postgres definido por `CFG.rag.pgUrl`.
+
+Para agendar o pipeline automaticamente, habilite `rag.enableFineTune` e defina `rag.fineTuneCron` no `config/custom.json` (ou exporte `RAG_ENABLE_FINE_TUNE=true`). O cron scheduler de `src/index.js` importa dinamicamente o script e grava logs estruturados a cada execução. O atalho `npm run fine-tune:schedule` inicia o bot com o agendamento ativado imediatamente.
+
+### Promoção, canário e rollback de modelos personalizados
+
+- **Registro e auditoria**: após cada execução bem-sucedida, confira a entrada gravada em `rag.modelRegistry` (por padrão `public.rag_models`) para obter `jobId`, `trainingFileId` e metadados do modelo. Esse registro serve como trilha de auditoria e fonte para dashboards.
+- **Canário controlado**: atribua o modelo recém-criado a `CFG.rag.candidateModel` (via `config-cli set rag.candidateModel <modelo>`). O bot continuará respondendo com `CFG.rag.activeModel`, mas você pode direcionar requisições canário manualmente apontando agentes específicos para o candidato.
+- **Promoção definitiva**: quando o canário estiver validado, mova-o para `CFG.rag.activeModel` e limpe `candidateModel`. O processo é revertido automaticamente caso o canário não esteja definido.
+- **Rollback rápido**: mantenha o último modelo aprovado registrado em `rag.modelRegistry`. Caso um deploy degrade a qualidade, reatribua `CFG.rag.activeModel` ao identificador anterior (ou simplesmente remova o valor atual) para voltar ao baseline original sem recriar jobs.
 
 ## Monitoramento e relatórios
 
