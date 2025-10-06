@@ -103,7 +103,8 @@ const listenMock = vi.fn((_, callback) => {
 
 vi.mock("node-cron", () => ({ default: { schedule: scheduleMock } }));
 vi.mock("http", () => ({ createServer: vi.fn(() => ({ listen: listenMock })), default: { createServer: vi.fn(() => ({ listen: listenMock })) } }));
-vi.mock("../src/config.js", () => ({ CFG: cfgMock }));
+const onConfigChangeMock = vi.fn(() => () => {});
+vi.mock("../src/config.js", () => ({ CFG: cfgMock, onConfigChange: onConfigChangeMock }));
 vi.mock("../src/assets.js", () => ({
     ASSETS: [{ key: "BTC", binance: "BTCUSDT" }],
     TIMEFRAMES: ["1h", "4h"],
