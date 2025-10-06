@@ -55,7 +55,12 @@ npm install
    - `BINANCE_CACHE_TTL_MINUTES` controla a validade do cache de preços compartilhado.
    - Variáveis `INDICATOR_*` permitem sobrescrever períodos de médias, configurações do MACD, multiplicadores de bandas de Bollinger/Keltner, etc.
 4. Revise os IDs dos canais/servidores onde os conteúdos serão publicados (`DISCORD_GUILD_ID`, `DISCORD_CHANNEL_CHARTS_ID`, `DISCORD_WEBHOOK_GENERAL`, `DISCORD_WEBHOOK_ALERTS`, ...).
-5. Para exportar mensagens para planilhas, defina `GOOGLE_SHEETS_ENABLED=true`, informe `GOOGLE_SHEETS_SPREADSHEET_ID` e forneça credenciais via `GOOGLE_SHEETS_CREDENTIALS_FILE` ou `GOOGLE_SHEETS_CREDENTIALS_JSON`. Use `GOOGLE_SHEETS_CHANNEL_MAP` para relacionar canais do Discord às abas da planilha.
+5. Para exportar mensagens para planilhas:
+   - Ative o recurso definindo `GOOGLE_SHEETS_ENABLED=true` no `.env` **e** habilitando `googleSheets.enabled` via `npm exec config-cli set googleSheets.enabled true` (o valor do arquivo de configuração vence quando ambos estiverem definidos).
+   - Crie uma conta de serviço no [Google Cloud Console](https://console.cloud.google.com/): gere uma chave JSON, compartilhe a planilha com o e-mail da conta e aponte o caminho do arquivo com `GOOGLE_SHEETS_CREDENTIALS_FILE` **ou** cole o JSON no `GOOGLE_SHEETS_CREDENTIALS_JSON`.
+   - Obtenha o ID da planilha diretamente da URL (`https://docs.google.com/spreadsheets/d/<ID>/edit`) e informe em `GOOGLE_SHEETS_SPREADSHEET_ID`.
+   - Mapeie os canais/relatórios para abas específicas usando `GOOGLE_SHEETS_CHANNEL_MAP` (por exemplo, `{ "1234567890": "alerts-general", "987654321": "portfolio-growth" }`). Webhooks reutilizam a aba mesmo quando mudam o nome exibido.
+   - Consulte as [notas de design do exportador](docs/google-sheets-export.md) para detalhes de layout, colunas obrigatórias e regras de normalização.
 
 > 📌 Consulte `.env.example` para descrições completas e exemplos de cada variável disponível.
 
