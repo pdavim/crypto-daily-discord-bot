@@ -22,6 +22,12 @@
     "SOL": null,
     "TRX": null
   },
+  "googleSheets": {
+    "enabled": false,
+    "spreadsheetId": null,
+    "credentialsFile": null,
+    "channelMap": {}
+  },
   "webhookReports_BTC": null,
   "webhookReports_ETH": null,
   "webhookReports_POL": null,
