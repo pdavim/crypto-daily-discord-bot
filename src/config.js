@@ -133,6 +133,23 @@ const toBoolean = (value, fallback) => {
     return fallback;
 };
 
+const normalizeStringOrNull = (value, fallback = null) => {
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        return trimmed === "" ? fallback ?? null : trimmed;
+    }
+
+    if (value === undefined) {
+        return fallback ?? null;
+    }
+
+    if (value === null) {
+        return null;
+    }
+
+    return String(value);
+};
+
 const DEFAULT_MIN_PROFIT_CONFIG = { default: 0, users: {} };
 
 const DEFAULT_GOOGLE_SHEETS_CONFIG = {
@@ -141,6 +158,17 @@ const DEFAULT_GOOGLE_SHEETS_CONFIG = {
     credentialsFile: null,
     credentialsJson: null,
     channelMap: {},
+};
+
+const DEFAULT_RAG_CONFIG = {
+    pgUrl: null,
+    embeddingModel: "text-embedding-3-large",
+    chunkSize: 800,
+    chunkOverlap: 160,
+    ingestCron: "0 * * * *",
+    searchLimit: 5,
+    activeModel: null,
+    candidateModel: null,
 };
 
 const DEFAULT_NEWS_DIGEST_CONFIG = {
@@ -488,6 +516,70 @@ const normalizeAllocation = (allocation) => {
         normalized[asset] = weight / total;
     }
     return normalized;
+};
+
+const buildRagConfig = (baseConfig = {}) => {
+    const base = isPlainObject(baseConfig) ? baseConfig : {};
+    const config = {
+        ...DEFAULT_RAG_CONFIG,
+        ...base,
+    };
+
+    config.pgUrl = normalizeStringOrNull(config.pgUrl, null);
+    config.pgUrl = normalizeStringOrNull(process.env.RAG_PG_URL, config.pgUrl);
+
+    config.embeddingModel = normalizeStringOrNull(
+        config.embeddingModel,
+        DEFAULT_RAG_CONFIG.embeddingModel,
+    );
+    config.embeddingModel = normalizeStringOrNull(
+        process.env.RAG_EMBEDDING_MODEL,
+        config.embeddingModel,
+    );
+
+    const baseChunkSize = toInt(config.chunkSize, DEFAULT_RAG_CONFIG.chunkSize);
+    config.chunkSize = Number.isFinite(baseChunkSize) && baseChunkSize > 0
+        ? baseChunkSize
+        : DEFAULT_RAG_CONFIG.chunkSize;
+    const envChunkSize = toInt(process.env.RAG_CHUNK_SIZE, config.chunkSize);
+    config.chunkSize = Number.isFinite(envChunkSize) && envChunkSize > 0
+        ? envChunkSize
+        : config.chunkSize;
+
+    const baseChunkOverlap = toInt(config.chunkOverlap, DEFAULT_RAG_CONFIG.chunkOverlap);
+    config.chunkOverlap = Number.isFinite(baseChunkOverlap) && baseChunkOverlap >= 0
+        ? baseChunkOverlap
+        : DEFAULT_RAG_CONFIG.chunkOverlap;
+    const envChunkOverlap = toInt(process.env.RAG_CHUNK_OVERLAP, config.chunkOverlap);
+    config.chunkOverlap = Number.isFinite(envChunkOverlap) && envChunkOverlap >= 0
+        ? envChunkOverlap
+        : config.chunkOverlap;
+
+    config.ingestCron = normalizeStringOrNull(
+        config.ingestCron,
+        DEFAULT_RAG_CONFIG.ingestCron,
+    );
+    config.ingestCron = normalizeStringOrNull(
+        process.env.RAG_INGEST_CRON,
+        config.ingestCron,
+    );
+
+    const baseSearchLimit = toInt(config.searchLimit, DEFAULT_RAG_CONFIG.searchLimit);
+    config.searchLimit = Number.isFinite(baseSearchLimit) && baseSearchLimit > 0
+        ? baseSearchLimit
+        : DEFAULT_RAG_CONFIG.searchLimit;
+    const envSearchLimit = toInt(process.env.RAG_SEARCH_LIMIT, config.searchLimit);
+    config.searchLimit = Number.isFinite(envSearchLimit) && envSearchLimit > 0
+        ? envSearchLimit
+        : config.searchLimit;
+
+    config.activeModel = normalizeStringOrNull(config.activeModel, null);
+    config.activeModel = normalizeStringOrNull(process.env.RAG_ACTIVE_MODEL, config.activeModel);
+
+    config.candidateModel = normalizeStringOrNull(config.candidateModel, null);
+    config.candidateModel = normalizeStringOrNull(process.env.RAG_CANDIDATE_MODEL, config.candidateModel);
+
+    return config;
 };
 
 const buildTradingConfig = (baseConfig = {}) => {
@@ -1108,6 +1200,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.analysisFrequency = process.env.ANALYSIS_FREQUENCY ?? nextCFG.analysisFrequency ?? 'hourly';
     nextCFG.openrouterApiKey = process.env.OPENROUTER_API_KEY ?? nextCFG.openrouterApiKey ?? null;
     nextCFG.openrouterModel = process.env.OPENROUTER_MODEL ?? nextCFG.openrouterModel ?? 'openrouter/sonoma-dusk-alpha';
+    nextCFG.rag = buildRagConfig(nextCFG.rag);
     nextCFG.sentimentProvider = (process.env.SENTIMENT_PROVIDER ?? nextCFG.sentimentProvider ?? 'tfjs').toLowerCase();
     nextCFG.sentimentApiUrl = process.env.SENTIMENT_API_URL ?? nextCFG.sentimentApiUrl ?? null;
     nextCFG.sentimentApiKey = process.env.SENTIMENT_API_KEY ?? nextCFG.sentimentApiKey ?? null;

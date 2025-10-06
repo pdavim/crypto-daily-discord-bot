@@ -41,6 +41,16 @@
   "analysisFrequency": "hourly",
   "openrouterApiKey": null,
   "openrouterModel": "openrouter/sonoma-dusk-alpha",
+  "rag": {
+    "pgUrl": null,
+    "embeddingModel": "text-embedding-3-large",
+    "chunkSize": 800,
+    "chunkOverlap": 160,
+    "ingestCron": "0 * * * *",
+    "searchLimit": 5,
+    "activeModel": null,
+    "candidateModel": null
+  },
   "enableCharts": true,
   "enableAlerts": true,
   "enableAnalysis": true,
