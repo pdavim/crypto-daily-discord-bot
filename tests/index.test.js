@@ -33,9 +33,10 @@ const runAssetsSafelyMock = vi.fn(() => Promise.resolve());
 const flushAlertQueueMock = vi.fn(() => Promise.resolve());
 const runPortfolioGrowthSimulationMock = vi.fn(() => Promise.resolve(null));
 const postChartsMock = vi.fn(() => Promise.resolve(true));
-const sendDiscordAlertMock = vi.fn(() => Promise.resolve(true));
-const postAnalysisMock = vi.fn(() => Promise.resolve({ posted: true }));
-const postMonthlyReportMock = vi.fn(() => Promise.resolve(true));
+const sendDiscordAlertMock = vi.fn(() => Promise.resolve({ delivered: true, webhookUrl: "https://example.com", channelId: "123" }));
+const sendDiscordAlertWithAttachmentsMock = vi.fn(() => Promise.resolve({ delivered: true, webhookUrl: "https://example.com", channelId: "123" }));
+const postAnalysisMock = vi.fn(() => Promise.resolve({ posted: true, webhookConfigKey: "webhookAnalysis", webhookUrl: "https://example.com", channelId: "123", attachments: [] }));
+const postMonthlyReportMock = vi.fn(() => Promise.resolve({ posted: true, webhookConfigKey: "webhookMonthly", webhookUrl: "https://example.com", channelId: "123", attachments: [] }));
 const notifyOpsMock = vi.fn(() => Promise.resolve());
 const fetchDailyClosesMock = vi.fn(() => Promise.resolve([{ t: new Date(), o: 1, h: 1, l: 1, c: 1, v: 1 }]));
 const fetchOHLCVMock = vi.fn(() => Promise.resolve([]));
@@ -136,6 +137,7 @@ vi.mock("../src/reporter.js", () => ({
 vi.mock("../src/discord.js", () => ({
     postAnalysis: postAnalysisMock,
     sendDiscordAlert: sendDiscordAlertMock,
+    sendDiscordAlertWithAttachments: sendDiscordAlertWithAttachmentsMock,
     postMonthlyReport: postMonthlyReportMock,
 }));
 vi.mock("../src/discordBot.js", () => ({
@@ -204,9 +206,20 @@ vi.mock("../src/forecasting.js", () => ({
     persistForecastEntry: persistForecastEntryMock,
 }));
 vi.mock("../src/portfolio/growth.js", () => ({ runPortfolioGrowthSimulation: runPortfolioGrowthSimulationMock }));
+const recordAlertMock = vi.fn();
+const recordDeliveryMock = vi.fn();
+const recordAnalysisReportMock = vi.fn();
+const recordMonthlyReportMock = vi.fn();
+const recordPortfolioGrowthMock = vi.fn();
+const recordChartUploadMock = vi.fn();
+
 vi.mock("../src/controllers/sheetsReporter.js", () => ({
-    recordAlert: vi.fn(),
-    recordDelivery: vi.fn(),
+    recordAlert: recordAlertMock,
+    recordDelivery: recordDeliveryMock,
+    recordAnalysisReport: recordAnalysisReportMock,
+    recordMonthlyReport: recordMonthlyReportMock,
+    recordPortfolioGrowth: recordPortfolioGrowthMock,
+    recordChartUpload: recordChartUploadMock,
 }));
 
 const originalArgv = [...process.argv];
@@ -224,6 +237,7 @@ describe("analysis scheduler", () => {
         runPortfolioGrowthSimulationMock.mockClear();
         postChartsMock.mockClear();
         sendDiscordAlertMock.mockClear();
+        sendDiscordAlertWithAttachmentsMock.mockClear();
         postAnalysisMock.mockClear();
         postMonthlyReportMock.mockClear();
         notifyOpsMock.mockClear();
@@ -254,6 +268,12 @@ describe("analysis scheduler", () => {
         cfgMock.analysisFrequency = "hourly";
         cfgMock.tz = "UTC";
         cfgMock.dailyReportHour = "8";
+        recordAlertMock.mockClear();
+        recordDeliveryMock.mockClear();
+        recordAnalysisReportMock.mockClear();
+        recordMonthlyReportMock.mockClear();
+        recordPortfolioGrowthMock.mockClear();
+        recordChartUploadMock.mockClear();
     });
 
     afterEach(() => {

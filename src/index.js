@@ -31,7 +31,7 @@ import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
 import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
-import { recordAlert, recordDelivery } from "./controllers/sheetsReporter.js";
+import { recordAlert, recordDelivery, recordAnalysisReport, recordMonthlyReport, recordPortfolioGrowth } from "./controllers/sheetsReporter.js";
 import { buildAssetAlertMessage, buildAssetGuidanceMessage } from "./alerts/messageBuilder.js";
 import { deriveDecisionDetails } from "./alerts/decision.js";
 import { collectVariationMetrics } from "./alerts/variationMetrics.js";
@@ -600,7 +600,21 @@ async function runOnceForAsset(asset, options = {}) {
         summary = buildSummary({ assetKey: asset.key, snapshots });
         if (enableAnalysis && shouldPostAnalysis) {
             const analysisResult = await postAnalysis(asset.key, "4h", summary);
-            if (!analysisResult?.posted) {
+            if (analysisResult?.posted) {
+                recordAnalysisReport({
+                    asset: asset.key,
+                    timeframe: "4h",
+                    webhookKey: analysisResult.webhookConfigKey,
+                    webhookUrl: analysisResult.webhookUrl,
+                    channelId: analysisResult.channelId,
+                    content: summary,
+                    attachments: analysisResult.attachments,
+                    metadata: {
+                        reportPath: analysisResult.path,
+                    },
+                    timestamp: new Date(),
+                });
+            } else {
                 const log = withContext(logger, { asset: asset.key, timeframe: '4h' });
                 log.warn({ fn: 'runOnceForAsset', reportPath: analysisResult?.path }, 'report upload failed');
             }
@@ -700,11 +714,14 @@ async function runAll() {
 
                 const timestamp = new Date();
                 const deliveryOptions = options ?? {};
-                const delivered = await sendDiscordAlert(message, deliveryOptions);
+                const deliveryResult = await sendDiscordAlert(message, deliveryOptions);
 
-                if (!delivered) {
+                if (!deliveryResult?.delivered) {
                     return;
                 }
+
+                const resolvedWebhookUrl = deliveryResult.webhookUrl ?? deliveryOptions.webhookUrl;
+                const resolvedChannelId = deliveryResult.channelId ?? deliveryOptions.channelId;
 
                 const baseRecord = {
                     asset,
@@ -713,8 +730,8 @@ async function runAll() {
                     attachments,
                     metadata,
                     webhookKey: deliveryOptions.webhookKey,
-                    webhookUrl: deliveryOptions.webhookUrl,
-                    channelId: deliveryOptions.channelId,
+                    webhookUrl: resolvedWebhookUrl,
+                    channelId: resolvedChannelId,
                     timestamp,
                 };
 
@@ -747,7 +764,7 @@ async function runAll() {
                     ? growthSummary.discord.attachments
                     : [];
                 const hasAttachments = attachments.length > 0;
-                const delivered = hasAttachments
+                const deliveryResult = hasAttachments
                     ? await sendDiscordAlertWithAttachments({
                         content: growthSummary.discord.message,
                         attachments,
@@ -758,8 +775,25 @@ async function runAll() {
                         webhookUrl: webhook,
                         channelId,
                     });
-                if (!delivered) {
+                if (!deliveryResult?.delivered) {
                     jobLog.warn('Failed to dispatch portfolio growth summary');
+                } else {
+                    const attachmentNames = attachments
+                        .map(item => (item && typeof item.filename === "string") ? item.filename : null)
+                        .filter(Boolean);
+                    recordPortfolioGrowth({
+                        asset: "PORTFOLIO",
+                        timeframe: "growth",
+                        webhookKey: CFG.portfolioGrowth.discord.webhookKey?.trim?.() || undefined,
+                        webhookUrl: deliveryResult.webhookUrl ?? webhook,
+                        channelId: deliveryResult.channelId ?? channelId,
+                        content: growthSummary.discord.message,
+                        attachments: attachmentNames,
+                        metadata: {
+                            reportPaths: growthSummary.reports,
+                        },
+                        timestamp: new Date(),
+                    });
                 }
             }
         } catch (error) {
@@ -816,6 +850,19 @@ async function runDailyAnalysis() {
             }
             const analysisResult = await postAnalysis("DAILY", "1d", finalReport);
             if (analysisResult?.posted) {
+                recordAnalysisReport({
+                    asset: "DAILY",
+                    timeframe: "1d",
+                    webhookKey: analysisResult.webhookConfigKey,
+                    webhookUrl: analysisResult.webhookUrl,
+                    channelId: analysisResult.channelId,
+                    content: finalReport,
+                    attachments: analysisResult.attachments,
+                    metadata: {
+                        reportPath: analysisResult.path,
+                    },
+                    timestamp: new Date(),
+                });
                 updateAlertHash(DAILY_ALERT_SCOPE, DAILY_ALERT_KEY, hash);
                 saveStore();
             } else {
@@ -1035,8 +1082,21 @@ async function compileMonthlyPerformanceReport() {
             lines.push(`- ${item.assetKey}: média ${item.average.toFixed(2)}% (min ${item.min.toFixed(2)}%, máx ${item.max.toFixed(2)}%, amostras=${item.count})`);
         }
         const content = lines.join("\n");
-        const posted = await postMonthlyReport({ content, filePath: chartPath });
-        if (posted) {
+        const monthlyResult = await postMonthlyReport({ content, filePath: chartPath });
+        if (monthlyResult?.posted) {
+            recordMonthlyReport({
+                asset: "PORTFOLIO",
+                timeframe: monthKey,
+                webhookKey: monthlyResult.webhookConfigKey,
+                webhookUrl: monthlyResult.webhookUrl,
+                channelId: monthlyResult.channelId,
+                content,
+                attachments: monthlyResult.attachments,
+                metadata: {
+                    chartPath,
+                },
+                timestamp: new Date(),
+            });
             updateSignature(signatureKey, monthKey);
             saveStore();
             log.info({ monthKey }, 'Monthly performance report sent.');

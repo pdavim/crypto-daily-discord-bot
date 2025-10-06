@@ -4,6 +4,7 @@
  * gráficos com previsões/alertas enriquecidos.
  */
 import { Client, GatewayIntentBits, ApplicationCommandOptionType } from "discord.js";
+import path from "path";
 import { CFG } from "./config.js";
 import { logger, withContext } from "./logger.js";
 import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
@@ -1154,6 +1155,25 @@ export async function postCharts(files) {
     try {
         const channel = await client.channels.fetch(CFG.channelChartsId);
         await channel.send({ files });
+        if (CFG?.googleSheets?.enabled) {
+            const attachmentNames = files
+                .map(file => (typeof file === "string" ? path.basename(file) : null))
+                .filter(Boolean);
+            try {
+                const { recordChartUpload } = await import("./controllers/sheetsReporter.js");
+                recordChartUpload({
+                    asset: "PORTFOLIO",
+                    timeframe: "charts",
+                    channelId: CFG.channelChartsId,
+                    content: "Chart upload",
+                    attachments: attachmentNames,
+                    metadata: { filePaths: files },
+                    timestamp: new Date(),
+                });
+            } catch (error) {
+                log.error({ fn: 'postCharts', err: error }, 'Failed to record chart upload to Sheets');
+            }
+        }
         return true;
     } catch (e) {
         log.error({ fn: 'postCharts', err: e }, 'Failed to post charts to Discord');
