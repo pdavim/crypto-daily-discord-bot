@@ -223,6 +223,9 @@ Para moderar exemplos antes de usá-los em fine-tuning:
    WHERE approved = TRUE
    ORDER BY created_at;
    ```
+4. Execute `npm run build:fine-tune` para transformar os exemplos aprovados em `data/fine-tune.jsonl`. O script consolida os snapshots e indicadores citados nas fontes locais e garante que o arquivo seja criado com final de linha apropriado.
+
+O comando pode ser executado quantas vezes for necessário; ele recria o arquivo de saída sempre que novos exemplos forem aprovados.
 
 O processo garante que apenas respostas revisadas manualmente abasteçam pipelines de fine-tuning ou RAG supervisionado, mantendo a qualidade das instruções.
 

@@ -12,6 +12,7 @@
     "test:chart": "node tests/render-chart.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --hook-timeout=20000",
+    "build:fine-tune": "node bin/buildFineTuneDataset.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "cleanup:reports": "node bin/cleanup-reports.js",
