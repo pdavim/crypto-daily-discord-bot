@@ -5,6 +5,7 @@
   - Aggregated asset alerts (`scope: aggregate`) and timeframe guidance messages (`scope: guidance`) already expose the originating webhook via optional `options.webhookUrl`; resolve this to a stable worksheet name (e.g., `alerts-general`).
   - Portfolio growth digests may post to a dedicated webhook/channel pair defined under `CFG.portfolioGrowth.discord`; treat each unique `(webhookUrl, channelId)` tuple as a worksheet (e.g., `portfolio-growth`).
   - Chart uploads posted with the bot client use `CFG.channelChartsId` instead of webhooks; reserve a worksheet such as `charts-bot` for these uploads.
+  - Trading automation events (`trading_decision`, `trading_execution`, `trading_margin`) honour `trading.logging.sheetKey` (default `trading_actions`) so they can be audited alongside Discord alerts.
 
 ## Required columns
 | Column | Description |
@@ -12,7 +13,7 @@
 | `timestamp` | ISO-8601 timestamp (UTC) when the message was submitted to Google Sheets, not Discord latency. |
 | `channel_id` | Normalized channel identifier: supplied `channelId` option, extracted webhook channel, or the bot channel ID. |
 | `webhook_url` | Raw webhook URL when available for traceability; blank for bot uploads. |
-| `message_type` | Enum covering `aggregate_alert`, `guidance_alert`, `portfolio_growth`, `chart_upload`, `analysis_report`, `monthly_report`. |
+| `message_type` | Enum covering `aggregate_alert`, `guidance_alert`, `portfolio_growth`, `chart_upload`, `analysis_report`, `monthly_report`, `trading_decision`, `trading_execution`, `trading_margin`. |
 | `asset` | Asset key when supplied by the payload (e.g., aggregate/guidance alerts). |
 | `timeframe` | Scope or timeframe label supplied with the payload (`aggregate`, `guidance`, `4h`, etc.). |
 | `content` | Markdown or plaintext body dispatched to Discord. |

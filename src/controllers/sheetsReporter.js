@@ -261,6 +261,20 @@ function recordEvent({
     enqueueRow(sheetName, row, context);
 }
 
+function resolveTradingFallbackSheet(fallback) {
+    const configured = CFG?.trading?.logging;
+    if (typeof configured?.sheetKey === "string") {
+        const trimmed = configured.sheetKey.trim();
+        if (trimmed !== "") {
+            return trimmed;
+        }
+    }
+    if (typeof fallback === "string" && fallback.trim() !== "") {
+        return fallback.trim();
+    }
+    return "trading_actions";
+}
+
 export function recordAlert({
     asset,
     timeframe,
@@ -390,6 +404,34 @@ export function recordPortfolioGrowth({
         metadata,
         messageType: "portfolio_growth",
         fallbackSheet: webhookKey || "portfolio_growth",
+        timestamp,
+    });
+}
+
+export function recordTradingEvent({
+    asset,
+    timeframe,
+    webhookKey,
+    channelId,
+    webhookUrl,
+    content,
+    attachments,
+    metadata,
+    messageType = "trading_event",
+    fallbackSheet,
+    timestamp,
+} = {}) {
+    recordEvent({
+        asset,
+        timeframe,
+        webhookKey,
+        channelId,
+        webhookUrl,
+        content,
+        attachments,
+        metadata,
+        messageType,
+        fallbackSheet: resolveTradingFallbackSheet(fallbackSheet ?? messageType),
         timestamp,
     });
 }

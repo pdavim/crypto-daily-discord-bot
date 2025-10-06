@@ -31,7 +31,7 @@ import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
 import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
-import { recordAlert, recordDelivery, recordAnalysisReport, recordMonthlyReport, recordPortfolioGrowth } from "./controllers/sheetsReporter.js";
+import { recordAlert, recordDelivery, recordAnalysisReport, recordMonthlyReport, recordPortfolioGrowth, flushSheets } from "./controllers/sheetsReporter.js";
 import { buildAssetAlertMessage, buildAssetGuidanceMessage } from "./alerts/messageBuilder.js";
 import { deriveDecisionDetails } from "./alerts/decision.js";
 import { collectVariationMetrics } from "./alerts/variationMetrics.js";
@@ -91,6 +91,31 @@ process.on('unhandledRejection', (err) => {
     const log = withContext(logger, { fn: 'unhandledRejection' });
     log.error({ err }, 'Unhandled promise rejection');
 });
+
+async function flushSheetsOnShutdown(event) {
+    if (CFG?.googleSheets?.enabled !== true) {
+        return;
+    }
+    const log = withContext(logger, { fn: 'flushSheetsOnShutdown', event });
+    try {
+        await flushSheets();
+        log.info('Flushed Google Sheets queue before shutdown');
+    } catch (error) {
+        log.error({ err: error }, 'Failed to flush Google Sheets queue during shutdown');
+    }
+}
+
+process.once('beforeExit', () => {
+    flushSheetsOnShutdown('beforeExit');
+});
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.once(signal, () => {
+        flushSheetsOnShutdown(signal).finally(() => {
+            process.exit(0);
+        });
+    });
+}
 
 initBot({ onAnalysis: handleAnalysisSlashCommand });
 

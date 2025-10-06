@@ -2,6 +2,7 @@ import { CFG } from "../config.js";
 import { logger, withContext } from "../logger.js";
 import { getMarginPositionRisk } from "./binance.js";
 import { openPosition, closePosition } from "./executor.js";
+import { reportTradingDecision } from "./notifier.js";
 
 function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -113,23 +114,55 @@ export async function automateTrading({
     const automationCfg = getAutomationConfig();
     const log = withContext(logger, { asset: assetKey ?? symbol, action: "automateTrading" });
 
+    const baseDirection = mapDecisionToDirection(decision?.decision ?? decision);
+    const baseConfidence = extractConfidence({ strategy, posture, decision });
+
+    const emitDecision = async (event) => {
+        try {
+            await reportTradingDecision({
+                assetKey,
+                symbol,
+                timeframe,
+                status: event.status,
+                action: event.action,
+                direction: event.direction ?? baseDirection,
+                reason: event.reason,
+                confidence: event.confidence ?? baseConfidence,
+                quantity: event.quantity,
+                metadata: event.metadata,
+                timestamp: event.timestamp,
+            });
+        } catch (error) {
+            log.error({ fn: "automateTrading", err: error }, "Failed to report trading decision");
+        }
+    };
+
     if (!tradingCfg.enabled || !automationCfg.enabled) {
+        await emitDecision({ status: "skipped", reason: "disabled" });
         return { skipped: true, reason: "disabled" };
     }
 
     if (typeof symbol !== "string" || symbol.length === 0) {
+        await emitDecision({ status: "skipped", reason: "missingSymbol" });
         return { skipped: true, reason: "missingSymbol" };
     }
 
     if (timeframe !== automationCfg.timeframe) {
+        await emitDecision({ status: "skipped", reason: "timeframeMismatch", metadata: { timeframe } });
         return { skipped: true, reason: "timeframeMismatch" };
     }
 
-    const direction = mapDecisionToDirection(decision?.decision ?? decision);
-    const confidence = extractConfidence({ strategy, posture, decision });
+    const direction = baseDirection;
+    const confidence = baseConfidence;
 
     if (direction !== "flat" && confidence !== null && confidence < automationCfg.minConfidence) {
         log.debug({ fn: "automateTrading", confidence }, 'Skipped trade due to low confidence');
+        await emitDecision({
+            status: "skipped",
+            reason: "lowConfidence",
+            confidence,
+            metadata: { minConfidence: automationCfg.minConfidence },
+        });
         return { skipped: true, reason: "lowConfidence", confidence };
     }
 
@@ -137,6 +170,7 @@ export async function automateTrading({
         const positions = filterActivePositions(await getMarginPositionRisk({ symbol }), automationCfg.positionEpsilon);
         const existing = findPositionForSymbol(positions, symbol, automationCfg.positionEpsilon);
         if (!existing) {
+            await emitDecision({ status: "skipped", reason: "noPosition", direction: "flat" });
             return { skipped: true, reason: "noPosition" };
         }
         const existingDirection = derivePositionDirection(existing.positionAmt, automationCfg.positionEpsilon);
@@ -149,9 +183,22 @@ export async function automateTrading({
                 metadata: { referencePrice: snapshot?.kpis?.price },
             });
             log.info({ fn: "automateTrading", direction: existingDirection }, 'Closed position after flat signal');
+            await emitDecision({
+                status: "executed",
+                action: "close",
+                direction: existingDirection,
+                quantity: Math.abs(existing.positionAmt),
+            });
             return { executed: true, action: "close", direction: existingDirection };
         } catch (err) {
             log.error({ fn: "automateTrading", err }, 'Failed to close position');
+            await emitDecision({
+                status: "error",
+                action: "close",
+                direction: existingDirection,
+                reason: "closeFailure",
+                metadata: { error: err.message },
+            });
             throw err;
         }
     }
@@ -162,6 +209,11 @@ export async function automateTrading({
 
     if (!existing && positions.length >= automationCfg.maxPositions) {
         log.warn({ fn: "automateTrading", positions: positions.length }, 'Skipped trade due to max positions');
+        await emitDecision({
+            status: "skipped",
+            reason: "maxPositions",
+            metadata: { activePositions: positions.length },
+        });
         return { skipped: true, reason: "maxPositions" };
     }
 
@@ -169,11 +221,21 @@ export async function automateTrading({
     const quantity = computeQuantity({ price, positionPct: automationCfg.positionPct });
     if (quantity === null) {
         log.warn({ fn: "automateTrading", price }, 'Skipped trade due to invalid sizing');
+        await emitDecision({
+            status: "skipped",
+            reason: "invalidSizing",
+            metadata: { price },
+        });
         return { skipped: true, reason: "invalidSizing" };
     }
 
     if (existingDirection === direction) {
         log.debug({ fn: "automateTrading", direction }, 'Position already aligned with signal');
+        await emitDecision({
+            status: "skipped",
+            reason: "alreadyAligned",
+            direction,
+        });
         return { skipped: true, reason: "alreadyAligned" };
     }
 
@@ -187,8 +249,22 @@ export async function automateTrading({
                 metadata: { referencePrice: price },
             });
             log.info({ fn: "automateTrading", from: existingDirection, to: direction }, 'Closed opposing position before reversal');
+            await emitDecision({
+                status: "executed",
+                action: "close",
+                direction: existingDirection,
+                quantity: Math.abs(existing.positionAmt),
+                metadata: { reason: "reverse" },
+            });
         } catch (err) {
             log.error({ fn: "automateTrading", err }, 'Failed to close opposing position');
+            await emitDecision({
+                status: "error",
+                action: "close",
+                direction: existingDirection,
+                reason: "reverseCloseFailure",
+                metadata: { error: err.message },
+            });
             throw err;
         }
     }
@@ -202,9 +278,24 @@ export async function automateTrading({
             metadata: { referencePrice: price },
         });
         log.info({ fn: "automateTrading", direction, quantity }, 'Opened automated position');
+        await emitDecision({
+            status: "executed",
+            action: "open",
+            direction,
+            quantity,
+            metadata: { price },
+        });
         return { executed: true, action: "open", direction, quantity };
     } catch (err) {
         log.error({ fn: "automateTrading", err }, 'Failed to open position');
+        await emitDecision({
+            status: "error",
+            action: "open",
+            direction,
+            quantity,
+            reason: "openFailure",
+            metadata: { error: err.message, price },
+        });
         throw err;
     }
 }

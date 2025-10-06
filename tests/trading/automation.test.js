@@ -15,9 +15,15 @@ vi.mock("../../src/trading/executor.js", () => ({
 
 const loggerMocks = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
+const reportTradingDecisionMock = vi.fn();
+
 vi.mock("../../src/logger.js", () => ({
     logger: loggerMocks,
     withContext: () => loggerMocks,
+}));
+
+vi.mock("../../src/trading/notifier.js", () => ({
+    reportTradingDecision: reportTradingDecisionMock,
 }));
 
 const { CFG } = await import("../../src/config.js");
@@ -29,6 +35,7 @@ describe("automated trading integration", () => {
         openPositionMock.mockReset();
         closePositionMock.mockReset();
         Object.values(loggerMocks).forEach(mock => mock.mockReset());
+        reportTradingDecisionMock.mockReset();
         CFG.trading = {
             enabled: true,
             automation: {
@@ -48,6 +55,7 @@ describe("automated trading integration", () => {
         openPositionMock.mockReset();
         closePositionMock.mockReset();
         Object.values(loggerMocks).forEach(mock => mock.mockReset());
+        reportTradingDecisionMock.mockReset();
     });
 
     it("skips when trading or automation are disabled", async () => {
@@ -63,6 +71,7 @@ describe("automated trading integration", () => {
         });
         expect(result).toEqual({ skipped: true, reason: "disabled" });
         expect(getMarginPositionRiskMock).not.toHaveBeenCalled();
+        expect(reportTradingDecisionMock).toHaveBeenCalledWith(expect.objectContaining({ status: "skipped", reason: "disabled" }));
     });
 
     it("opens a long position when confidence is sufficient", async () => {
@@ -83,6 +92,7 @@ describe("automated trading integration", () => {
         expect(call.direction).toBe("long");
         expect(call.quantity).toBeCloseTo((CFG.accountEquity * CFG.trading.automation.positionPct) / 30000, 6);
         expect(closePositionMock).not.toHaveBeenCalled();
+        expect(reportTradingDecisionMock).toHaveBeenCalledWith(expect.objectContaining({ status: "executed", action: "open" }));
     });
 
     it("closes an open position when signal turns flat", async () => {
@@ -102,6 +112,7 @@ describe("automated trading integration", () => {
         const call = closePositionMock.mock.calls[0][0];
         expect(call.direction).toBe("long");
         expect(call.quantity).toBeCloseTo(0.02);
+        expect(reportTradingDecisionMock).toHaveBeenCalledWith(expect.objectContaining({ action: "close", status: "executed" }));
     });
 
     it("reverses short positions before opening a long", async () => {
@@ -120,6 +131,8 @@ describe("automated trading integration", () => {
         expect(openPositionMock).toHaveBeenCalledTimes(1);
         expect(closePositionMock.mock.calls[0][0].direction).toBe("short");
         expect(openPositionMock.mock.calls[0][0].direction).toBe("long");
+        expect(reportTradingDecisionMock).toHaveBeenCalledWith(expect.objectContaining({ action: "close", status: "executed" }));
+        expect(reportTradingDecisionMock).toHaveBeenCalledWith(expect.objectContaining({ action: "open", status: "executed" }));
     });
 
     it("respects maximum active position limits", async () => {
@@ -138,6 +151,7 @@ describe("automated trading integration", () => {
         });
         expect(result).toEqual({ skipped: true, reason: "maxPositions" });
         expect(openPositionMock).not.toHaveBeenCalled();
+        expect(reportTradingDecisionMock).toHaveBeenCalledWith(expect.objectContaining({ reason: "maxPositions", status: "skipped" }));
     });
 
     it("skips trades when confidence is below the threshold", async () => {
@@ -153,5 +167,6 @@ describe("automated trading integration", () => {
         });
         expect(result.reason).toBe("lowConfidence");
         expect(openPositionMock).not.toHaveBeenCalled();
+        expect(reportTradingDecisionMock).toHaveBeenCalledWith(expect.objectContaining({ reason: "lowConfidence", status: "skipped" }));
     });
 });
