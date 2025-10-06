@@ -86,4 +86,19 @@ describe("postAnalysis webhook selection", () => {
         expect(result.webhookConfigKey).toBe("webhookDaily");
         expect(axiosPost).toHaveBeenCalledWith("https://discord.test/daily", { content: "analysis text" });
     });
+
+    it("returns delivery metadata needed for Sheets exports", async () => {
+        mockCFG.webhookAnalysis = "https://discord.test/api/webhooks/321/analysis";
+
+        const { postAnalysis } = await import("../../src/discord.js");
+        const result = await postAnalysis("btc", "4h", "analysis text");
+
+        expect(result).toEqual(expect.objectContaining({
+            posted: true,
+            webhookConfigKey: "webhookAnalysis",
+            webhookUrl: "https://discord.test/api/webhooks/321/analysis",
+            channelId: "321",
+            attachments: [],
+        }));
+    });
 });
