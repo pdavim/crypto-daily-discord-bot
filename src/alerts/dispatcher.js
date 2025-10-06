@@ -62,7 +62,18 @@ export function enqueueAlertPayload(payload) {
     if (!payload || !payload.message) {
         return;
     }
-    queue.push(payload);
+    const messageType = typeof payload.messageType === "string" && payload.messageType.trim() !== ""
+        ? payload.messageType.trim()
+        : undefined;
+    const metadata = payload.metadata && typeof payload.metadata === "object"
+        ? payload.metadata
+        : undefined;
+
+    queue.push({
+        ...payload,
+        ...(messageType ? { messageType } : {}),
+        ...(metadata ? { metadata } : {}),
+    });
 }
 
 export async function flushAlertQueue({ sender, timeframeOrder = [] } = {}) {

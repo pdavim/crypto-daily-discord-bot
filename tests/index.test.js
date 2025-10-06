@@ -204,6 +204,10 @@ vi.mock("../src/forecasting.js", () => ({
     persistForecastEntry: persistForecastEntryMock,
 }));
 vi.mock("../src/portfolio/growth.js", () => ({ runPortfolioGrowthSimulation: runPortfolioGrowthSimulationMock }));
+vi.mock("../src/controllers/sheetsReporter.js", () => ({
+    recordAlert: vi.fn(),
+    recordDelivery: vi.fn(),
+}));
 
 const originalArgv = [...process.argv];
 
