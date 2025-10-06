@@ -31,6 +31,7 @@ import { saveWeeklySnapshot, loadWeeklySnapshots } from "./weeklySnapshots.js";
 import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
+import { recordAlert, recordDelivery } from "./controllers/sheetsReporter.js";
 import { buildAssetAlertMessage, buildAssetGuidanceMessage } from "./alerts/messageBuilder.js";
 import { deriveDecisionDetails } from "./alerts/decision.js";
 import { collectVariationMetrics } from "./alerts/variationMetrics.js";
@@ -577,7 +578,17 @@ async function runOnceForAsset(asset, options = {}) {
                 const windowMs = CFG.alertDedupMinutes * 60 * 1000;
                 const scope = "aggregate";
                 if (shouldSend({ asset: asset.key, tf: scope, hash }, windowMs)) {
-                    enqueueAlertPayload({ asset: asset.key, timeframe: scope, message: alertMsg });
+                    enqueueAlertPayload({
+                        asset: asset.key,
+                        timeframe: scope,
+                        message: alertMsg,
+                        messageType: "aggregate_alert",
+                        metadata: {
+                            hash,
+                            timeframeSummaries,
+                            variationByTimeframe,
+                        },
+                    });
                 }
             }
         }
@@ -631,6 +642,12 @@ async function runOnceForAsset(asset, options = {}) {
                         asset: asset.key,
                         timeframe: scope,
                         message: guidanceMessage,
+                        messageType: "guidance_alert",
+                        metadata: {
+                            hash,
+                            timeframeSummaries: guidanceSummaries,
+                            variationByTimeframe,
+                        },
                         options: { webhookUrl },
                     });
                 }
@@ -670,8 +687,48 @@ async function runAll() {
             logger,
         });
         await flushAlertQueue({
-            sender: async ({ message, options }) => {
-                await sendDiscordAlert(message, options);
+            sender: async payload => {
+                const {
+                    asset,
+                    timeframe,
+                    message,
+                    messageType,
+                    metadata,
+                    attachments,
+                    options,
+                } = payload;
+
+                const timestamp = new Date();
+                const deliveryOptions = options ?? {};
+                const delivered = await sendDiscordAlert(message, deliveryOptions);
+
+                if (!delivered) {
+                    return;
+                }
+
+                const baseRecord = {
+                    asset,
+                    timeframe,
+                    content: message,
+                    attachments,
+                    metadata,
+                    webhookKey: deliveryOptions.webhookKey,
+                    webhookUrl: deliveryOptions.webhookUrl,
+                    channelId: deliveryOptions.channelId,
+                    timestamp,
+                };
+
+                if (messageType === "aggregate_alert" || messageType === "guidance_alert") {
+                    recordAlert({
+                        ...baseRecord,
+                        scope: timeframe,
+                    });
+                } else if (messageType) {
+                    recordDelivery({
+                        ...baseRecord,
+                        messageType,
+                    });
+                }
             },
             timeframeOrder: TIMEFRAMES
         });
