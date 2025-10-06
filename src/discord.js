@@ -12,6 +12,25 @@ import { buildSummaryPdf } from "./reporter.js";
 
 const REPORTS_DIR = "reports";
 
+const extractChannelId = (url, fallback = "default") => {
+    if (typeof url !== "string") {
+        return fallback;
+    }
+
+    try {
+        const parsed = new URL(url);
+        const parts = parsed.pathname.split("/").filter(Boolean);
+        const webhookIndex = parts.indexOf("webhooks");
+        if (webhookIndex !== -1 && parts.length > webhookIndex + 1) {
+            return parts[webhookIndex + 1];
+        }
+    } catch (_) {
+        // Ignore parsing errors and fall through to default fallback below.
+    }
+
+    return fallback;
+};
+
 async function saveAnalysisReport(text, { assetKey, timeframe }) {
     if (text == null) {
         return null;
@@ -80,9 +99,18 @@ export async function postAnalysis(assetKey, tf, text) {
     } catch (err) {
         log.error({ fn: 'postAnalysis', err }, 'Failed to persist analysis report');
     }
+    const channelId = url ? extractChannelId(url, "") : undefined;
+
     if (!url) {
         log.warn({ fn: 'postAnalysis', tried: filteredCandidates }, 'No Discord webhook configured for analysis posts—skipping post.');
-        return { posted: false, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
+        return {
+            posted: false,
+            path: savedReportPath,
+            webhookConfigKey: resolvedConfigKey,
+            webhookUrl: undefined,
+            channelId: undefined,
+            attachments: [],
+        };
     }
 
     const payload = { content: text };
@@ -110,26 +138,61 @@ export async function postAnalysis(assetKey, tf, text) {
                 return axios.post(url, form, { headers: form.getHeaders() });
             };
             await fetchWithRetry(sendWithPdf, { retries: 2 });
-            return { posted: true, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
+            return {
+                posted: true,
+                path: savedReportPath,
+                webhookConfigKey: resolvedConfigKey,
+                webhookUrl: url,
+                channelId,
+                attachments: pdfFilename ? [pdfFilename] : [],
+            };
         }
         await fetchWithRetry(() => axios.post(url, payload), { retries: 2 });
-        return { posted: true, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
+        return {
+            posted: true,
+            path: savedReportPath,
+            webhookConfigKey: resolvedConfigKey,
+            webhookUrl: url,
+            channelId,
+            attachments: [],
+        };
     } catch (err) {
         if (pdfBuffer) {
             log.error({ fn: 'postAnalysis', err }, 'Failed to post analysis with PDF, retrying with text only.');
             try {
                 await fetchWithRetry(() => axios.post(url, payload), { retries: 2 });
-                return { posted: true, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
+                return {
+                    posted: true,
+                    path: savedReportPath,
+                    webhookConfigKey: resolvedConfigKey,
+                    webhookUrl: url,
+                    channelId,
+                    attachments: [],
+                };
             } catch (fallbackErr) {
                 log.error({ fn: 'postAnalysis', err: fallbackErr }, 'Failed to post analysis after PDF fallback');
                 await notifyOps(`Failed to post analysis for ${assetKey} ${tf}: ${fallbackErr.message || fallbackErr}`);
-                return { posted: false, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
+                return {
+                    posted: false,
+                    path: savedReportPath,
+                    webhookConfigKey: resolvedConfigKey,
+                    webhookUrl: url,
+                    channelId,
+                    attachments: pdfFilename ? [pdfFilename] : [],
+                };
             }
         }
 
         log.error({ fn: 'postAnalysis', err }, 'Failed to post analysis after retries');
         await notifyOps(`Failed to post analysis for ${assetKey} ${tf}: ${err.message || err}`);
-        return { posted: false, path: savedReportPath, webhookConfigKey: resolvedConfigKey };
+        return {
+            posted: false,
+            path: savedReportPath,
+            webhookConfigKey: resolvedConfigKey,
+            webhookUrl: url,
+            channelId,
+            attachments: pdfFilename ? [pdfFilename] : [],
+        };
     }
 }
 
@@ -159,9 +222,16 @@ export async function postMonthlyReport({ content, filePath } = {}) {
     }
 
     const log = withContext(logger, { fn: 'postMonthlyReport', webhookConfigKey: resolvedConfigKey });
+    const channelId = url ? extractChannelId(url, "") : undefined;
     if (!url) {
         log.warn({ fn: 'postMonthlyReport', tried: candidateKeys }, 'No Discord webhook configured for monthly report.');
-        return false;
+        return {
+            posted: false,
+            webhookConfigKey: resolvedConfigKey,
+            webhookUrl: undefined,
+            channelId: undefined,
+            attachments: [],
+        };
     }
 
     let buffer;
@@ -183,35 +253,34 @@ export async function postMonthlyReport({ content, filePath } = {}) {
             form.append('payload_json', JSON.stringify(payload));
             form.append('files[0]', buffer, { filename, contentType: 'image/png' });
             await fetchWithRetry(() => axios.post(url, form, { headers: form.getHeaders() }), { retries: 2 });
-            return true;
+            return {
+                posted: true,
+                webhookConfigKey: resolvedConfigKey,
+                webhookUrl: url,
+                channelId,
+                attachments: [filename],
+            };
         }
         await fetchWithRetry(() => axios.post(url, payload), { retries: 2 });
-        return true;
+        return {
+            posted: true,
+            webhookConfigKey: resolvedConfigKey,
+            webhookUrl: url,
+            channelId,
+            attachments: [],
+        };
     } catch (err) {
         log.error({ fn: 'postMonthlyReport', err }, 'Failed to post monthly report after retries');
         await notifyOps(`Failed to post monthly report: ${err.message || err}`);
-        return false;
+        return {
+            posted: false,
+            webhookConfigKey: resolvedConfigKey,
+            webhookUrl: url,
+            channelId,
+            attachments: filename ? [filename] : [],
+        };
     }
 }
-
-const extractChannelId = (url, fallback = "default") => {
-    if (typeof url !== "string") {
-        return fallback;
-    }
-
-    try {
-        const parsed = new URL(url);
-        const parts = parsed.pathname.split("/").filter(Boolean);
-        const webhookIndex = parts.indexOf("webhooks");
-        if (webhookIndex !== -1 && parts.length > webhookIndex + 1) {
-            return parts[webhookIndex + 1];
-        }
-    } catch (_) {
-        // Ignore parsing errors and fall through to default fallback below.
-    }
-
-    return fallback;
-};
 
 /**
  * Dispatches an alert message to Discord honouring webhook rate limits.
@@ -227,6 +296,10 @@ export async function sendDiscordAlert(text, options = {}) {
     const providedChannelId = typeof options.channelId === "string" && options.channelId.trim() !== ""
         ? options.channelId
         : undefined;
+    if (!url) {
+        log.warn({ fn: 'sendDiscordAlert' }, 'No Discord webhook configured for alert delivery');
+        return { delivered: false, webhookUrl: undefined, channelId: providedChannelId };
+    }
     const channelId = providedChannelId ?? extractChannelId(url);
     alertCounter.inc();
     const end = alertHistogram.startTimer();
@@ -235,12 +308,12 @@ export async function sendDiscordAlert(text, options = {}) {
         await limit.consume(channelId);
         await fetchWithRetry(() => axios.post(url, { content: text }), { retries: 2 });
         end();
-        return true;
+        return { delivered: true, webhookUrl: url, channelId };
     } catch (err) {
         end();
         log.error({ fn: 'sendDiscordAlert', err }, 'Failed to send alert after retries');
         await notifyOps(`Failed to send alert: ${err.message || err}`);
-        return false;
+        return { delivered: false, webhookUrl: url, channelId };
     }
 }
 
@@ -275,16 +348,16 @@ export async function sendDiscordAlertWithAttachments({ content = "", attachment
     const url = webhookUrl ?? CFG.webhookAlerts ?? CFG.webhook;
     const log = withContext(logger, { fn: "sendDiscordAlertWithAttachments" });
     const providedChannelId = typeof channelId === "string" && channelId.trim() !== "" ? channelId : undefined;
-    const resolvedChannelId = providedChannelId ?? extractChannelId(url);
-
     const normalizedAttachments = Array.isArray(attachments)
         ? attachments.map((attachment, index) => normalizeAttachment(attachment, index)).filter(Boolean)
         : [];
 
     if (!url) {
         log.warn({ attachments: normalizedAttachments.length }, "No Discord webhook configured for alert with attachments");
-        return false;
+        return { delivered: false, webhookUrl: undefined, channelId: providedChannelId };
     }
+
+    const resolvedChannelId = providedChannelId ?? extractChannelId(url);
 
     if (normalizedAttachments.length === 0) {
         return sendDiscordAlert(content, { webhookUrl: url, channelId: resolvedChannelId });
@@ -308,11 +381,11 @@ export async function sendDiscordAlertWithAttachments({ content = "", attachment
             isFirst = false;
         }
         end();
-        return true;
+        return { delivered: true, webhookUrl: url, channelId: resolvedChannelId };
     } catch (err) {
         end();
         log.error({ err }, "Failed to send alert with attachments after retries");
         await notifyOps(`Failed to send alert with attachments: ${err.message || err}`);
-        return false;
+        return { delivered: false, webhookUrl: url, channelId: resolvedChannelId };
     }
 }
