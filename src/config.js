@@ -135,6 +135,14 @@ const toBoolean = (value, fallback) => {
 
 const DEFAULT_MIN_PROFIT_CONFIG = { default: 0, users: {} };
 
+const DEFAULT_GOOGLE_SHEETS_CONFIG = {
+    enabled: false,
+    spreadsheetId: null,
+    credentialsFile: null,
+    credentialsJson: null,
+    channelMap: {},
+};
+
 const parseMinimumProfitValue = (value) => {
     if (value === undefined || value === null) {
         return null;
@@ -178,6 +186,55 @@ const normalizeMinimumProfitThreshold = (raw, fallback = DEFAULT_MIN_PROFIT_CONF
     }
 
     return normalized;
+};
+
+const normalizeGoogleSheetsChannelMap = (raw, fallback = DEFAULT_GOOGLE_SHEETS_CONFIG.channelMap) => {
+    const base = isPlainObject(fallback) ? { ...fallback } : {};
+
+    if (isPlainObject(raw)) {
+        const normalized = {};
+        for (const [channelId, sheetName] of Object.entries(raw)) {
+            const normalizedChannel = typeof channelId === "string" ? channelId.trim() : String(channelId ?? "").trim();
+            const normalizedSheet = typeof sheetName === "string" ? sheetName.trim() : String(sheetName ?? "").trim();
+            if (normalizedChannel && normalizedSheet) {
+                normalized[normalizedChannel] = normalizedSheet;
+            }
+        }
+        return Object.keys(normalized).length > 0 ? normalized : base;
+    }
+
+    if (typeof raw !== "string") {
+        return base;
+    }
+
+    const value = raw.trim();
+    if (value === "") {
+        return {};
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+        if (isPlainObject(parsed)) {
+            return normalizeGoogleSheetsChannelMap(parsed, base);
+        }
+    } catch (error) {
+        // ignore and fallback to pair parsing
+    }
+
+    const normalized = {};
+    for (const pair of value.split(",")) {
+        if (!pair) {
+            continue;
+        }
+        const [channelPart, sheetPart] = pair.split(/[:=]/);
+        const channelId = channelPart?.trim();
+        const sheetName = sheetPart?.trim();
+        if (channelId && sheetName) {
+            normalized[channelId] = sheetName;
+        }
+    }
+
+    return Object.keys(normalized).length > 0 ? normalized : base;
 };
 
 const DEFAULT_TRADING_MARGIN_CONFIG = {
@@ -958,6 +1015,56 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.alerts.modules = buildAlertModuleConfig(mergedConfig.alerts?.modules ?? nextCFG.alerts?.modules ?? {});
     nextCFG.alertThresholds = clone(mergedConfig.alertThresholds ?? nextCFG.alertThresholds ?? {});
     nextCFG.discordRateLimit = buildDiscordRateLimit(mergedConfig.discordRateLimit ?? nextCFG.discordRateLimit ?? {});
+
+    const googleSheetsBase = isPlainObject(nextCFG.googleSheets) ? nextCFG.googleSheets : {};
+    const googleSheetsConfig = {
+        ...DEFAULT_GOOGLE_SHEETS_CONFIG,
+        ...googleSheetsBase,
+    };
+
+    googleSheetsConfig.enabled = toBoolean(process.env.GOOGLE_SHEETS_ENABLED, googleSheetsConfig.enabled);
+
+    const spreadsheetEnv = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+    if (typeof spreadsheetEnv === "string") {
+        const trimmed = spreadsheetEnv.trim();
+        googleSheetsConfig.spreadsheetId = trimmed === "" ? null : trimmed;
+    } else if (typeof googleSheetsConfig.spreadsheetId === "string") {
+        const trimmed = googleSheetsConfig.spreadsheetId.trim();
+        googleSheetsConfig.spreadsheetId = trimmed === "" ? null : trimmed;
+    }
+
+    const credentialsFileEnv = process.env.GOOGLE_SHEETS_CREDENTIALS_FILE;
+    if (typeof credentialsFileEnv === "string") {
+        const trimmed = credentialsFileEnv.trim();
+        googleSheetsConfig.credentialsFile = trimmed === "" ? null : trimmed;
+    } else if (typeof googleSheetsConfig.credentialsFile === "string") {
+        const trimmed = googleSheetsConfig.credentialsFile.trim();
+        googleSheetsConfig.credentialsFile = trimmed === "" ? null : trimmed;
+    }
+
+    if (process.env.GOOGLE_SHEETS_CREDENTIALS_JSON !== undefined) {
+        const rawCredentials = process.env.GOOGLE_SHEETS_CREDENTIALS_JSON;
+        if (typeof rawCredentials === "string") {
+            const trimmed = rawCredentials.trim();
+            googleSheetsConfig.credentialsJson = trimmed === "" ? null : trimmed;
+        } else {
+            googleSheetsConfig.credentialsJson = null;
+        }
+    } else if (googleSheetsConfig.credentialsJson == null) {
+        googleSheetsConfig.credentialsJson = null;
+    }
+
+    const channelMapEnv = process.env.GOOGLE_SHEETS_CHANNEL_MAP;
+    if (channelMapEnv !== undefined) {
+        googleSheetsConfig.channelMap = normalizeGoogleSheetsChannelMap(channelMapEnv, googleSheetsConfig.channelMap);
+    } else {
+        googleSheetsConfig.channelMap = normalizeGoogleSheetsChannelMap(
+            googleSheetsConfig.channelMap,
+            DEFAULT_GOOGLE_SHEETS_CONFIG.channelMap,
+        );
+    }
+
+    nextCFG.googleSheets = googleSheetsConfig;
 
     loadSettings({
         riskPerTrade: nextCFG.riskPerTrade,
