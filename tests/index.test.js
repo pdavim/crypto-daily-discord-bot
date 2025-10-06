@@ -325,6 +325,135 @@ describe("analysis scheduler", () => {
 
         expect(scheduleMock).not.toHaveBeenCalled();
     });
+
+    it("invokes the Sheets controller with delivery metadata when exports are enabled", async () => {
+        cfgMock.googleSheets = { enabled: true };
+        cfgMock.enableAnalysis = true;
+        cfgMock.enableReports = true;
+        cfgMock.enableAlerts = true;
+        cfgMock.portfolioGrowth.discord = {
+            enabled: true,
+            webhookUrl: "https://discord.test/portfolio",
+            channelId: "654",
+            webhookKey: "portfolioWebhook",
+        };
+
+        const alertPayload = {
+            asset: "BTC",
+            timeframe: "aggregate",
+            message: "Alert message",
+            messageType: "aggregate_alert",
+            metadata: { source: "alerts" },
+            attachments: ["chart.png"],
+            options: {
+                webhookKey: "alertsWebhook",
+                webhookUrl: "https://discord.test/custom-alerts",
+                channelId: "123",
+            },
+        };
+        const deliveryPayload = {
+            asset: "BTC",
+            timeframe: "1h",
+            message: "Delivery message",
+            messageType: "custom_event",
+            metadata: { id: "evt-1" },
+            attachments: [],
+            options: {
+                webhookKey: "customWebhook",
+                webhookUrl: "https://discord.test/custom-delivery",
+                channelId: "999",
+            },
+        };
+
+        flushAlertQueueMock.mockImplementationOnce(async ({ sender }) => {
+            await sender(alertPayload);
+            await sender(deliveryPayload);
+        });
+        sendDiscordAlertMock.mockResolvedValue({ delivered: true, webhookUrl: "https://discord.test/alerts", channelId: "789" });
+        sendDiscordAlertWithAttachmentsMock.mockResolvedValue({ delivered: true, webhookUrl: "https://discord.test/portfolio", channelId: "654" });
+
+        postAnalysisMock.mockResolvedValue({
+            posted: true,
+            webhookConfigKey: "webhookAnalysis_BTC",
+            webhookUrl: "https://discord.test/analysis",
+            channelId: "321",
+            attachments: ["analysis.pdf"],
+            path: "reports/2024-01-01.txt",
+        });
+
+        runPortfolioGrowthSimulationMock.mockResolvedValue({
+            discord: {
+                message: "Portfolio growth summary",
+                attachments: [{ filename: "growth-1.png" }, { filename: "growth-2.png" }],
+            },
+            uploads: [],
+            reports: ["reports/growth.csv"],
+        });
+
+        fetchDailyClosesMock.mockResolvedValue([
+            { t: new Date("2024-01-01T00:00:00Z"), o: 1, h: 1, l: 1, c: 1, v: 1 },
+            { t: new Date("2024-01-02T00:00:00Z"), o: 1, h: 1, l: 1, c: 1, v: 1 },
+        ]);
+        getSignatureMock.mockImplementation((key) => (key === "DAILY:1d" ? 0 : null));
+        getAlertHashMock.mockReturnValue(null);
+        buildHashMock.mockReturnValue("daily-hash");
+
+        await import("../src/index.js");
+
+        const analysisTask = scheduledTasks.find((task) => task.expression === "0 * * * *");
+        expect(analysisTask).toBeDefined();
+        await analysisTask?.handler();
+
+        expect(recordAlertMock).toHaveBeenCalledWith(expect.objectContaining({
+            asset: "BTC",
+            timeframe: "aggregate",
+            scope: "aggregate",
+            content: "Alert message",
+            attachments: ["chart.png"],
+            metadata: { source: "alerts" },
+            webhookKey: "alertsWebhook",
+            webhookUrl: "https://discord.test/alerts",
+            channelId: "789",
+            timestamp: expect.any(Date),
+        }));
+        expect(recordDeliveryMock).toHaveBeenCalledWith(expect.objectContaining({
+            asset: "BTC",
+            timeframe: "1h",
+            messageType: "custom_event",
+            content: "Delivery message",
+            metadata: { id: "evt-1" },
+            webhookKey: "customWebhook",
+            webhookUrl: "https://discord.test/alerts",
+            channelId: "789",
+            timestamp: expect.any(Date),
+        }));
+        expect(recordPortfolioGrowthMock).toHaveBeenCalledWith(expect.objectContaining({
+            asset: "PORTFOLIO",
+            timeframe: "growth",
+            webhookKey: "portfolioWebhook",
+            webhookUrl: "https://discord.test/portfolio",
+            channelId: "654",
+            content: "Portfolio growth summary",
+            attachments: ["growth-1.png", "growth-2.png"],
+            metadata: { reportPaths: ["reports/growth.csv"] },
+            timestamp: expect.any(Date),
+        }));
+
+        const dailyTask = scheduledTasks.find((task) => task.expression === `0 ${cfgMock.dailyReportHour} * * *`);
+        expect(dailyTask).toBeDefined();
+        await dailyTask?.handler();
+
+        expect(recordAnalysisReportMock).toHaveBeenCalledWith(expect.objectContaining({
+            asset: "DAILY",
+            timeframe: "1d",
+            webhookKey: "webhookAnalysis_BTC",
+            webhookUrl: "https://discord.test/analysis",
+            channelId: "321",
+            attachments: ["analysis.pdf"],
+            content: expect.stringContaining("report"),
+            timestamp: expect.any(Date),
+        }));
+    });
 });
 
 describe("job logging", () => {
