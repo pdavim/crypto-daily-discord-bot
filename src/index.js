@@ -40,6 +40,7 @@ import { evaluateMarketPosture, deriveStrategyFromPosture } from "./trading/post
 import { automateTrading } from "./trading/automation.js";
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
 import { runPortfolioGrowthSimulation } from "./portfolio/growth.js";
+import { ingestPosts, ingestReports, ingestInteractions } from "./ingest.js";
 
 const ONCE = process.argv.includes("--once");
 
@@ -1182,6 +1183,41 @@ if (!ONCE) {
     });
     const scheduleLog = withContext(logger);
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const ragCronExpression = typeof CFG?.rag?.ingestCron === "string"
+        ? CFG.rag.ingestCron.trim()
+        : "";
+    if (ragCronExpression) {
+        cron.schedule(ragCronExpression, async () => {
+            const jobLog = withContext(logger, { fn: 'ragIngestJob', cron: ragCronExpression });
+            jobLog.info('Starting scheduled RAG ingestion');
+            try {
+                const tasks = [
+                    { scope: 'posts', run: ingestPosts },
+                    { scope: 'reports', run: ingestReports },
+                    { scope: 'interactions', run: ingestInteractions },
+                ];
+                const results = await Promise.allSettled(tasks.map(({ run }) => run()));
+                const summary = {};
+                for (let index = 0; index < tasks.length; index += 1) {
+                    const { scope } = tasks[index];
+                    const result = results[index];
+                    if (result.status === 'fulfilled') {
+                        summary[scope] = result.value;
+                        jobLog.info({ scope, result: result.value }, `Completed ${scope} ingestion step`);
+                    } else {
+                        summary[scope] = null;
+                        jobLog.error({ scope, err: result.reason }, `Failed ${scope} ingestion step`);
+                    }
+                }
+                jobLog.info({ summary }, 'Completed scheduled RAG ingestion');
+            } catch (error) {
+                jobLog.error({ err: error }, 'Scheduled RAG ingestion failed');
+            }
+        }, { timezone: CFG.tz });
+        scheduleLog.info({ fn: 'schedule', channel: 'rag' }, `📚 Scheduled RAG ingestion (cron=${ragCronExpression}, TZ=${CFG.tz})`);
+    } else {
+        scheduleLog.info({ fn: 'schedule', channel: 'rag' }, '⏸️ RAG ingestion schedule disabled');
+    }
     const analysisSchedule = resolveAnalysisSchedule(CFG.analysisFrequency);
     if (analysisSchedule.alias) {
         scheduleLog.info({ fn: 'schedule', provided: analysisSchedule.alias, normalized: analysisSchedule.key }, `ℹ️ Normalized analysis frequency "${analysisSchedule.alias}" to "${analysisSchedule.key}".`);
