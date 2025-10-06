@@ -27,7 +27,8 @@ import {
 } from "./minimumProfit.js";
 import { getAccountOverview, submitOrder } from "./trading/binance.js";
 import { openPosition, adjustMargin } from "./trading/executor.js";
-import { answerWithRAG, recordFeedback } from "./rag.js";
+import { answerWithRAG } from "./rag.js";
+import { recordFeedback, recordInteraction } from "./feedback.js";
 
 
 const startTime = Date.now();
@@ -67,7 +68,7 @@ function truncateDiscordMessage(content) {
     return `${content.slice(0, DISCORD_MESSAGE_LIMIT - 1)}…`;
 }
 
-function formatAskSources(sources) {
+function collectAskSourceStrings(sources) {
     if (!Array.isArray(sources)) {
         return [];
     }
@@ -77,14 +78,14 @@ function formatAskSources(sources) {
                 return null;
             }
             const trimmed = sourceEntry.source.trim();
-            if (!trimmed) {
-                return null;
-            }
-            const label = trimmed;
-            const url = trimmed.startsWith("http://") || trimmed.startsWith("https://") ? trimmed : trimmed;
-            return { label, url };
+            return trimmed ? trimmed : null;
         })
         .filter(Boolean);
+}
+
+function formatAskSources(sources) {
+    return collectAskSourceStrings(sources)
+        .map(value => ({ label: value, url: value }));
 }
 
 function buildAskResponseContent(question, answer, sources) {
@@ -947,8 +948,18 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
         const log = withContext(logger, { fn: 'handleInteraction', command: 'ask' });
         try {
             const { answer, sources } = await answerWithRAG(question);
+            const sourceStrings = collectAskSourceStrings(sources);
             const content = buildAskResponseContent(displayQuestion, answer, sources);
             await interaction.editReply({ content, components: buildAskFeedbackComponents() });
+            try {
+                await recordInteraction({
+                    question: displayQuestion,
+                    answer,
+                    sources: sourceStrings,
+                });
+            } catch (interactionError) {
+                log.warn({ err: interactionError }, 'Failed to persist ask interaction');
+            }
         } catch (error) {
             log.error({ err: error }, 'Failed to answer ask command');
             await interaction.editReply('😔 Não consegui gerar uma resposta agora. Tente novamente mais tarde.');

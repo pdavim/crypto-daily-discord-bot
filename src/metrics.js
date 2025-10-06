@@ -117,3 +117,32 @@ export const googleSheetsAppendCounter = new Counter({
     labelNames: SHEETS_LABELS,
     registers: [register],
 });
+
+const wrapCounterWithSnapshot = (counter) => {
+    const asyncGet = counter.get.bind(counter);
+    counter.getAsync = asyncGet;
+    counter.get = () => ({
+        name: counter.name,
+        help: counter.help,
+        type: counter.type,
+        aggregator: counter.aggregator ?? 'sum',
+        values: Object.values(counter.hashMap ?? {}).map(({ value, labels }) => ({
+            value,
+            labels,
+        })),
+    });
+    return counter;
+};
+
+export const feedbackInteractionCounter = wrapCounterWithSnapshot(new Counter({
+    name: 'app_feedback_interactions_total',
+    help: 'Total number of /ask interactions stored for feedback review',
+    registers: [register],
+}));
+
+export const feedbackRatingCounter = wrapCounterWithSnapshot(new Counter({
+    name: 'app_feedback_ratings_total',
+    help: 'Total number of feedback ratings received for /ask responses',
+    labelNames: ['rating'],
+    registers: [register],
+}));

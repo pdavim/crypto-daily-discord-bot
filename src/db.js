@@ -5,18 +5,19 @@ import { logger, withContext } from "./logger.js";
 
 const { Pool } = pg;
 
-try {
-    registerVectorType(pg);
-} catch (error) {
-    const log = withContext(logger);
-    log.warn({ fn: "db.registerVector", err: error }, "Failed to register pgvector type parser; proceeding without custom handler.");
-}
-
 let pool;
 let activeConnectionString;
 
 const createPool = (connectionString) => {
     const instance = new Pool({ connectionString });
+    instance.on("connect", async (client) => {
+        const log = withContext(logger);
+        try {
+            await registerVectorType(client);
+        } catch (error) {
+            log.warn({ fn: "db.registerVector", err: error }, "Failed to register pgvector type parser for connection.");
+        }
+    });
     instance.on("error", (error) => {
         const log = withContext(logger);
         log.error({ fn: "db.pool", err: error }, "Unexpected error emitted by Postgres pool.");

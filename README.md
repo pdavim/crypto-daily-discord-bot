@@ -198,6 +198,34 @@ O comando `/status` agora adiciona uma seção `🔮` para cada ativo da sua wat
 
 Quando ainda não há histórico para um timeframe específico, o bot mostra `—`, reforçando que nenhuma previsão foi persistida para aquele horizonte.
 
+## Feedback do `/ask` e preparação para fine-tuning
+
+O fluxo do comando `/ask` grava cada resposta em uma tabela Postgres `feedback` com as colunas `id`, `question`, `answer`, `sources`, `rating`, `approved` e `created_at`. Assim que a mensagem é enviada ao usuário, o bot chama `recordInteraction` para persistir a pergunta, a resposta e as fontes; quando alguém clica nos botões 👍/👎 o `recordFeedback` atualiza a mesma linha com a avaliação e expõe contadores em `/metrics` (`app_feedback_interactions_total` e `app_feedback_ratings_total{rating="up|down"}`).
+
+Para moderar exemplos antes de usá-los em fine-tuning:
+
+1. Revise as interações recentes filtrando avaliações pendentes:
+   ```sql
+   SELECT id, question, answer, sources, rating, created_at
+   FROM feedback
+   WHERE rating IS NOT NULL AND COALESCE(approved, FALSE) = FALSE
+   ORDER BY created_at DESC;
+   ```
+2. Valide se a resposta está correta, cita fontes adequadas e segue o tom desejado.
+   Se estiver tudo certo, aprove com:
+   ```sql
+   UPDATE feedback SET approved = TRUE WHERE id = <id>;
+   ```
+3. Gere o dataset de treinamento lendo apenas os exemplos aprovados via `listApprovedExamples()` ou diretamente no banco:
+   ```sql
+   SELECT question, answer, sources
+   FROM feedback
+   WHERE approved = TRUE
+   ORDER BY created_at;
+   ```
+
+O processo garante que apenas respostas revisadas manualmente abasteçam pipelines de fine-tuning ou RAG supervisionado, mantendo a qualidade das instruções.
+
 ### Ajuda paginada no Discord
 
 - O comando `/help` agora fraciona a resposta em múltiplas mensagens efêmeras sempre que a listagem completa ultrapassar o limite de 2 000 caracteres imposto pelo Discord.
