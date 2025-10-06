@@ -63,3 +63,17 @@ export const tradingNotionalHistogram = new Histogram({
   buckets: [10, 25, 50, 100, 250, 500, 1_000, 5_000, 10_000, 50_000, 100_000],
   registers: [register],
 });
+
+export const googleSheetsAppendCounter = new Counter({
+  name: 'app_google_sheets_appended_rows_total',
+  help: 'Total number of rows appended to Google Sheets',
+  labelNames: ['sheet'],
+  registers: [register],
+});
+
+export const googleSheetsAppendFailureCounter = new Counter({
+  name: 'app_google_sheets_append_failures_total',
+  help: 'Total number of Google Sheets append failures',
+  labelNames: ['sheet'],
+  registers: [register],
+});
