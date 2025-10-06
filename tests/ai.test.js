@@ -156,9 +156,20 @@ describe("ai module", () => {
     it("combines indicators, alerts and context when data is available", async () => {
         mockAssets.push({ key: "BTC", binance: "BTCUSDT" });
         const { runAgent } = await import("../src/ai.js");
+        const { getAssetNews } = await import("../src/news.js");
         const output = await runAgent();
+
         expect(output).toContain("**Alert Status:**");
         expect(output).toContain("Mock alert");
+        expect(output).toContain("News for BTC");
+        expect(output).toContain("- Weighted sentiment: 0.32");
+        expect(output).toContain("**Macro**");
+        expect(output).toContain("News for crypto market");
         expect(output).toContain("_This report is for educational purposes only");
+
+        expect(getAssetNews).toHaveBeenCalledWith({ symbol: "crypto market" });
+        const assetNewsCalls = getAssetNews.mock.calls.filter(([params]) => params.symbol !== "crypto market");
+        expect(assetNewsCalls).toHaveLength(1);
+        expect(assetNewsCalls[0][0]).toMatchObject({ symbol: "BTC" });
     });
 });
