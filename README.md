@@ -249,6 +249,20 @@ Para manter os canais organizados, configure webhooks específicos para cada tip
 - `webhookDaily` permanece reservado para o resumo diário (`assetKey === 'DAILY'`) quando não há canais de análise configurados.
 - `webhookMonthly` direciona o relatório mensal com gráficos anexados.
 
+## Recuperação aumentada por geração (RAG)
+
+O bloco `rag` de `config/default.json` organiza as integrações de busca vetorial utilizadas pelos agentes de IA:
+
+- `pgUrl` define a URL de conexão com o Postgres que possui a extensão `pgvector` habilitada.
+- `embeddingModel` indica o modelo responsável por gerar os vetores (`RAG_EMBEDDING_MODEL`).
+- `chunkSize` e `chunkOverlap` controlam o fracionamento dos textos antes da vetorização, via utilitário compatível com ESM (`@langchain/textsplitters`).
+- `ingestCron` agenda a rotina de ingestão automática; sobrescreva com `RAG_INGEST_CRON` para ajustar a cadência.
+- `searchLimit` limita a quantidade de chunks retornados em buscas (`RAG_SEARCH_LIMIT`).
+- `activeModel` registra o modelo atual usado para responder consultas (`RAG_ACTIVE_MODEL`).
+- `candidateModel` guarda o modelo em avaliação para experimentos A/B (`RAG_CANDIDATE_MODEL`).
+
+As mesmas chaves podem ser definidas por variáveis de ambiente `RAG_*`, que prevalecem sobre `config/custom.json` em tempo de execução.
+
 ## Monitoramento e relatórios
 
 - As entradas de deduplicação de alertas são expurgadas diariamente e também no start do processo, mantendo o cache coerente entre execuções longas e jobs efêmeros.
