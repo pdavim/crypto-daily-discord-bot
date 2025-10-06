@@ -143,6 +143,15 @@ const DEFAULT_GOOGLE_SHEETS_CONFIG = {
     channelMap: {},
 };
 
+const DEFAULT_NEWS_DIGEST_CONFIG = {
+    enabled: false,
+    cron: "0 9 * * *",
+    webhookUrl: null,
+    channelId: null,
+    sheetMapKey: "newsDigest",
+    sheetFallback: "news_digest",
+};
+
 const parseMinimumProfitValue = (value) => {
     if (value === undefined || value === null) {
         return null;
@@ -268,6 +277,73 @@ const DEFAULT_TRADING_CONFIG = {
     strategy: DEFAULT_TRADING_STRATEGY_CONFIG,
     discord: DEFAULT_TRADING_DISCORD_CONFIG,
     logging: DEFAULT_TRADING_LOGGING_CONFIG,
+};
+
+const buildNewsDigestConfig = (baseConfig = {}) => {
+    const base = isPlainObject(baseConfig) ? baseConfig : {};
+    const config = {
+        ...DEFAULT_NEWS_DIGEST_CONFIG,
+        ...base,
+    };
+
+    config.enabled = toBoolean(process.env.NEWS_DIGEST_ENABLED, config.enabled);
+
+    const cronEnv = process.env.NEWS_DIGEST_CRON;
+    if (typeof cronEnv === "string") {
+        const trimmed = cronEnv.trim();
+        config.cron = trimmed === "" ? DEFAULT_NEWS_DIGEST_CONFIG.cron : trimmed;
+    } else if (typeof config.cron === "string") {
+        const trimmed = config.cron.trim();
+        config.cron = trimmed === "" ? DEFAULT_NEWS_DIGEST_CONFIG.cron : trimmed;
+    } else {
+        config.cron = DEFAULT_NEWS_DIGEST_CONFIG.cron;
+    }
+
+    const webhookEnv = process.env.NEWS_DIGEST_WEBHOOK_URL;
+    if (typeof webhookEnv === "string") {
+        const trimmed = webhookEnv.trim();
+        config.webhookUrl = trimmed === "" ? null : trimmed;
+    } else if (typeof config.webhookUrl === "string") {
+        const trimmed = config.webhookUrl.trim();
+        config.webhookUrl = trimmed === "" ? null : trimmed;
+    } else {
+        config.webhookUrl = null;
+    }
+
+    const channelEnv = process.env.NEWS_DIGEST_CHANNEL_ID;
+    if (typeof channelEnv === "string") {
+        const trimmed = channelEnv.trim();
+        config.channelId = trimmed === "" ? null : trimmed;
+    } else if (typeof config.channelId === "string") {
+        const trimmed = config.channelId.trim();
+        config.channelId = trimmed === "" ? null : trimmed;
+    } else {
+        config.channelId = null;
+    }
+
+    const sheetKeyEnv = process.env.NEWS_DIGEST_SHEET_MAP_KEY;
+    if (typeof sheetKeyEnv === "string") {
+        const trimmed = sheetKeyEnv.trim();
+        config.sheetMapKey = trimmed === "" ? DEFAULT_NEWS_DIGEST_CONFIG.sheetMapKey : trimmed;
+    } else if (typeof config.sheetMapKey === "string") {
+        const trimmed = config.sheetMapKey.trim();
+        config.sheetMapKey = trimmed === "" ? DEFAULT_NEWS_DIGEST_CONFIG.sheetMapKey : trimmed;
+    } else {
+        config.sheetMapKey = DEFAULT_NEWS_DIGEST_CONFIG.sheetMapKey;
+    }
+
+    const sheetFallbackEnv = process.env.NEWS_DIGEST_SHEET_FALLBACK;
+    if (typeof sheetFallbackEnv === "string") {
+        const trimmed = sheetFallbackEnv.trim();
+        config.sheetFallback = trimmed === "" ? DEFAULT_NEWS_DIGEST_CONFIG.sheetFallback : trimmed;
+    } else if (typeof config.sheetFallback === "string") {
+        const trimmed = config.sheetFallback.trim();
+        config.sheetFallback = trimmed === "" ? DEFAULT_NEWS_DIGEST_CONFIG.sheetFallback : trimmed;
+    } else {
+        config.sheetFallback = DEFAULT_NEWS_DIGEST_CONFIG.sheetFallback;
+    }
+
+    return config;
 };
 
 const DEFAULT_MARKET_POSTURE_CONFIG = {
@@ -1130,6 +1206,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     }
 
     nextCFG.googleSheets = googleSheetsConfig;
+    nextCFG.newsDigest = buildNewsDigestConfig(nextCFG.newsDigest);
 
     loadSettings({
         riskPerTrade: nextCFG.riskPerTrade,

@@ -32,6 +32,7 @@ import { renderMonthlyPerformanceChart } from "./monthlyReport.js";
 import { runAssetsSafely } from "./runner.js";
 import { enqueueAlertPayload, flushAlertQueue } from "./alerts/dispatcher.js";
 import { recordAlert, recordDelivery, recordAnalysisReport, recordMonthlyReport, recordPortfolioGrowth, flushSheets } from "./controllers/sheetsReporter.js";
+import { dispatchNewsDigest } from "./controllers/newsDigest.js";
 import { buildAssetAlertMessage, buildAssetGuidanceMessage } from "./alerts/messageBuilder.js";
 import { deriveDecisionDetails } from "./alerts/decision.js";
 import { collectVariationMetrics } from "./alerts/variationMetrics.js";
@@ -1220,6 +1221,34 @@ if (!ONCE) {
     scheduleLog.info({ fn: 'schedule' }, `⏱️ Scheduled weekly snapshot at 18h Sunday (TZ=${CFG.tz})`);
     cron.schedule('0 1 1 * *', compileMonthlyPerformanceReport, { timezone: CFG.tz });
     scheduleLog.info({ fn: 'schedule' }, `📈 Scheduled monthly performance report on day 1 at 01h (TZ=${CFG.tz})`);
+    if (CFG?.newsDigest?.enabled) {
+        const cronExpression = typeof CFG.newsDigest.cron === 'string' && CFG.newsDigest.cron.trim() !== ''
+            ? CFG.newsDigest.cron.trim()
+            : '0 9 * * *';
+        cron.schedule(cronExpression, async () => {
+            const jobLog = withContext(logger, { fn: 'newsDigestJob', cron: cronExpression });
+            const startedAt = Date.now();
+            jobLog.info('Starting scheduled news digest run');
+            try {
+                const result = await dispatchNewsDigest();
+                if (result?.delivery?.delivered) {
+                    try {
+                        await flushSheets();
+                        jobLog.info('Flushed Google Sheets queue after news digest delivery');
+                    } catch (flushError) {
+                        jobLog.error({ err: flushError }, 'Failed to flush Google Sheets queue after news digest delivery');
+                    }
+                }
+                const durationMs = Date.now() - startedAt;
+                jobLog.info({ durationMs }, 'Completed scheduled news digest run');
+            } catch (error) {
+                jobLog.error({ err: error }, 'Scheduled news digest run failed');
+            }
+        }, { timezone: CFG.tz });
+        scheduleLog.info({ fn: 'schedule', channel: 'newsDigest' }, `📰 Scheduled news digest (cron=${cronExpression}, TZ=${CFG.tz})`);
+    } else {
+        scheduleLog.info({ fn: 'schedule', channel: 'newsDigest' }, '⏸️ News digest schedule disabled');
+    }
     cron.schedule('0 0 * * 0', () => {
         const log = withContext(logger, { fn: 'resetAlertHashesJob' });
         resetAlertHashes();

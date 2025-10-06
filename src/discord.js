@@ -389,3 +389,40 @@ export async function sendDiscordAlertWithAttachments({ content = "", attachment
         return { delivered: false, webhookUrl: url, channelId: resolvedChannelId };
     }
 }
+
+export async function postNewsDigest({ content = "", webhookUrl, channelId } = {}) {
+    const log = withContext(logger, { fn: "postNewsDigest" });
+    const configuredWebhook = typeof CFG?.newsDigest?.webhookUrl === "string"
+        ? CFG.newsDigest.webhookUrl.trim()
+        : "";
+    const resolvedWebhook = typeof webhookUrl === "string" && webhookUrl.trim() !== ""
+        ? webhookUrl.trim()
+        : configuredWebhook !== ""
+            ? configuredWebhook
+            : null;
+
+    const configuredChannelId = typeof CFG?.newsDigest?.channelId === "string"
+        ? CFG.newsDigest.channelId.trim()
+        : "";
+    const resolvedChannelId = typeof channelId === "string" && channelId.trim() !== ""
+        ? channelId.trim()
+        : configuredChannelId !== ""
+            ? configuredChannelId
+            : undefined;
+
+    if (!resolvedWebhook) {
+        log.warn('No Discord webhook configured for news digest delivery');
+        return { delivered: false, webhookUrl: undefined, channelId: resolvedChannelId };
+    }
+
+    const result = await sendDiscordAlert(content, {
+        webhookUrl: resolvedWebhook,
+        channelId: resolvedChannelId,
+    });
+
+    if (result?.delivered) {
+        log.info({ channelId: result.channelId ?? resolvedChannelId }, 'Delivered news digest to Discord');
+    }
+
+    return result;
+}
