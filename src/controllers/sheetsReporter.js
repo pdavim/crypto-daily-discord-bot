@@ -1,6 +1,14 @@
 import { CFG } from "../config.js";
 import { appendRows } from "../googleSheets.js";
 import { logger, withContext } from "../logger.js";
+import {
+    googleSheetsAppendAttemptCounter,
+    googleSheetsAppendAttemptDurationHistogram,
+    googleSheetsAppendFailureCounter,
+    googleSheetsAppendFailureDurationHistogram,
+    googleSheetsAppendSuccessCounter,
+    googleSheetsAppendSuccessDurationHistogram,
+} from "../metrics.js";
 import { fetchWithRetry } from "../utils.js";
 
 const BATCH_SIZE = 20;
@@ -176,15 +184,25 @@ async function flushSheet(sheetName) {
     const contexts = entries.map(entry => entry.context).filter(Boolean);
     const log = withContext(logger, { fn: "flushSheet", sheet: sheetName });
 
+    const metricsLabels = { sheet: sheetName, source: "sheetsReporter" };
+    const assets = Array.from(new Set(contexts.map(ctx => ctx?.asset).filter(Boolean)));
+    googleSheetsAppendAttemptCounter.inc(metricsLabels);
+    const stopAttemptTimer = googleSheetsAppendAttemptDurationHistogram.startTimer(metricsLabels);
+
     const flushPromise = (async () => {
         try {
             await fetchWithRetry(() => appendRows({ sheetName, rows }), { retries: 2, baseDelay: 1_000 });
-            const assets = Array.from(new Set(contexts.map(ctx => ctx?.asset).filter(Boolean)));
-            log.info({ rows: rows.length, assets }, 'Flushed Google Sheets rows');
+            const duration = stopAttemptTimer();
+            googleSheetsAppendSuccessCounter.inc(metricsLabels);
+            googleSheetsAppendSuccessDurationHistogram.observe(metricsLabels, duration);
+            log.info({ rows: rows.length, assets, duration }, 'Flushed Google Sheets rows');
         } catch (error) {
+            const duration = stopAttemptTimer();
+            googleSheetsAppendFailureCounter.inc(metricsLabels);
+            googleSheetsAppendFailureDurationHistogram.observe(metricsLabels, duration);
             const currentQueue = queue.get(sheetName) ?? [];
             queue.set(sheetName, [...entries, ...currentQueue]);
-            log.error({ err: error, rows: rows.length }, 'Failed to flush Google Sheets rows');
+            log.error({ err: error, rows: rows.length, assets, duration }, 'Failed to flush Google Sheets rows');
             scheduleFlush(sheetName);
             throw error;
         } finally {

@@ -3,7 +3,15 @@ import { google } from "googleapis";
 import { CFG } from "./config.js";
 import { fetchWithRetry } from "./utils.js";
 import { logger, withContext } from "./logger.js";
-import { googleSheetsAppendCounter, googleSheetsAppendFailureCounter } from "./metrics.js";
+import {
+    googleSheetsAppendAttemptCounter,
+    googleSheetsAppendAttemptDurationHistogram,
+    googleSheetsAppendCounter,
+    googleSheetsAppendFailureCounter,
+    googleSheetsAppendFailureDurationHistogram,
+    googleSheetsAppendSuccessCounter,
+    googleSheetsAppendSuccessDurationHistogram,
+} from "./metrics.js";
 
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 let sheetsClientPromise;
@@ -116,7 +124,9 @@ export async function appendRows({
     }
 
     const client = await loadSheetsClient({ log });
-    const labels = { sheet: sheetName };
+    const labels = { sheet: sheetName, source: "googleSheets" };
+    googleSheetsAppendAttemptCounter.inc(labels);
+    const stopAttemptTimer = googleSheetsAppendAttemptDurationHistogram.startTimer(labels);
 
     try {
         const response = await fetchWithRetry(async () => client.spreadsheets.values.append({
@@ -126,12 +136,26 @@ export async function appendRows({
             insertDataOption,
             requestBody: { values: rows },
         }));
+        const duration = stopAttemptTimer();
+        googleSheetsAppendSuccessCounter.inc(labels);
+        googleSheetsAppendSuccessDurationHistogram.observe(labels, duration);
         googleSheetsAppendCounter.inc(labels, rows.length);
-        log.info({ fn: "appendRows", sheet: sheetName, rows: rows.length }, 'Appended rows to Google Sheets');
+        log.info({ fn: "appendRows", sheet: sheetName, rows: rows.length, duration }, 'Appended rows to Google Sheets');
         return response;
     } catch (error) {
+        const duration = stopAttemptTimer();
         googleSheetsAppendFailureCounter.inc(labels);
-        log.error({ fn: "appendRows", err: error, sheet: sheetName }, 'Failed to append rows to Google Sheets');
+        googleSheetsAppendFailureDurationHistogram.observe(labels, duration);
+        log.error({
+            fn: "appendRows",
+            err: error,
+            sheet: sheetName,
+            spreadsheetId,
+            rows: rows.length,
+            duration,
+            valueInputOption,
+            insertDataOption,
+        }, 'Failed to append rows to Google Sheets');
         throw error;
     }
 }
