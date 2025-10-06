@@ -1,9 +1,42 @@
-import pg from "pg";
-import { registerType as registerVectorType } from "pgvector/pg";
 import { CFG, onConfigChange } from "./config.js";
 import { logger, withContext } from "./logger.js";
 
-const { Pool } = pg;
+class FallbackPool {
+    constructor() {
+        this.query = async () => {
+            throw new Error("Postgres driver not available in this environment.");
+        };
+    }
+
+    on() {
+        return this;
+    }
+
+    async end() {}
+}
+
+let Pool = FallbackPool;
+
+let registerVectorType = async () => {};
+
+try {
+    const pgModule = await import("pg");
+    const resolved = pgModule?.default ?? pgModule;
+    if (resolved?.Pool) {
+        Pool = resolved.Pool;
+    }
+} catch {
+    Pool = FallbackPool;
+}
+
+try {
+    const vectorModule = await import("pgvector/pg");
+    if (typeof vectorModule?.registerType === "function") {
+        registerVectorType = vectorModule.registerType;
+    }
+} catch {
+    registerVectorType = async () => {};
+}
 
 let pool;
 let activeConnectionString;

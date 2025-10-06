@@ -1,7 +1,17 @@
-import { toSql } from "pgvector/utils";
 import { v4 as uuidv4 } from "uuid";
 import { CFG } from "./config.js";
 import { query } from "./db.js";
+
+let convertToSqlVector = (values) => JSON.stringify(values);
+
+try {
+    const module = await import("pgvector/utils");
+    if (module && typeof module.toSql === "function") {
+        convertToSqlVector = module.toSql;
+    }
+} catch {
+    convertToSqlVector = (values) => JSON.stringify(values);
+}
 
 const UPSERT_DOCUMENT_SQL = `
     INSERT INTO rag_documents (
@@ -113,7 +123,7 @@ export const upsertDocument = async ({
     const normalizedChunkId = normalizeOptionalString(chunkId);
     const normalizedHash = normalizeOptionalString(hash);
     const serializedMetadata = serializeMetadata(metadata);
-    const vector = toSql(normalizeEmbedding(embedding));
+    const vector = convertToSqlVector(normalizeEmbedding(embedding));
 
     const result = await query(UPSERT_DOCUMENT_SQL, [
         documentId,
@@ -129,7 +139,7 @@ export const upsertDocument = async ({
 };
 
 export const searchEmbeddings = async ({ embedding, sources = [], limit } = {}) => {
-    const vector = toSql(normalizeEmbedding(embedding));
+    const vector = convertToSqlVector(normalizeEmbedding(embedding));
     const normalizedSources = Array.isArray(sources)
         ? sources
             .map((value) => (typeof value === "string" ? value.trim() : ""))
