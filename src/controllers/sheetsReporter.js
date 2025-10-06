@@ -275,6 +275,17 @@ function resolveTradingFallbackSheet(fallback) {
     return "trading_actions";
 }
 
+function resolveNewsDigestFallbackSheet(fallback) {
+    const configured = CFG?.newsDigest?.sheetFallback;
+    if (typeof configured === "string" && configured.trim() !== "") {
+        return configured.trim();
+    }
+    if (typeof fallback === "string" && fallback.trim() !== "") {
+        return fallback.trim();
+    }
+    return "news_digest";
+}
+
 export function recordAlert({
     asset,
     timeframe,
@@ -458,6 +469,51 @@ export function recordChartUpload({
         metadata,
         messageType: "chart_upload",
         fallbackSheet: webhookKey || timeframe || "chart_upload",
+        timestamp,
+    });
+}
+
+export function recordNewsDigest({
+    summary,
+    topHeadlines,
+    sentiment,
+    assets,
+    webhookKey,
+    channelId,
+    webhookUrl,
+    fallbackSheet,
+    timestamp,
+} = {}) {
+    const metadata = {};
+    if (Array.isArray(topHeadlines) && topHeadlines.length > 0) {
+        metadata.topHeadlines = topHeadlines;
+    }
+    if (Array.isArray(sentiment) && sentiment.length > 0) {
+        metadata.sentiment = sentiment;
+    } else if (Number.isFinite(sentiment)) {
+        metadata.sentiment = sentiment;
+    }
+    if (Array.isArray(assets) && assets.length > 0) {
+        metadata.assets = assets;
+    }
+
+    const resolvedMetadata = Object.keys(metadata).length > 0 ? metadata : undefined;
+    const normalizedSummary = typeof summary === "string"
+        ? summary.trim()
+        : summary != null
+            ? String(summary)
+            : "";
+
+    recordEvent({
+        asset: undefined,
+        timeframe: undefined,
+        webhookKey: webhookKey ?? CFG?.newsDigest?.sheetMapKey ?? "newsDigest",
+        channelId,
+        webhookUrl,
+        content: normalizedSummary,
+        metadata: resolvedMetadata,
+        messageType: "news_digest",
+        fallbackSheet: resolveNewsDigestFallbackSheet(fallbackSheet),
         timestamp,
     });
 }
