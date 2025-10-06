@@ -2,10 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const answerWithRAGMock = vi.fn();
 const recordFeedbackMock = vi.fn();
+const recordInteractionMock = vi.fn();
 
 vi.mock("../src/rag.js", () => ({
     answerWithRAG: answerWithRAGMock,
+}));
+
+vi.mock("../src/feedback.js", () => ({
     recordFeedback: recordFeedbackMock,
+    recordInteraction: recordInteractionMock,
 }));
 
 describe("handleInteraction /ask", () => {
@@ -45,6 +50,11 @@ describe("handleInteraction /ask", () => {
 
         expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
         expect(answerWithRAGMock).toHaveBeenCalledWith("O que é o modo RAG?");
+        expect(recordInteractionMock).toHaveBeenCalledWith({
+            question: "O que é o modo RAG?",
+            answer: "Resposta detalhada sobre o funcionamento do bot.",
+            sources: ["docs/alpha.md", "https://example.com/ref"],
+        });
         const response = editReply.mock.calls[0][0];
         expect(response.content).toContain("**Pergunta:** O que é o modo RAG?");
         expect(response.content).toContain("🧠 **Resposta:**");
