@@ -160,6 +160,72 @@ const DEFAULT_GOOGLE_SHEETS_CONFIG = {
     channelMap: {},
 };
 
+const DEFAULT_MODEL_REGISTRY_COLUMNS = {
+    name: "name",
+    status: "status",
+    jobId: "job_id",
+    fileId: "training_file",
+    metadata: "metadata",
+};
+
+const DEFAULT_MODEL_REGISTRY_CONFIG = {
+    schema: "public",
+    table: "rag_models",
+    columns: { ...DEFAULT_MODEL_REGISTRY_COLUMNS },
+};
+
+const MODEL_REGISTRY_COLUMN_KEYS = Object.keys(DEFAULT_MODEL_REGISTRY_COLUMNS);
+
+const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+const normalizeIdentifier = (value) => {
+    if (typeof value !== "string") {
+        return null;
+    }
+    const trimmed = value.trim();
+    if (trimmed === "") {
+        return null;
+    }
+    if (!IDENTIFIER_PATTERN.test(trimmed)) {
+        return null;
+    }
+    return trimmed;
+};
+
+const normalizeModelRegistryColumns = (columns) => {
+    const base = isPlainObject(columns) ? columns : {};
+    const normalized = { ...DEFAULT_MODEL_REGISTRY_COLUMNS };
+    for (const key of MODEL_REGISTRY_COLUMN_KEYS) {
+        const candidate = normalizeIdentifier(base[key]);
+        if (candidate) {
+            normalized[key] = candidate;
+        }
+    }
+    return normalized;
+};
+
+const buildModelRegistryConfig = (raw) => {
+    const base = isPlainObject(raw) ? raw : {};
+    const normalized = {
+        schema: DEFAULT_MODEL_REGISTRY_CONFIG.schema,
+        table: DEFAULT_MODEL_REGISTRY_CONFIG.table,
+        columns: normalizeModelRegistryColumns(base.columns),
+    };
+    if (base.schema === null) {
+        normalized.schema = null;
+    } else {
+        const schema = normalizeIdentifier(base.schema);
+        if (schema) {
+            normalized.schema = schema;
+        }
+    }
+    const table = normalizeIdentifier(base.table);
+    if (table) {
+        normalized.table = table;
+    }
+    return normalized;
+};
+
 const DEFAULT_RAG_CONFIG = {
     pgUrl: null,
     embeddingModel: "text-embedding-3-large",
@@ -169,6 +235,9 @@ const DEFAULT_RAG_CONFIG = {
     searchLimit: 5,
     activeModel: null,
     candidateModel: null,
+    modelRegistry: buildModelRegistryConfig(DEFAULT_MODEL_REGISTRY_CONFIG),
+    fineTuneCron: "0 3 * * 1",
+    enableFineTune: false,
 };
 
 const DEFAULT_NEWS_DIGEST_CONFIG = {
@@ -572,6 +641,34 @@ const buildRagConfig = (baseConfig = {}) => {
     config.searchLimit = Number.isFinite(envSearchLimit) && envSearchLimit > 0
         ? envSearchLimit
         : config.searchLimit;
+
+    config.modelRegistry = buildModelRegistryConfig(config.modelRegistry);
+    const envRegistryTable = normalizeIdentifier(process.env.RAG_MODEL_REGISTRY_TABLE);
+    if (envRegistryTable) {
+        config.modelRegistry.table = envRegistryTable;
+    }
+    if (process.env.RAG_MODEL_REGISTRY_SCHEMA !== undefined) {
+        const envSchemaRaw = process.env.RAG_MODEL_REGISTRY_SCHEMA;
+        const trimmedSchema = typeof envSchemaRaw === "string" ? envSchemaRaw.trim() : "";
+        if (trimmedSchema === "") {
+            config.modelRegistry.schema = null;
+        } else {
+            const normalizedSchema = normalizeIdentifier(trimmedSchema);
+            if (normalizedSchema) {
+                config.modelRegistry.schema = normalizedSchema;
+            }
+        }
+    }
+    config.fineTuneCron = normalizeStringOrNull(
+        config.fineTuneCron,
+        DEFAULT_RAG_CONFIG.fineTuneCron,
+    );
+    config.fineTuneCron = normalizeStringOrNull(
+        process.env.RAG_FINE_TUNE_CRON,
+        config.fineTuneCron,
+    );
+    config.enableFineTune = toBoolean(config.enableFineTune, DEFAULT_RAG_CONFIG.enableFineTune);
+    config.enableFineTune = toBoolean(process.env.RAG_ENABLE_FINE_TUNE, config.enableFineTune);
 
     config.activeModel = normalizeStringOrNull(config.activeModel, null);
     config.activeModel = normalizeStringOrNull(process.env.RAG_ACTIVE_MODEL, config.activeModel);

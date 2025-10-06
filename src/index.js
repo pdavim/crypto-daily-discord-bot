@@ -1218,6 +1218,37 @@ if (!ONCE) {
     } else {
         scheduleLog.info({ fn: 'schedule', channel: 'rag' }, '⏸️ RAG ingestion schedule disabled');
     }
+    if (CFG?.rag?.enableFineTune) {
+        const fineTuneCronExpression = typeof CFG?.rag?.fineTuneCron === 'string'
+            ? CFG.rag.fineTuneCron.trim()
+            : '';
+        if (fineTuneCronExpression) {
+            cron.schedule(fineTuneCronExpression, async () => {
+                const jobLog = withContext(logger, { fn: 'fineTuneJob', cron: fineTuneCronExpression });
+                jobLog.info('Starting scheduled fine-tune job');
+                try {
+                    const module = await import("../scripts/run-fine-tune.js");
+                    const runFineTune = typeof module.runFineTune === 'function'
+                        ? module.runFineTune
+                        : typeof module.default === 'function'
+                            ? module.default
+                            : null;
+                    if (!runFineTune) {
+                        throw new Error('runFineTune export not found.');
+                    }
+                    const result = await runFineTune();
+                    jobLog.info({ jobId: result?.jobId, model: result?.model }, 'Completed fine-tune job');
+                } catch (error) {
+                    jobLog.error({ err: error }, 'Scheduled fine-tune job failed');
+                }
+            }, { timezone: CFG.tz });
+            scheduleLog.info({ fn: 'schedule', channel: 'fineTune' }, `🤖 Scheduled fine-tune job (cron=${fineTuneCronExpression}, TZ=${CFG.tz})`);
+        } else {
+            scheduleLog.info({ fn: 'schedule', channel: 'fineTune' }, '⏸️ Fine-tune schedule disabled (missing cron expression)');
+        }
+    } else {
+        scheduleLog.info({ fn: 'schedule', channel: 'fineTune' }, '⏸️ Fine-tune schedule disabled');
+    }
     const analysisSchedule = resolveAnalysisSchedule(CFG.analysisFrequency);
     if (analysisSchedule.alias) {
         scheduleLog.info({ fn: 'schedule', provided: analysisSchedule.alias, normalized: analysisSchedule.key }, `ℹ️ Normalized analysis frequency "${analysisSchedule.alias}" to "${analysisSchedule.key}".`);

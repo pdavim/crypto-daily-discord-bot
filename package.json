@@ -13,6 +13,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --hook-timeout=20000",
     "build:fine-tune": "node bin/buildFineTuneDataset.js",
+    "fine-tune": "node scripts/run-fine-tune.js",
+    "fine-tune:schedule": "node --input-type=module -e \"process.env.RAG_ENABLE_FINE_TUNE='true'; await import('./src/index.js');\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "cleanup:reports": "node bin/cleanup-reports.js",
