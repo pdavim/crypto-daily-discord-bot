@@ -65,12 +65,14 @@ describe("answerWithRAG", () => {
                 source: "docs/alpha.md",
                 content: "Alpha content",
                 distance: 0.12,
+                metadata: { url: "https://example.com/alpha", title: "Alpha Doc" },
             },
             {
                 document_id: "doc-2",
                 source: "docs/beta.md",
                 content: "Beta content",
                 distance: 0.34,
+                metadata: { url: "https://example.com/beta" },
             },
             {
                 document_id: "doc-3",
@@ -101,11 +103,15 @@ describe("answerWithRAG", () => {
         expect(result.sources[0]).toMatchObject({
             id: "doc-1",
             source: "docs/alpha.md",
+            citationUrl: "https://example.com/alpha",
+            citationLabel: "Alpha Doc",
         });
         expect(result.sources[0].score).toBeCloseTo(1 / (1 + 0.12));
         expect(result.sources[1]).toMatchObject({
             id: "doc-2",
             source: "docs/beta.md",
+            citationUrl: "https://example.com/beta",
+            citationLabel: "https://example.com/beta",
         });
         expect(result.sources[1].score).toBeCloseTo(1 / (1 + 0.34));
     });
@@ -119,6 +125,7 @@ describe("answerWithRAG", () => {
                 source: "docs/delta.md",
                 content: "Delta content",
                 distance: 0.42,
+                metadata: { title: "Delta Doc" },
             },
         ]);
         chatCompletionMock.mockResolvedValue({
@@ -139,7 +146,12 @@ describe("answerWithRAG", () => {
         });
         expect(result.answer).toBe("OpenAI answer");
         expect(result.sources).toHaveLength(1);
-        expect(result.sources[0]).toMatchObject({ id: "doc-4", source: "docs/delta.md" });
+        expect(result.sources[0]).toMatchObject({
+            id: "doc-4",
+            source: "docs/delta.md",
+            citationUrl: null,
+            citationLabel: "Delta Doc",
+        });
     });
 });
 

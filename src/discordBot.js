@@ -68,24 +68,68 @@ function truncateDiscordMessage(content) {
     return `${content.slice(0, DISCORD_MESSAGE_LIMIT - 1)}…`;
 }
 
+const isAskSourceString = (value) => typeof value === "string" && value.trim() !== "";
+
+const isHttpUrl = (value) => /^https?:\/\//i.test(value);
+
+const resolveAskSourceDetails = (sourceEntry) => {
+    if (isAskSourceString(sourceEntry)) {
+        const value = sourceEntry.trim();
+        return { label: value, url: value };
+    }
+    if (!sourceEntry || typeof sourceEntry !== "object") {
+        return { label: null, url: null };
+    }
+    const get = (value) => (isAskSourceString(value) ? value.trim() : "");
+    const citationUrl = get(sourceEntry.citationUrl);
+    const citationLabel = get(sourceEntry.citationLabel);
+    const source = get(sourceEntry.source);
+    const id = get(sourceEntry.id);
+    const urlCandidates = [citationUrl, isHttpUrl(source) ? source : "", isHttpUrl(id) ? id : "", source, id];
+    const labelCandidates = [citationLabel, citationUrl, source, id];
+    const resolvedUrl = urlCandidates.find((candidate) => isAskSourceString(candidate)) ?? null;
+    const resolvedLabel = labelCandidates.find((candidate) => isAskSourceString(candidate))
+        ?? resolvedUrl
+        ?? null;
+    return {
+        label: resolvedLabel,
+        url: resolvedUrl,
+    };
+};
+
 function collectAskSourceStrings(sources) {
     if (!Array.isArray(sources)) {
         return [];
     }
     return sources
-        .map(sourceEntry => {
-            if (!sourceEntry || typeof sourceEntry.source !== "string") {
-                return null;
+        .map((sourceEntry) => {
+            const { label, url } = resolveAskSourceDetails(sourceEntry);
+            if (isAskSourceString(url) && isHttpUrl(url)) {
+                return url;
             }
-            const trimmed = sourceEntry.source.trim();
-            return trimmed ? trimmed : null;
+            if (isAskSourceString(label) && isHttpUrl(label)) {
+                return label;
+            }
+            return isAskSourceString(url) ? url : isAskSourceString(label) ? label : null;
         })
         .filter(Boolean);
 }
 
 function formatAskSources(sources) {
-    return collectAskSourceStrings(sources)
-        .map(value => ({ label: value, url: value }));
+    if (!Array.isArray(sources)) {
+        return [];
+    }
+    return sources
+        .map((sourceEntry) => {
+            const { label, url } = resolveAskSourceDetails(sourceEntry);
+            if (!isAskSourceString(label) && !isAskSourceString(url)) {
+                return null;
+            }
+            const resolvedLabel = isAskSourceString(label) ? label : url;
+            const resolvedUrl = isAskSourceString(url) ? url : resolvedLabel;
+            return { label: resolvedLabel, url: resolvedUrl };
+        })
+        .filter(Boolean);
 }
 
 function buildAskResponseContent(question, answer, sources) {

@@ -25,8 +25,18 @@ describe("handleInteraction /ask", () => {
         answerWithRAGMock.mockResolvedValue({
             answer: "Resposta detalhada sobre o funcionamento do bot.",
             sources: [
-                { source: "docs/alpha.md" },
-                { source: "https://example.com/ref" },
+                {
+                    id: "doc-1",
+                    source: "docs/alpha.md",
+                    citationUrl: "https://example.com/articles/alpha",
+                    citationLabel: "Alpha Doc",
+                },
+                {
+                    id: "doc-2",
+                    source: "https://example.com/ref",
+                    citationUrl: "https://example.com/ref",
+                    citationLabel: "Example Ref",
+                },
             ],
         });
         const deferReply = vi.fn().mockResolvedValue();
@@ -53,14 +63,14 @@ describe("handleInteraction /ask", () => {
         expect(recordInteractionMock).toHaveBeenCalledWith({
             question: "O que é o modo RAG?",
             answer: "Resposta detalhada sobre o funcionamento do bot.",
-            sources: ["docs/alpha.md", "https://example.com/ref"],
+            sources: ["https://example.com/articles/alpha", "https://example.com/ref"],
         });
         const response = editReply.mock.calls[0][0];
         expect(response.content).toContain("**Pergunta:** O que é o modo RAG?");
         expect(response.content).toContain("🧠 **Resposta:**");
         expect(response.content).toContain("Resposta detalhada");
-        expect(response.content).toContain("1. [docs/alpha.md](docs/alpha.md)");
-        expect(response.content).toContain("2. [https://example.com/ref](https://example.com/ref)");
+        expect(response.content).toContain("1. [Alpha Doc](https://example.com/articles/alpha)");
+        expect(response.content).toContain("2. [Example Ref](https://example.com/ref)");
         expect(Array.isArray(response.components)).toBe(true);
         expect(response.components).toHaveLength(1);
         const row = response.components[0];
@@ -77,7 +87,7 @@ describe("handleInteraction /ask", () => {
             customId: "ask:feedback:up",
             message: {
                 id: "msg-123",
-                content: "❓ **Pergunta:** O que é RAG?\n\n🧠 **Resposta:**\nUma resposta exemplo.\n\n🔗 **Fontes:**\n1. [docs/alpha.md](docs/alpha.md)",
+                content: "❓ **Pergunta:** O que é RAG?\n\n🧠 **Resposta:**\nUma resposta exemplo.\n\n🔗 **Fontes:**\n1. [Alpha Doc](https://example.com/alpha)",
             },
             user: { id: "user-456" },
             reply,
@@ -91,7 +101,7 @@ describe("handleInteraction /ask", () => {
             userId: "user-456",
             question: "O que é RAG?",
             answer: "Uma resposta exemplo.",
-            sources: ["docs/alpha.md"],
+            sources: ["https://example.com/alpha"],
         });
         expect(reply).toHaveBeenCalledWith({ content: expect.stringContaining("Obrigado"), ephemeral: true });
     });
