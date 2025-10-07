@@ -36,39 +36,54 @@ const computeScore = (distance) => {
     return 1 / (1 + parsed);
 };
 
-const extractMetadataSummary = (metadata) => {
+const isNonEmptyString = (value) => typeof value === "string" && value.trim() !== "";
+
+const isLikelyHttpUrl = (value) => /^https?:\/\//i.test(value);
+
+const extractMetadataDetails = (metadata) => {
     if (metadata == null) {
-        return null;
+        return { summary: null, citationUrl: null, citationLabel: null };
     }
     let value = metadata;
     if (typeof value === "string") {
         const trimmed = value.trim();
         if (trimmed === "") {
-            return null;
+            return { summary: null, citationUrl: null, citationLabel: null };
         }
         try {
             value = JSON.parse(trimmed);
         } catch {
-            return trimmed;
+            const citationUrl = isLikelyHttpUrl(trimmed) ? trimmed : null;
+            return {
+                summary: trimmed,
+                citationUrl,
+                citationLabel: citationUrl ?? trimmed,
+            };
         }
     }
-    if (typeof value !== "object" || Array.isArray(value)) {
-        return null;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return { summary: null, citationUrl: null, citationLabel: null };
     }
+    const title = isNonEmptyString(value.title) ? value.title.trim() : null;
+    const label = title
+        ?? (isNonEmptyString(value.label) ? value.label.trim() : null)
+        ?? null;
+    const url = isNonEmptyString(value.url) ? value.url.trim() : null;
     const parts = [];
-    if (typeof value.title === "string") {
-        const title = value.title.trim();
-        if (title !== "") {
-            parts.push(title);
-        }
+    if (title) {
+        parts.push(title);
     }
-    if (typeof value.url === "string") {
-        const url = value.url.trim();
-        if (url !== "") {
-            parts.push(url);
-        }
+    if (url) {
+        parts.push(url);
     }
-    return parts.length > 0 ? parts.join(" | ") : null;
+    if (!parts.length && isNonEmptyString(value.summary)) {
+        parts.push(value.summary.trim());
+    }
+    return {
+        summary: parts.length > 0 ? parts.join(" | ") : null,
+        citationUrl: url,
+        citationLabel: label ?? url ?? null,
+    };
 };
 
 const selectTopMatches = (rows, limit) => {
@@ -96,14 +111,16 @@ const selectTopMatches = (rows, limit) => {
         const chunkId = typeof row?.chunk_id === "string" && row.chunk_id.trim() !== ""
             ? row.chunk_id.trim()
             : null;
-        const metadataSummary = extractMetadataSummary(row?.metadata);
+        const { summary, citationUrl, citationLabel } = extractMetadataDetails(row?.metadata);
         matches.push({
             id,
             source,
             score,
             content,
             chunkId,
-            metadataSummary,
+            metadataSummary: summary,
+            citationUrl,
+            citationLabel,
         });
     }
     return matches;
@@ -218,6 +235,8 @@ export const answerWithRAG = async (question) => {
                 id: match.id,
                 score: match.score,
                 source: match.source,
+                citationUrl: match.citationUrl ?? null,
+                citationLabel: match.citationLabel ?? null,
             })),
         };
     } catch (error) {
