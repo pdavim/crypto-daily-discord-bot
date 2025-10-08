@@ -51,6 +51,7 @@ describe("trading notifier", () => {
             asset: "BTC",
         });
         expect(payload.metadata).toMatchObject({ status: "skipped", reason: "maxPositions" });
+        expect(payload.metadata.complianceStatus).toBeUndefined();
     });
 
     it("sends Discord alerts with mentions when configured", async () => {
@@ -92,5 +93,31 @@ describe("trading notifier", () => {
             notional: 900,
             orderId: 1,
         });
+    });
+
+    it("annotates compliance breaches in notifications", async () => {
+        await reportTradingExecution({
+            assetKey: "SOL",
+            symbol: "SOLUSDT",
+            action: "open",
+            status: "skipped",
+            side: "BUY",
+            reason: "risk:maxExposure",
+            metadata: {
+                compliance: {
+                    status: "blocked",
+                    breaches: [{ type: "maxExposure", message: "limit" }],
+                    messages: ["Exposure limit"]
+                }
+            }
+        });
+
+        expect(recordTradingEventMock).toHaveBeenCalledTimes(1);
+        const payload = recordTradingEventMock.mock.calls[0][0];
+        expect(payload.content).toContain("Risk blocked");
+        expect(payload.metadata).toMatchObject({
+            complianceStatus: "blocked",
+        });
+        expect(payload.metadata.complianceBreaches).toContain("maxExposure");
     });
 });

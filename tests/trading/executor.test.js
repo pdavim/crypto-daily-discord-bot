@@ -6,6 +6,7 @@ const borrowMarginMock = vi.fn();
 const repayMarginMock = vi.fn();
 const reportTradingExecutionMock = vi.fn();
 const reportTradingMarginMock = vi.fn();
+const evaluateTradeIntentMock = vi.fn();
 
 vi.mock("../../src/trading/binance.js", () => ({
     submitOrder: submitOrderMock,
@@ -18,6 +19,14 @@ vi.mock("../../src/trading/notifier.js", () => ({
     reportTradingExecution: reportTradingExecutionMock,
     reportTradingMargin: reportTradingMarginMock,
 }));
+
+vi.mock("../../src/trading/riskManager.js", async () => {
+    const actual = await vi.importActual("../../src/trading/riskManager.js");
+    return {
+        ...actual,
+        evaluateTradeIntent: evaluateTradeIntentMock,
+    };
+});
 
 const { CFG } = await import("../../src/config.js");
 const { openPosition, closePosition, adjustMargin } = await import("../../src/trading/executor.js");
@@ -35,6 +44,13 @@ describe("trading executor", () => {
         reportTradingExecutionMock.mockResolvedValue(undefined);
         reportTradingMarginMock.mockResolvedValue(undefined);
         register.resetMetrics();
+        evaluateTradeIntentMock.mockReset();
+        evaluateTradeIntentMock.mockImplementation((intent) => ({
+            decision: "allow",
+            quantity: intent.quantity,
+            notional: intent.notional ?? null,
+            compliance: { status: "cleared", breaches: [], messages: [] },
+        }));
 
         CFG.trading = {
             enabled: true,
@@ -60,6 +76,7 @@ describe("trading executor", () => {
         repayMarginMock.mockReset();
         reportTradingExecutionMock.mockReset();
         reportTradingMarginMock.mockReset();
+        evaluateTradeIntentMock.mockReset();
     });
 
     it("skips trading when disabled", async () => {
@@ -105,7 +122,11 @@ describe("trading executor", () => {
         const notionalMetric = metrics.find(m => m.name === 'app_trading_notional_size');
         const sumEntry = notionalMetric?.values.find(v => v.metricName === 'app_trading_notional_size_sum');
         expect(sumEntry?.value).toBeCloseTo(0.005 * 30500, 6);
-        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'executed', action: 'open' }));
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'executed',
+            action: 'open',
+            metadata: expect.objectContaining({ compliance: expect.objectContaining({ status: 'cleared' }) }),
+        }));
     });
 
     it("propagates submission failures", async () => {
@@ -115,7 +136,52 @@ describe("trading executor", () => {
         const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
         const errors = tradeMetric?.values.find(v => v.labels.action === 'openPosition' && v.labels.result === 'error');
         expect(errors?.value).toBe(1);
-        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', action: 'open' }));
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'error',
+            action: 'open',
+            metadata: expect.objectContaining({ compliance: expect.objectContaining({ status: 'cleared' }) }),
+        }));
+    });
+
+    it("aborts orders when the risk manager blocks the trade", async () => {
+        evaluateTradeIntentMock.mockImplementationOnce(() => ({
+            decision: "block",
+            reason: "maxExposure",
+            quantity: 0.01,
+            notional: 300,
+            compliance: { status: "blocked", breaches: [{ type: "maxExposure" }] },
+        }));
+
+        const result = await openPosition({ symbol: "BTCUSDT", direction: "long", quantity: 0.01, price: 30000 });
+
+        expect(result.executed).toBe(false);
+        expect(result.reason).toBe('risk:maxExposure');
+        expect(submitOrderMock).not.toHaveBeenCalled();
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'skipped',
+            reason: 'risk:maxExposure',
+            metadata: expect.objectContaining({ compliance: expect.objectContaining({ status: 'blocked' }) }),
+        }));
+    });
+
+    it("scales quantity when the risk manager adjusts the trade", async () => {
+        evaluateTradeIntentMock.mockImplementationOnce((intent) => ({
+            decision: "scale",
+            reason: "maxExposure",
+            quantity: intent.quantity / 2,
+            notional: intent.notional ? intent.notional / 2 : null,
+            compliance: { status: "scaled", breaches: [{ type: "maxExposure" }] },
+        }));
+        submitOrderMock.mockResolvedValueOnce({ orderId: 10, fillPrice: 29500 });
+
+        const result = await openPosition({ symbol: "BTCUSDT", direction: "long", quantity: 0.02, price: 29500 });
+
+        expect(result.executed).toBe(true);
+        expect(submitOrderMock).toHaveBeenCalledWith(expect.objectContaining({ quantity: 0.01 }), expect.any(Object));
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'executed',
+            metadata: expect.objectContaining({ compliance: expect.objectContaining({ status: 'scaled' }) }),
+        }));
     });
 
     it("closes positions using reduce only orders", async () => {
@@ -134,7 +200,11 @@ describe("trading executor", () => {
         const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
         const success = tradeMetric?.values.find(v => v.labels.action === 'closePosition' && v.labels.result === 'success');
         expect(success?.value).toBe(1);
-        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'executed', action: 'close' }));
+        expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'executed',
+            action: 'close',
+            metadata: expect.objectContaining({ compliance: expect.objectContaining({ status: 'cleared' }) }),
+        }));
     });
 
     it("avoids removing too much margin", async () => {
