@@ -4,6 +4,20 @@ const mockCFG = {
     debug: false,
     openrouterApiKey: null,
     openrouterModel: "gpt-4",
+    kaiban: {
+        enabled: false,
+        logLevel: "info",
+        maxIterations: 3,
+        models: {
+            technical: "gpt-4",
+            news: "gpt-4",
+            sentiment: "gpt-4",
+            research: "gpt-4",
+            trader: "gpt-4",
+            risk: "gpt-4",
+            execution: "gpt-4",
+        },
+    },
 };
 
 const mockAssets = [];
@@ -62,6 +76,8 @@ const indicatorsStub = {
     obv: vi.fn(() => Array.from({ length: 260 }, () => 10)),
 };
 
+const runKaibanWorkflowMock = vi.fn();
+
 vi.mock("../src/config.js", () => ({ CFG: mockCFG }));
 vi.mock("../src/assets.js", () => ({ ASSETS: mockAssets }));
 vi.mock("../src/data/binance.js", () => ({
@@ -98,6 +114,9 @@ vi.mock("../src/logger.js", () => {
     };
 });
 vi.mock("../src/indicators.js", () => indicatorsStub);
+vi.mock("../src/agents/team.js", () => ({
+    runKaibanWorkflow: runKaibanWorkflowMock,
+}));
 vi.mock("openai", () => ({
     default: class {
         constructor() {
@@ -124,6 +143,8 @@ beforeEach(() => {
     mockAssets.length = 0;
     mockCFG.openrouterApiKey = null;
     mockCFG.openrouterModel = "gpt-4";
+    mockCFG.kaiban.enabled = false;
+    runKaibanWorkflowMock.mockReset();
 });
 
 describe("ai module", () => {
@@ -144,6 +165,7 @@ describe("ai module", () => {
         const { runAgent } = await import("../src/ai.js");
         const output = await runAgent();
         expect(output).toContain("No Binance symbol configured.");
+        expect(runKaibanWorkflowMock).not.toHaveBeenCalled();
     });
 
     it("skips assets that return no candles", async () => {
@@ -151,6 +173,7 @@ describe("ai module", () => {
         const { runAgent } = await import("../src/ai.js");
         const output = await runAgent();
         expect(output).toContain("No candle data.");
+        expect(runKaibanWorkflowMock).not.toHaveBeenCalled();
     });
 
     it("combines indicators, alerts and context when data is available", async () => {
@@ -171,5 +194,31 @@ describe("ai module", () => {
         const assetNewsCalls = getAssetNews.mock.calls.filter(([params]) => params.symbol !== "crypto market");
         expect(assetNewsCalls).toHaveLength(1);
         expect(assetNewsCalls[0][0]).toMatchObject({ symbol: "BTC" });
+        expect(runKaibanWorkflowMock).not.toHaveBeenCalled();
+    });
+
+    it("uses Kaiban workflow when enabled", async () => {
+        mockCFG.openrouterApiKey = "token";
+        mockCFG.kaiban.enabled = true;
+        runKaibanWorkflowMock.mockResolvedValue({ report: "# Kaiban" });
+
+        const { runAgent } = await import("../src/ai.js");
+        const output = await runAgent();
+
+        expect(runKaibanWorkflowMock).toHaveBeenCalledTimes(1);
+        expect(output).toBe("# Kaiban");
+    });
+
+    it("falls back to legacy analysis when Kaiban fails", async () => {
+        mockCFG.openrouterApiKey = "token";
+        mockCFG.kaiban.enabled = true;
+        mockAssets.push({ key: "BTC", binance: "BTCUSDT" });
+        runKaibanWorkflowMock.mockRejectedValue(new Error("Kaiban failed"));
+
+        const { runAgent } = await import("../src/ai.js");
+        const output = await runAgent();
+
+        expect(runKaibanWorkflowMock).toHaveBeenCalledTimes(1);
+        expect(output).toContain("**Alert Status:**");
     });
 });
