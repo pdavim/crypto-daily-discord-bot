@@ -4,6 +4,7 @@ import { tradingExecutionCounter, tradingNotionalHistogram } from "../metrics.js
 
 import { submitOrder, transferMargin, borrowMargin, repayMargin } from "./binance.js";
 import { reportTradingExecution, reportTradingMargin } from "./notifier.js";
+import { evaluateTradeIntent, mergeCompliance } from "./riskManager.js";
 
 function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -98,6 +99,7 @@ export async function openPosition({
 } = {}) {
     const tradingCfg = getTradingConfig();
     const log = withContext(logger, { asset: assetKey ?? symbol, symbol, action: 'openPosition' });
+    const metadataPayload = isPlainObject(metadata) ? { ...metadata } : {};
 
     if (!tradingCfg.enabled) {
         return abortTrade(log, 'openPosition', 'disabled', {}, { assetKey, symbol, action: 'open', direction });
@@ -107,7 +109,7 @@ export async function openPosition({
         return abortTrade(log, 'openPosition', 'missingSymbol', {}, { assetKey, symbol, action: 'open', direction });
     }
 
-    const qty = toFiniteNumber(quantity);
+    let qty = toFiniteNumber(quantity);
     if (qty === null || qty <= 0) {
         return abortTrade(log, 'openPosition', 'invalidQuantity', { quantity }, {
             assetKey,
@@ -120,7 +122,7 @@ export async function openPosition({
 
     let referencePrice;
     try {
-        referencePrice = ensureOrderPrice(price ?? metadata.referencePrice, type);
+        referencePrice = ensureOrderPrice(price ?? metadataPayload.referencePrice, type);
     } catch (err) {
         return abortTrade(log, 'openPosition', 'invalidPrice', { message: err.message }, {
             assetKey,
@@ -128,6 +130,7 @@ export async function openPosition({
             action: 'open',
             direction,
             quantity: qty,
+            metadata: metadataPayload,
         });
     }
 
@@ -138,10 +141,11 @@ export async function openPosition({
             action: 'open',
             direction,
             quantity: qty,
+            metadata: metadataPayload,
         });
     }
 
-    const notional = referencePrice !== null ? qty * referencePrice : null;
+    let notional = referencePrice !== null ? qty * referencePrice : null;
     if (Number.isFinite(tradingCfg.minNotional) && tradingCfg.minNotional > 0 && notional !== null && notional < tradingCfg.minNotional) {
         return abortTrade(log, 'openPosition', 'belowMinNotional', {
             notional,
@@ -154,15 +158,38 @@ export async function openPosition({
             quantity: qty,
             price: referencePrice,
             notional,
+            metadata: metadataPayload,
         });
     }
 
-    const maxNotional = computeMaxNotionalLimit(tradingCfg);
-    if (maxNotional !== null && notional !== null && notional > maxNotional) {
-        return abortTrade(log, 'openPosition', 'exceedsRiskLimit', {
-            notional,
-            maxNotional,
-        }, {
+    const side = direction === 'short' ? 'SELL' : 'BUY';
+
+    const riskContext = isPlainObject(metadataPayload.riskContext)
+        ? { ...metadataPayload.riskContext }
+        : {};
+    if (!Number.isFinite(riskContext.accountEquity)) {
+        riskContext.accountEquity = toFiniteNumber(CFG.accountEquity);
+    }
+
+    const riskEvaluation = evaluateTradeIntent({
+        source: metadataPayload.source ?? 'executor',
+        action: 'open',
+        symbol,
+        assetKey,
+        direction,
+        side,
+        quantity: qty,
+        price: referencePrice,
+        notional,
+        type,
+    }, riskContext);
+
+    let compliance = mergeCompliance(metadataPayload.compliance, riskEvaluation.compliance);
+    metadataPayload.riskContext = riskContext;
+    metadataPayload.compliance = compliance;
+
+    if (riskEvaluation.decision === 'block') {
+        return abortTrade(log, 'openPosition', `risk:${riskEvaluation.reason ?? 'blocked'}`, { compliance }, {
             assetKey,
             symbol,
             action: 'open',
@@ -170,10 +197,49 @@ export async function openPosition({
             quantity: qty,
             price: referencePrice,
             notional,
+            metadata: metadataPayload,
         });
     }
 
-    const side = direction === 'short' ? 'SELL' : 'BUY';
+    if (riskEvaluation.decision === 'scale') {
+        if (!Number.isFinite(riskEvaluation.quantity) || riskEvaluation.quantity <= 0) {
+            return abortTrade(log, 'openPosition', 'risk:invalidQuantity', { compliance }, {
+                assetKey,
+                symbol,
+                action: 'open',
+                direction,
+                quantity: qty,
+                price: referencePrice,
+                notional,
+                metadata: metadataPayload,
+            });
+        }
+        qty = riskEvaluation.quantity;
+        notional = riskEvaluation.notional ?? (referencePrice !== null ? qty * referencePrice : null);
+        compliance = mergeCompliance(compliance, riskEvaluation.compliance);
+        metadataPayload.compliance = compliance;
+        if (Number.isFinite(tradingCfg.minNotional) && tradingCfg.minNotional > 0 && notional !== null && notional < tradingCfg.minNotional) {
+            return abortTrade(log, 'openPosition', 'riskScaledBelowMinNotional', {
+                notional,
+                minNotional: tradingCfg.minNotional,
+                compliance,
+            }, {
+                assetKey,
+                symbol,
+                action: 'open',
+                direction,
+                quantity: qty,
+                price: referencePrice,
+                notional,
+                metadata: metadataPayload,
+            });
+        }
+    }
+
+    if (compliance && compliance.status === 'flagged') {
+        log.warn({ fn: 'openPosition', compliance }, 'Executing trade with compliance flags');
+    }
+
     const orderParams = buildOrderParams(params);
 
     try {
@@ -205,6 +271,7 @@ export async function openPosition({
                 price: order.fillPrice ?? referencePrice,
                 notional,
                 orderId: order.orderId,
+                metadata: metadataPayload,
             });
         } catch (notifyErr) {
             log.debug({ fn: 'openPosition', err: notifyErr }, 'Failed to report trading execution success');
@@ -224,6 +291,7 @@ export async function openPosition({
                 price: referencePrice,
                 notional,
                 reason: err.message,
+                metadata: metadataPayload,
             });
         } catch (notifyErr) {
             log.debug({ fn: 'openPosition', err: notifyErr }, 'Failed to report trading execution error');
@@ -245,6 +313,7 @@ export async function closePosition({
 } = {}) {
     const tradingCfg = getTradingConfig();
     const log = withContext(logger, { asset: assetKey ?? symbol, symbol, action: 'closePosition' });
+    const metadataPayload = isPlainObject(metadata) ? { ...metadata } : {};
 
     if (!tradingCfg.enabled) {
         return abortTrade(log, 'closePosition', 'disabled', {}, { assetKey, symbol, action: 'close', direction });
@@ -254,7 +323,7 @@ export async function closePosition({
         return abortTrade(log, 'closePosition', 'missingSymbol', {}, { assetKey, symbol, action: 'close', direction });
     }
 
-    const qty = toFiniteNumber(quantity);
+    let qty = toFiniteNumber(quantity);
     if (qty === null || qty <= 0) {
         return abortTrade(log, 'closePosition', 'invalidQuantity', { quantity }, {
             assetKey,
@@ -267,7 +336,7 @@ export async function closePosition({
 
     let referencePrice;
     try {
-        referencePrice = ensureOrderPrice(price ?? metadata.referencePrice, type);
+        referencePrice = ensureOrderPrice(price ?? metadataPayload.referencePrice, type);
     } catch (err) {
         return abortTrade(log, 'closePosition', 'invalidPrice', { message: err.message }, {
             assetKey,
@@ -275,10 +344,22 @@ export async function closePosition({
             action: 'close',
             direction,
             quantity: qty,
+            metadata: metadataPayload,
         });
     }
 
-    const notional = referencePrice !== null ? qty * referencePrice : null;
+    if (referencePrice === null && tradingCfg.minNotional > 0) {
+        return abortTrade(log, 'closePosition', 'missingPrice', {}, {
+            assetKey,
+            symbol,
+            action: 'close',
+            direction,
+            quantity: qty,
+            metadata: metadataPayload,
+        });
+    }
+
+    let notional = referencePrice !== null ? qty * referencePrice : null;
     const maxNotional = computeMaxNotionalLimit(tradingCfg);
     if (maxNotional !== null && notional !== null && notional > maxNotional * 1.5) {
         return abortTrade(log, 'closePosition', 'exceedsCloseLimit', {
@@ -292,11 +373,45 @@ export async function closePosition({
             quantity: qty,
             price: referencePrice,
             notional,
+            metadata: metadataPayload,
         });
     }
 
     const side = direction === 'short' ? 'BUY' : 'SELL';
     const orderParams = buildOrderParams({ reduceOnly: true, ...params });
+
+    const riskContext = isPlainObject(metadataPayload.riskContext)
+        ? { ...metadataPayload.riskContext }
+        : {};
+    if (!Number.isFinite(riskContext.accountEquity)) {
+        riskContext.accountEquity = toFiniteNumber(CFG.accountEquity);
+    }
+
+    const riskEvaluation = evaluateTradeIntent({
+        source: metadataPayload.source ?? 'executor',
+        action: 'close',
+        symbol,
+        assetKey,
+        direction,
+        side,
+        quantity: qty,
+        price: referencePrice,
+        notional,
+        type,
+    }, riskContext);
+
+    const compliance = mergeCompliance(metadataPayload.compliance, riskEvaluation.compliance);
+    metadataPayload.riskContext = riskContext;
+    metadataPayload.compliance = compliance;
+
+    if (riskEvaluation.decision === 'block') {
+        log.warn({ fn: 'closePosition', compliance }, 'Risk manager flagged close order');
+    }
+
+    if (riskEvaluation.decision === 'scale' && Number.isFinite(riskEvaluation.quantity) && riskEvaluation.quantity > 0) {
+        qty = riskEvaluation.quantity;
+        notional = referencePrice !== null ? qty * referencePrice : notional;
+    }
 
     try {
         const order = await submitOrder({
@@ -327,6 +442,7 @@ export async function closePosition({
                 price: order.fillPrice ?? referencePrice,
                 notional,
                 orderId: order.orderId,
+                metadata: metadataPayload,
             });
         } catch (notifyErr) {
             log.debug({ fn: 'closePosition', err: notifyErr }, 'Failed to report trading execution success');
@@ -346,6 +462,7 @@ export async function closePosition({
                 price: referencePrice,
                 notional,
                 reason: err.message,
+                metadata: metadataPayload,
             });
         } catch (notifyErr) {
             log.debug({ fn: 'closePosition', err: notifyErr }, 'Failed to report trading execution error');

@@ -18,6 +18,10 @@ const queue = new Map();
 const flushTimers = new Map();
 const pendingFlushes = new Map();
 
+function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function integrationEnabled() {
     return CFG?.googleSheets?.enabled === true;
 }
@@ -107,6 +111,7 @@ function buildRow({
     const ts = timestamp instanceof Date ? timestamp.toISOString() : new Date().toISOString();
     const normalizedContent = typeof content === "string" ? content : String(content ?? "");
     const resolvedChannelId = channelId || extractChannelId(webhookUrl, "");
+    const complianceInfo = extractComplianceInfo(metadata);
     return [
         ts,
         resolvedChannelId ?? "",
@@ -117,7 +122,70 @@ function buildRow({
         normalizedContent,
         formatAttachments(attachments),
         formatMetadata(metadata),
+        complianceInfo.status,
+        complianceInfo.breaches,
+        complianceInfo.messages,
     ];
+}
+
+function extractComplianceInfo(metadata) {
+    const source = isPlainObject(metadata) ? metadata : {};
+    const compliance = isPlainObject(source.compliance) ? source.compliance : null;
+    const statusCandidate = typeof source.complianceStatus === "string" ? source.complianceStatus : null;
+    const status = statusCandidate
+        ?? (typeof compliance?.status === "string" ? compliance.status : "");
+
+    const breachesSource = Array.isArray(source.complianceBreaches)
+        ? source.complianceBreaches
+        : Array.isArray(compliance?.breaches)
+            ? compliance.breaches
+            : [];
+    const breachText = breachesSource
+        .map(entry => {
+            if (typeof entry === "string") {
+                return entry.trim();
+            }
+            if (isPlainObject(entry)) {
+                const parts = [];
+                if (typeof entry.type === "string") {
+                    parts.push(entry.type.trim());
+                }
+                if (typeof entry.message === "string") {
+                    parts.push(entry.message.trim());
+                }
+                return parts.join(": ").trim();
+            }
+            if (entry == null) {
+                return "";
+            }
+            return String(entry).trim();
+        })
+        .filter(entry => entry !== "")
+        .join("; ");
+
+    const messageSource = Array.isArray(source.complianceMessages)
+        ? source.complianceMessages
+        : Array.isArray(compliance?.messages)
+            ? compliance.messages
+            : [];
+    const messageText = messageSource
+        .map(entry => {
+            if (typeof entry === "string") {
+                return entry.trim();
+            }
+            if (entry == null) {
+                return "";
+            }
+            return String(entry).trim();
+        })
+        .filter(entry => entry !== "")
+        .join(" | ");
+
+    return {
+        status: status ?? "",
+        breaches: breachText,
+        messages: messageText,
+    };
 }
 
 function scheduleFlush(sheetName) {

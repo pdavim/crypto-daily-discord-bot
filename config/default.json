@@ -124,6 +124,22 @@
     "logging": {
       "sheetKey": "trading_actions"
     },
+    "riskPolicy": {
+      "maxExposurePct": 0.4,
+      "maxExposureValue": null,
+      "maxDailyLossPct": 0.08,
+      "maxDailyLossValue": null,
+      "volatilityTriggers": {
+        "enabled": false,
+        "maxAtrPct": null,
+        "maxChangePct": null,
+        "maxVolatilityPct": null
+      },
+      "blacklist": {
+        "symbols": [],
+        "reasons": {}
+      }
+    },
     "automation": {
       "enabled": false,
       "timeframe": "4h",

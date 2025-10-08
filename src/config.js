@@ -409,6 +409,23 @@ const DEFAULT_TRADING_LOGGING_CONFIG = {
     sheetKey: "trading_actions",
 };
 
+const DEFAULT_TRADING_RISK_POLICY = {
+    maxExposurePct: 0.4,
+    maxExposureValue: null,
+    maxDailyLossPct: 0.08,
+    maxDailyLossValue: null,
+    volatilityTriggers: {
+        enabled: false,
+        maxAtrPct: null,
+        maxChangePct: null,
+        maxVolatilityPct: null,
+    },
+    blacklist: {
+        symbols: [],
+        reasons: {},
+    },
+};
+
 const DEFAULT_TRADING_CONFIG = {
     enabled: false,
     minNotional: 0,
@@ -419,6 +436,7 @@ const DEFAULT_TRADING_CONFIG = {
     strategy: DEFAULT_TRADING_STRATEGY_CONFIG,
     discord: DEFAULT_TRADING_DISCORD_CONFIG,
     logging: DEFAULT_TRADING_LOGGING_CONFIG,
+    riskPolicy: DEFAULT_TRADING_RISK_POLICY,
 };
 
 const buildNewsDigestConfig = (baseConfig = {}) => {
@@ -724,6 +742,132 @@ const buildRagConfig = (baseConfig = {}) => {
     return config;
 };
 
+const normalizeBlacklistSymbols = (symbols) => {
+    if (!Array.isArray(symbols)) {
+        return [];
+    }
+    const normalized = symbols
+        .map((symbol) => {
+            if (typeof symbol !== "string") {
+                return null;
+            }
+            const trimmed = symbol.trim();
+            return trimmed === "" ? null : trimmed.toUpperCase();
+        })
+        .filter(Boolean);
+    return Array.from(new Set(normalized));
+};
+
+const normalizeBlacklistReasons = (reasons) => {
+    if (!isPlainObject(reasons)) {
+        return {};
+    }
+    const normalized = {};
+    for (const [key, value] of Object.entries(reasons)) {
+        if (typeof key !== "string") {
+            continue;
+        }
+        const trimmedKey = key.trim().toUpperCase();
+        if (trimmedKey === "") {
+            continue;
+        }
+        if (value === undefined || value === null) {
+            continue;
+        }
+        normalized[trimmedKey] = typeof value === "string" ? value : String(value);
+    }
+    return normalized;
+};
+
+const normalizeRiskPolicy = (baseConfig = {}) => {
+    const base = isPlainObject(baseConfig) ? baseConfig : {};
+    const policy = {
+        ...DEFAULT_TRADING_RISK_POLICY,
+        ...base,
+        volatilityTriggers: {
+            ...DEFAULT_TRADING_RISK_POLICY.volatilityTriggers,
+            ...(isPlainObject(base.volatilityTriggers) ? base.volatilityTriggers : {}),
+        },
+        blacklist: {
+            ...DEFAULT_TRADING_RISK_POLICY.blacklist,
+            ...(isPlainObject(base.blacklist) ? base.blacklist : {}),
+        },
+    };
+
+    policy.maxExposurePct = clampNumber(
+        toNumber(policy.maxExposurePct, DEFAULT_TRADING_RISK_POLICY.maxExposurePct),
+        DEFAULT_TRADING_RISK_POLICY.maxExposurePct,
+        { min: 0, max: 1 },
+    );
+    const envMaxExposurePct = toNumber(process.env.TRADING_RISK_MAX_EXPOSURE_PCT, policy.maxExposurePct);
+    policy.maxExposurePct = clampNumber(envMaxExposurePct, policy.maxExposurePct, { min: 0, max: 1 });
+
+    const baseMaxExposureValue = toNumber(policy.maxExposureValue, null);
+    policy.maxExposureValue = Number.isFinite(baseMaxExposureValue) && baseMaxExposureValue > 0
+        ? baseMaxExposureValue
+        : null;
+    const envMaxExposureValue = toNumber(process.env.TRADING_RISK_MAX_EXPOSURE_VALUE, policy.maxExposureValue);
+    policy.maxExposureValue = Number.isFinite(envMaxExposureValue) && envMaxExposureValue > 0
+        ? envMaxExposureValue
+        : policy.maxExposureValue;
+
+    policy.maxDailyLossPct = clampNumber(
+        toNumber(policy.maxDailyLossPct, DEFAULT_TRADING_RISK_POLICY.maxDailyLossPct),
+        DEFAULT_TRADING_RISK_POLICY.maxDailyLossPct,
+        { min: 0, max: 1 },
+    );
+    const envMaxDailyLossPct = toNumber(process.env.TRADING_RISK_MAX_DAILY_LOSS_PCT, policy.maxDailyLossPct);
+    policy.maxDailyLossPct = clampNumber(envMaxDailyLossPct, policy.maxDailyLossPct, { min: 0, max: 1 });
+
+    const baseDailyLossValue = toNumber(policy.maxDailyLossValue, null);
+    policy.maxDailyLossValue = Number.isFinite(baseDailyLossValue) && baseDailyLossValue > 0
+        ? baseDailyLossValue
+        : null;
+    const envMaxDailyLossValue = toNumber(process.env.TRADING_RISK_MAX_DAILY_LOSS_VALUE, policy.maxDailyLossValue);
+    policy.maxDailyLossValue = Number.isFinite(envMaxDailyLossValue) && envMaxDailyLossValue > 0
+        ? envMaxDailyLossValue
+        : policy.maxDailyLossValue;
+
+    policy.volatilityTriggers.enabled = toBoolean(
+        process.env.TRADING_RISK_VOL_ENABLED,
+        policy.volatilityTriggers.enabled,
+    );
+
+    const baseAtrPct = toNumber(policy.volatilityTriggers.maxAtrPct, null);
+    policy.volatilityTriggers.maxAtrPct = Number.isFinite(baseAtrPct) && baseAtrPct >= 0
+        ? baseAtrPct
+        : null;
+    const envAtrPct = toNumber(process.env.TRADING_RISK_VOL_MAX_ATR_PCT, policy.volatilityTriggers.maxAtrPct);
+    policy.volatilityTriggers.maxAtrPct = clampNumber(envAtrPct, policy.volatilityTriggers.maxAtrPct, { min: 0, max: 1 });
+
+    const baseChangePct = toNumber(policy.volatilityTriggers.maxChangePct, null);
+    policy.volatilityTriggers.maxChangePct = Number.isFinite(baseChangePct) && baseChangePct >= 0
+        ? baseChangePct
+        : null;
+    const envChangePct = toNumber(process.env.TRADING_RISK_VOL_MAX_CHANGE_PCT, policy.volatilityTriggers.maxChangePct);
+    policy.volatilityTriggers.maxChangePct = clampNumber(envChangePct, policy.volatilityTriggers.maxChangePct, { min: 0, max: 1 });
+
+    const baseVolatilityPct = toNumber(policy.volatilityTriggers.maxVolatilityPct, null);
+    policy.volatilityTriggers.maxVolatilityPct = Number.isFinite(baseVolatilityPct) && baseVolatilityPct >= 0
+        ? baseVolatilityPct
+        : null;
+    const envVolatilityPct = toNumber(
+        process.env.TRADING_RISK_VOL_MAX_VOLATILITY_PCT,
+        policy.volatilityTriggers.maxVolatilityPct,
+    );
+    policy.volatilityTriggers.maxVolatilityPct = clampNumber(envVolatilityPct, policy.volatilityTriggers.maxVolatilityPct, { min: 0, max: 2 });
+
+    if (typeof process.env.TRADING_RISK_BLACKLIST === "string") {
+        policy.blacklist.symbols = normalizeBlacklistSymbols(toStringList(process.env.TRADING_RISK_BLACKLIST));
+    } else {
+        policy.blacklist.symbols = normalizeBlacklistSymbols(policy.blacklist.symbols);
+    }
+
+    policy.blacklist.reasons = normalizeBlacklistReasons(policy.blacklist.reasons);
+
+    return policy;
+};
+
 const buildTradingConfig = (baseConfig = {}) => {
     const base = isPlainObject(baseConfig) ? baseConfig : {};
     const config = {
@@ -746,6 +890,8 @@ const buildTradingConfig = (baseConfig = {}) => {
             ...(isPlainObject(base.logging) ? base.logging : {}),
         },
     };
+
+    config.riskPolicy = normalizeRiskPolicy(base.riskPolicy ?? config.riskPolicy);
 
     config.enabled = toBoolean(process.env.TRADING_ENABLED, config.enabled);
 

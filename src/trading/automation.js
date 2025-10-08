@@ -3,6 +3,7 @@ import { logger, withContext } from "../logger.js";
 import { getMarginPositionRisk } from "./binance.js";
 import { openPosition, closePosition } from "./executor.js";
 import { reportTradingDecision } from "./notifier.js";
+import { evaluateTradeIntent } from "./riskManager.js";
 
 function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -101,6 +102,93 @@ function derivePositionDirection(positionAmt, epsilon) {
     return qty > 0 ? "long" : "short";
 }
 
+function computePositionExposure(position, fallbackPrice) {
+    if (!position) {
+        return 0;
+    }
+    const qty = toFinite(position?.positionAmt);
+    if (qty === null) {
+        return 0;
+    }
+    const priceCandidates = [
+        toFinite(position?.markPrice),
+        toFinite(position?.entryPrice),
+        toFinite(fallbackPrice),
+    ];
+    const referencePrice = priceCandidates.find(value => value !== null && value > 0);
+    if (referencePrice === undefined) {
+        return 0;
+    }
+    return Math.abs(qty) * referencePrice;
+}
+
+function computeExposureMetrics(positions, { referencePrices = {} } = {}) {
+    if (!Array.isArray(positions) || positions.length === 0) {
+        return { totalExposure: 0, exposures: {} };
+    }
+    const exposures = {};
+    let totalExposure = 0;
+    for (const position of positions) {
+        const symbol = normalizeSymbol(position?.symbol);
+        const fallbackPrice = symbol ? referencePrices[symbol] : undefined;
+        const notional = computePositionExposure(position, fallbackPrice);
+        if (notional <= 0 || !symbol) {
+            continue;
+        }
+        totalExposure += notional;
+        exposures[symbol] = (exposures[symbol] ?? 0) + notional;
+    }
+    return { totalExposure, exposures };
+}
+
+function buildRiskContext({ positions, symbol, price, snapshot }) {
+    const normalizedSymbol = normalizeSymbol(symbol);
+    const referencePrices = {};
+    const resolvedPrice = toFinite(price);
+    if (normalizedSymbol && resolvedPrice !== null && resolvedPrice > 0) {
+        referencePrices[normalizedSymbol] = resolvedPrice;
+    }
+    const { totalExposure, exposures } = computeExposureMetrics(positions, { referencePrices });
+    const accountEquity = toFinite(CFG.accountEquity);
+    const dailyLoss = toFinite(snapshot?.kpis?.dailyLoss
+        ?? snapshot?.metrics?.dailyLoss
+        ?? snapshot?.risk?.dailyLoss);
+    const volatility = {
+        atr: toFinite(snapshot?.kpis?.atr ?? snapshot?.metrics?.atr),
+        atrPct: toFinite(snapshot?.kpis?.atrPct ?? snapshot?.metrics?.atrPct),
+        changePct: toFinite(snapshot?.kpis?.dayChangePct ?? snapshot?.metrics?.changePct),
+        priceChangePct: toFinite(snapshot?.metrics?.priceChangePct),
+        volatilityPct: toFinite(snapshot?.kpis?.volatilityPct ?? snapshot?.metrics?.volatilityPct),
+        price: resolvedPrice,
+    };
+    return {
+        accountEquity,
+        totalExposure,
+        symbolExposure: exposures,
+        dailyLoss,
+        volatility,
+    };
+}
+
+function adjustExposureAfterClose(context, symbol, notional) {
+    const normalizedSymbol = normalizeSymbol(symbol);
+    const adjustedNotional = toFinite(notional);
+    if (normalizedSymbol === null || adjustedNotional === null || adjustedNotional <= 0) {
+        return context;
+    }
+    const baseExposure = toFinite(context?.totalExposure) ?? 0;
+    const reducedTotal = Math.max(baseExposure - adjustedNotional, 0);
+    const exposureMap = { ...(isPlainObject(context?.symbolExposure) ? context.symbolExposure : {}) };
+    const existing = toFinite(exposureMap[normalizedSymbol]) ?? 0;
+    const reducedSymbolExposure = Math.max(existing - adjustedNotional, 0);
+    exposureMap[normalizedSymbol] = reducedSymbolExposure;
+    return {
+        ...context,
+        totalExposure: reducedTotal,
+        symbolExposure: exposureMap,
+    };
+}
+
 export async function automateTrading({
     assetKey,
     symbol,
@@ -174,13 +262,36 @@ export async function automateTrading({
             return { skipped: true, reason: "noPosition" };
         }
         const existingDirection = derivePositionDirection(existing.positionAmt, automationCfg.positionEpsilon);
+        const price = snapshot?.kpis?.price;
+        const riskContext = buildRiskContext({ positions, symbol, price, snapshot });
+        const closeNotional = computePositionExposure(existing, price);
+        const closeIntent = {
+            source: "automation",
+            action: "close",
+            symbol,
+            assetKey,
+            direction: existingDirection,
+            side: existingDirection === "short" ? "BUY" : "SELL",
+            quantity: Math.abs(toFinite(existing.positionAmt) ?? 0),
+            price,
+            notional: closeNotional,
+        };
+        const closeAssessment = evaluateTradeIntent(closeIntent, riskContext);
+        const closeCompliance = closeAssessment?.compliance;
+        if (closeCompliance && closeCompliance.status !== "cleared") {
+            log.warn({ fn: "automateTrading", compliance: closeCompliance }, "Closing position with compliance flags");
+        }
         try {
             await closePosition({
                 symbol,
                 assetKey,
                 direction: existingDirection,
                 quantity: Math.abs(existing.positionAmt),
-                metadata: { referencePrice: snapshot?.kpis?.price },
+                metadata: {
+                    referencePrice: price,
+                    riskContext,
+                    compliance: closeCompliance,
+                },
             });
             log.info({ fn: "automateTrading", direction: existingDirection }, 'Closed position after flat signal');
             await emitDecision({
@@ -188,6 +299,7 @@ export async function automateTrading({
                 action: "close",
                 direction: existingDirection,
                 quantity: Math.abs(existing.positionAmt),
+                metadata: { compliance: closeCompliance },
             });
             return { executed: true, action: "close", direction: existingDirection };
         } catch (err) {
@@ -197,7 +309,7 @@ export async function automateTrading({
                 action: "close",
                 direction: existingDirection,
                 reason: "closeFailure",
-                metadata: { error: err.message },
+                metadata: { error: err.message, compliance: closeCompliance },
             });
             throw err;
         }
@@ -205,7 +317,13 @@ export async function automateTrading({
 
     const positions = filterActivePositions(await getMarginPositionRisk(), automationCfg.positionEpsilon);
     const existing = findPositionForSymbol(positions, symbol, automationCfg.positionEpsilon);
+    const price = snapshot?.kpis?.price;
+    const baseRiskContext = buildRiskContext({ positions, symbol, price, snapshot });
+    const existingNotional = computePositionExposure(existing, price);
     const existingDirection = derivePositionDirection(existing?.positionAmt, automationCfg.positionEpsilon);
+    const openRiskContext = existingDirection !== "flat" && existingDirection !== direction
+        ? adjustExposureAfterClose(baseRiskContext, symbol, existingNotional)
+        : baseRiskContext;
 
     if (!existing && positions.length >= automationCfg.maxPositions) {
         log.warn({ fn: "automateTrading", positions: positions.length }, 'Skipped trade due to max positions');
@@ -217,7 +335,6 @@ export async function automateTrading({
         return { skipped: true, reason: "maxPositions" };
     }
 
-    const price = snapshot?.kpis?.price;
     const quantity = computeQuantity({ price, positionPct: automationCfg.positionPct });
     if (quantity === null) {
         log.warn({ fn: "automateTrading", price }, 'Skipped trade due to invalid sizing');
@@ -240,13 +357,33 @@ export async function automateTrading({
     }
 
     if (existingDirection !== "flat" && existingDirection !== direction) {
+        const reverseIntent = {
+            source: "automation",
+            action: "close",
+            symbol,
+            assetKey,
+            direction: existingDirection,
+            side: existingDirection === "short" ? "BUY" : "SELL",
+            quantity: Math.abs(toFinite(existing?.positionAmt) ?? 0),
+            price,
+            notional: existingNotional,
+        };
+        const reverseAssessment = evaluateTradeIntent(reverseIntent, baseRiskContext);
+        const reverseCompliance = reverseAssessment?.compliance;
+        if (reverseCompliance && reverseCompliance.status !== "cleared") {
+            log.warn({ fn: "automateTrading", compliance: reverseCompliance }, "Reversal close flagged by risk manager");
+        }
         try {
             await closePosition({
                 symbol,
                 assetKey,
                 direction: existingDirection,
                 quantity: Math.abs(existing.positionAmt),
-                metadata: { referencePrice: price },
+                metadata: {
+                    referencePrice: price,
+                    riskContext: baseRiskContext,
+                    compliance: reverseCompliance,
+                },
             });
             log.info({ fn: "automateTrading", from: existingDirection, to: direction }, 'Closed opposing position before reversal');
             await emitDecision({
@@ -254,7 +391,7 @@ export async function automateTrading({
                 action: "close",
                 direction: existingDirection,
                 quantity: Math.abs(existing.positionAmt),
-                metadata: { reason: "reverse" },
+                metadata: { reason: "reverse", compliance: reverseCompliance },
             });
         } catch (err) {
             log.error({ fn: "automateTrading", err }, 'Failed to close opposing position');
@@ -263,38 +400,93 @@ export async function automateTrading({
                 action: "close",
                 direction: existingDirection,
                 reason: "reverseCloseFailure",
-                metadata: { error: err.message },
+                metadata: { error: err.message, compliance: reverseCompliance },
             });
             throw err;
         }
     }
 
+    let openQuantity = quantity;
+    let compliance = null;
     try {
+        const openIntent = {
+            source: "automation",
+            action: "open",
+            symbol,
+            assetKey,
+            direction,
+            side: direction === "short" ? "SELL" : "BUY",
+            quantity,
+            price,
+            notional: Number.isFinite(price) && Number.isFinite(quantity) ? quantity * price : null,
+            volatility: openRiskContext.volatility,
+        };
+        const openAssessment = evaluateTradeIntent(openIntent, openRiskContext);
+        compliance = openAssessment?.compliance ?? null;
+        if (openAssessment.decision === "block") {
+            log.warn({ fn: "automateTrading", compliance }, "Risk manager blocked automated trade");
+            await emitDecision({
+                status: "skipped",
+                reason: `risk:${openAssessment.reason ?? "blocked"}`,
+                direction,
+                quantity,
+                metadata: { price, compliance },
+            });
+            return { skipped: true, reason: "risk", compliance };
+        }
+        if (openAssessment.decision === "scale") {
+            log.warn({ fn: "automateTrading", compliance }, "Risk manager scaled automated trade");
+            if (Number.isFinite(openAssessment.quantity) && openAssessment.quantity > 0) {
+                openQuantity = openAssessment.quantity;
+            }
+        }
+        if (!Number.isFinite(openQuantity) || openQuantity <= 0) {
+            log.warn({ fn: "automateTrading", compliance }, "Risk manager produced invalid quantity");
+            await emitDecision({
+                status: "skipped",
+                reason: "risk:invalidQuantity",
+                direction,
+                quantity,
+                metadata: { price, compliance },
+            });
+            return { skipped: true, reason: "risk", compliance };
+        }
+
+        if (compliance && compliance.status === "flagged") {
+            log.warn({ fn: "automateTrading", compliance }, "Risk manager flagged automated trade");
+        }
+
+        const metadata = {
+            referencePrice: price,
+            riskContext: openRiskContext,
+            compliance,
+        };
+
         await openPosition({
             symbol,
             assetKey,
             direction,
-            quantity,
-            metadata: { referencePrice: price },
+            quantity: openQuantity,
+            metadata,
         });
-        log.info({ fn: "automateTrading", direction, quantity }, 'Opened automated position');
+        log.info({ fn: "automateTrading", direction, quantity: openQuantity }, 'Opened automated position');
         await emitDecision({
             status: "executed",
             action: "open",
             direction,
-            quantity,
-            metadata: { price },
+            quantity: openQuantity,
+            metadata: { price, compliance },
         });
-        return { executed: true, action: "open", direction, quantity };
+        return { executed: true, action: "open", direction, quantity: openQuantity, compliance };
     } catch (err) {
         log.error({ fn: "automateTrading", err }, 'Failed to open position');
         await emitDecision({
             status: "error",
             action: "open",
             direction,
-            quantity,
+            quantity: openQuantity,
             reason: "openFailure",
-            metadata: { error: err.message, price },
+            metadata: { error: err.message, price, compliance },
         });
         throw err;
     }
@@ -309,4 +501,8 @@ export const __private__ = {
     findPositionForSymbol,
     computeQuantity,
     derivePositionDirection,
+    computePositionExposure,
+    computeExposureMetrics,
+    buildRiskContext,
+    adjustExposureAfterClose,
 };

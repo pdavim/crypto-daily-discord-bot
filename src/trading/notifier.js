@@ -58,6 +58,98 @@ function deriveTimeframeLabel(timeframe) {
     return null;
 }
 
+function formatComplianceMessages(messages) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return null;
+    }
+    const formatted = messages
+        .map(message => {
+            if (typeof message === "string") {
+                return message.trim();
+            }
+            if (message == null) {
+                return "";
+            }
+            return String(message).trim();
+        })
+        .filter(entry => entry !== "");
+    return formatted.length > 0 ? formatted.join("; ") : null;
+}
+
+function formatComplianceSummary(compliance) {
+    if (!isPlainObject(compliance)) {
+        return null;
+    }
+    const status = typeof compliance.status === "string" ? compliance.status : "";
+    if (status === "" || status === "cleared") {
+        return null;
+    }
+    const prefix = status === "blocked"
+        ? "Risk blocked"
+        : status === "scaled"
+            ? "Risk adjusted"
+            : "Risk flag";
+    const breaches = Array.isArray(compliance.breaches) ? compliance.breaches : [];
+    const breachDetails = breaches
+        .map(breach => {
+            if (!isPlainObject(breach)) {
+                return null;
+            }
+            const parts = [];
+            if (typeof breach.type === "string" && breach.type.trim() !== "") {
+                parts.push(breach.type.trim());
+            }
+            if (typeof breach.message === "string" && breach.message.trim() !== "") {
+                parts.push(breach.message.trim());
+            }
+            const extras = [];
+            if (Number.isFinite(breach.limit)) {
+                extras.push(`limit ${formatNumber(breach.limit)}`);
+            }
+            if (Number.isFinite(breach.value)) {
+                extras.push(`value ${formatNumber(breach.value)}`);
+            }
+            if (extras.length > 0) {
+                parts.push(`(${extras.join(", ")})`);
+            }
+            if (parts.length === 0) {
+                return null;
+            }
+            return parts.join(" ");
+        })
+        .filter(entry => entry != null && entry !== "");
+    if (breachDetails.length > 0) {
+        return `${prefix}: ${breachDetails.join("; ")}`;
+    }
+    const messageSummary = formatComplianceMessages(compliance.messages);
+    if (messageSummary) {
+        return `${prefix}: ${messageSummary}`;
+    }
+    return `${prefix}.`;
+}
+
+function attachComplianceMetadata(metadata = {}) {
+    if (!isPlainObject(metadata)) {
+        return metadata ?? {};
+    }
+    const enriched = { ...metadata };
+    const compliance = metadata.compliance;
+    if (isPlainObject(compliance)) {
+        if (typeof compliance.status === "string" && compliance.status !== "") {
+            enriched.complianceStatus = compliance.status;
+        }
+        if (Array.isArray(compliance.breaches) && compliance.breaches.length > 0) {
+            enriched.complianceBreaches = compliance.breaches
+                .map(breach => (isPlainObject(breach) && typeof breach.type === "string") ? breach.type : null)
+                .filter(entry => entry != null);
+        }
+        if (Array.isArray(compliance.messages) && compliance.messages.length > 0) {
+            enriched.complianceMessages = compliance.messages.slice();
+        }
+    }
+    return enriched;
+}
+
 function formatNumber(value) {
     if (value === null || value === undefined) {
         return null;
@@ -75,43 +167,50 @@ function formatNumber(value) {
     return parsed.toLocaleString("en-US", { maximumFractionDigits: 6 });
 }
 
-function buildDecisionContent({ assetKey, symbol, timeframe, status, action, direction, reason, confidence, quantity }) {
+function buildDecisionContent({ assetKey, symbol, timeframe, status, action, direction, reason, confidence, quantity, compliance }) {
     const assetLabel = deriveAssetLabel({ assetKey, symbol });
     const tfLabel = deriveTimeframeLabel(timeframe);
     const base = tfLabel ? `${assetLabel} ${tfLabel}` : assetLabel;
     if (status === "executed") {
         if (action === "close") {
             const directionLabel = direction ? direction.toUpperCase() : "position";
-            return `✅ Automation closed ${base} ${directionLabel} position.`;
+            const summary = formatComplianceSummary(compliance);
+            return `✅ Automation closed ${base} ${directionLabel} position.${summary ? ` ${summary}` : ""}`;
         }
         const directionLabel = direction ? direction.toUpperCase() : "position";
         const qtyLabel = quantity ? ` qty ${formatNumber(quantity)}` : "";
-        return `✅ Automation opening ${directionLabel} on ${base}${qtyLabel ? ` (${qtyLabel})` : ""}.`;
+        const summary = formatComplianceSummary(compliance);
+        return `✅ Automation opening ${directionLabel} on ${base}${qtyLabel ? ` (${qtyLabel})` : ""}.${summary ? ` ${summary}` : ""}`;
     }
     if (status === "error") {
         const reasonLabel = reason ? `: ${reason}` : ".";
-        return `❌ Automation failed to ${action ?? "act"} on ${base}${reasonLabel}`;
+        const summary = formatComplianceSummary(compliance);
+        return `❌ Automation failed to ${action ?? "act"} on ${base}${reasonLabel}${summary ? ` ${summary}` : ""}`;
     }
     const reasonLabel = reason ? ` (${reason})` : "";
     const confidenceLabel = Number.isFinite(confidence) ? ` (confidence ${confidence.toFixed(2)})` : "";
-    return `⚠️ Automation skipped ${base}${reasonLabel}${confidenceLabel}.`;
+    const summary = formatComplianceSummary(compliance);
+    return `⚠️ Automation skipped ${base}${reasonLabel}${confidenceLabel}.${summary ? ` ${summary}` : ""}`;
 }
 
-function buildExecutionContent({ assetKey, symbol, action, status, side, quantity, price, notional, reason }) {
+function buildExecutionContent({ assetKey, symbol, action, status, side, quantity, price, notional, reason, compliance }) {
     const assetLabel = deriveAssetLabel({ assetKey, symbol });
     const directionLabel = side ? side.toUpperCase() : action;
     const qtyLabel = quantity ? ` qty ${formatNumber(quantity)}` : "";
     const priceLabel = price ? ` @ ${formatNumber(price)}` : "";
     const notionalLabel = notional ? ` (${formatNumber(notional)} notional)` : "";
     if (status === "executed") {
-        return `✅ Executed ${directionLabel} for ${assetLabel}${qtyLabel}${priceLabel}${notionalLabel}.`;
+        const summary = formatComplianceSummary(compliance);
+        return `✅ Executed ${directionLabel} for ${assetLabel}${qtyLabel}${priceLabel}${notionalLabel}.${summary ? ` ${summary}` : ""}`;
     }
     if (status === "skipped") {
         const reasonLabel = reason ? ` (${reason})` : "";
-        return `⚠️ Skipped ${directionLabel} for ${assetLabel}${reasonLabel}.`;
+        const summary = formatComplianceSummary(compliance);
+        return `⚠️ Skipped ${directionLabel} for ${assetLabel}${reasonLabel}.${summary ? ` ${summary}` : ""}`;
     }
     const reasonLabel = reason ? `: ${reason}` : ".";
-    return `❌ Failed ${directionLabel} for ${assetLabel}${qtyLabel}${priceLabel}${reasonLabel}`;
+    const summary = formatComplianceSummary(compliance);
+    return `❌ Failed ${directionLabel} for ${assetLabel}${qtyLabel}${priceLabel}${reasonLabel}${summary ? ` ${summary}` : ""}`;
 }
 
 function buildMarginContent({ asset, amount, operation, status, reason }) {
@@ -140,6 +239,7 @@ async function dispatchTradingEvent({
 }) {
     const discordCfg = getTradingDiscordConfig();
     const log = withContext(logger, { fn: "dispatchTradingEvent", messageType, asset: assetKey ?? symbol });
+    const metadataPayload = attachComplianceMetadata(metadata);
     let resolvedContent = content;
     let resolvedWebhookUrl;
     let resolvedChannelId = typeof discordCfg.channelId === "string" && discordCfg.channelId.trim() !== ""
@@ -172,7 +272,7 @@ async function dispatchTradingEvent({
             webhookUrl: resolvedWebhookUrl ?? discordCfg.webhookUrl ?? null,
             content: resolvedContent,
             metadata: {
-                ...metadata,
+                ...metadataPayload,
                 assetKey: assetKey ?? null,
                 symbol: symbol ?? null,
                 timeframe: timeframe ?? null,
@@ -207,6 +307,7 @@ export async function reportTradingDecision({
         reason,
         confidence,
         quantity,
+        compliance: metadata?.compliance,
     });
 
     await dispatchTradingEvent({
@@ -215,7 +316,7 @@ export async function reportTradingDecision({
         assetKey,
         symbol,
         timeframe,
-        metadata: {
+        metadata: attachComplianceMetadata({
             ...metadata,
             status,
             action,
@@ -223,7 +324,7 @@ export async function reportTradingDecision({
             reason,
             confidence,
             quantity,
-        },
+        }),
         fallbackSheet: CFG?.trading?.logging?.sheetKey,
         timestamp,
     });
@@ -254,6 +355,7 @@ export async function reportTradingExecution({
         price,
         notional,
         reason,
+        compliance: metadata?.compliance,
     });
 
     await dispatchTradingEvent({
@@ -262,7 +364,7 @@ export async function reportTradingExecution({
         assetKey,
         symbol,
         timeframe,
-        metadata: {
+        metadata: attachComplianceMetadata({
             ...metadata,
             status,
             action,
@@ -272,7 +374,7 @@ export async function reportTradingExecution({
             notional,
             reason,
             orderId,
-        },
+        }),
         fallbackSheet: CFG?.trading?.logging?.sheetKey,
         timestamp,
     });
