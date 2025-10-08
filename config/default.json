@@ -41,6 +41,20 @@
   "analysisFrequency": "hourly",
   "openrouterApiKey": null,
   "openrouterModel": "openrouter/sonoma-dusk-alpha",
+  "kaiban": {
+    "enabled": false,
+    "logLevel": "info",
+    "maxIterations": 3,
+    "models": {
+      "technical": "openrouter/sonoma-dusk-alpha",
+      "news": "openrouter/sonoma-dusk-alpha",
+      "sentiment": "openrouter/sonoma-dusk-alpha",
+      "research": "openrouter/sonoma-dusk-alpha",
+      "trader": "openrouter/sonoma-dusk-alpha",
+      "risk": "openrouter/sonoma-dusk-alpha",
+      "execution": "openrouter/sonoma-dusk-alpha"
+    }
+  },
   "rag": {
     "pgUrl": null,
     "embeddingModel": "text-embedding-3-large",

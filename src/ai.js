@@ -54,6 +54,8 @@ import { searchWeb } from "./websearch.js";
 import { sma, rsi, macd, atr14, bollinger, bollWidth, crossUp, crossDown, parabolicSAR, semaforo, isBBSqueeze, sparkline, volumeDivergence, trendFromMAs, scoreHeuristic, vwap, ema, stochastic, williamsR, cci, obv } from "./indicators.js";
 import { buildAlerts, formatAlertMessage } from "./alerts.js";
 import { logger, withContext } from "./logger.js";
+import { calcReturn, fallbackVerdict, getMacroContext } from "./agents/common.js";
+import { runKaibanWorkflow } from "./agents/team.js";
 
 const openrouter = CFG.openrouterApiKey
     ? new OpenAi({ baseURL: 'https://openrouter.ai/api/v1', apiKey: CFG.openrouterApiKey })
@@ -90,41 +92,11 @@ export async function callOpenRouter(messages, options = {}) {
     }
 }
 
-function calcReturn(closes, days) {
-    const last = closes.at(-1);
-    const prev = closes.at(-(days + 1));
-    if (!last || !prev) return 0;
-    return ((last - prev) / prev) * 100;
-}
-
-function fallbackVerdict({ ma20, ma50, rsi14 }) {
-    if (ma20 > ma50 && rsi14 > 55) {
-        return "📈 Uptrend with bullish momentum.";
-    }
-    if (ma20 < ma50 && rsi14 < 45) {
-        return "📉 Downtrend with weak momentum.";
-    }
-    return "🔁 Mixed technical signals, hold.";
-}
-
-async function getMacroContext() {
-    const log = withContext(logger);
-    log.info({ fn: 'getMacroContext' }, "Fetching macro context...");
-    try {
-        const { summary } = await getAssetNews({ symbol: "crypto market" });
-        const web = await searchWeb("crypto market");
-        return [summary, web.slice(0, 2).join(" | ")].filter(Boolean).join(" | ");
-    } catch {
-        return "";
-    }
-}
-
 /**
  * Builds a multi-asset analysis report using market data, news and AI summarization.
  * @returns {Promise} Markdown report describing the analysed assets.
  */
-// Gather metrics for several assets and use OpenRouter for a brief analysis
-export async function runAgent() {
+async function runLegacyAgent() {
     const log = withContext(logger);
     log.info({ fn: 'runAgent' }, "Running AI agent for asset analysis...");
     const reports = [];
@@ -322,6 +294,38 @@ export async function runAgent() {
     const macroSection = macro ? `**Macro**\n${macro}` : "";
     const disclaimer = "_This report is for educational purposes only and not financial advice._";
     return [reports.join("\n\n"), macroSection, disclaimer].filter(Boolean).join("\n\n");
+}
+
+function normalizeKaibanDecision(decision) {
+    if (decision && typeof decision.report === "string") {
+        const trimmed = decision.report.trim();
+        if (trimmed) {
+            return trimmed;
+        }
+    }
+    if (decision && typeof decision === "object") {
+        return JSON.stringify(decision, null, 2);
+    }
+    return "";
+}
+
+export async function runAgent() {
+    if (CFG.kaiban?.enabled) {
+        const log = withContext(logger);
+        try {
+            const decision = await runKaibanWorkflow();
+            const report = normalizeKaibanDecision(decision);
+            if (report) {
+                return report;
+            }
+            log.warn({ fn: 'runAgent' }, 'Kaiban workflow returned empty report, using legacy output');
+            return runLegacyAgent();
+        } catch (error) {
+            log.error({ fn: 'runAgent', err: error }, 'Kaiban workflow failed, falling back to legacy agent');
+            return runLegacyAgent();
+        }
+    }
+    return runLegacyAgent();
 }
 
 export { getEmbedding } from "./rag/embedding.js";

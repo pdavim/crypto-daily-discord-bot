@@ -152,6 +152,51 @@ const normalizeStringOrNull = (value, fallback = null) => {
 
 const DEFAULT_MIN_PROFIT_CONFIG = { default: 0, users: {} };
 
+const KAIBAN_ROLE_KEYS = [
+    "technical",
+    "news",
+    "sentiment",
+    "research",
+    "trader",
+    "risk",
+    "execution",
+];
+
+const DEFAULT_KAIBAN_MODEL = "openrouter/sonoma-dusk-alpha";
+
+const normalizeKaibanModels = (models, fallbackModel) => {
+    const base = isPlainObject(models) ? models : {};
+    const normalized = {};
+    for (const role of KAIBAN_ROLE_KEYS) {
+        const configValue = normalizeStringOrNull(base[role]);
+        normalized[role] = configValue ?? fallbackModel;
+    }
+    return normalized;
+};
+
+const buildKaibanConfig = (value, fallbackModel) => {
+    const base = isPlainObject(value) ? value : {};
+    const defaultModel = normalizeStringOrNull(base.defaultModel) ?? fallbackModel ?? DEFAULT_KAIBAN_MODEL;
+    const models = normalizeKaibanModels(base.models, defaultModel);
+    for (const role of KAIBAN_ROLE_KEYS) {
+        const envKey = `KAIBAN_MODEL_${role.toUpperCase()}`;
+        const override = normalizeStringOrNull(process.env[envKey]);
+        if (override) {
+            models[role] = override;
+        }
+    }
+    const enabled = toBoolean(process.env.KAIBAN_ENABLED, base.enabled ?? false);
+    const logLevel = normalizeStringOrNull(process.env.KAIBAN_LOG_LEVEL, base.logLevel ?? "info") ?? "info";
+    const rawIterations = toInt(process.env.KAIBAN_MAX_ITERATIONS, base.maxIterations ?? 3);
+    const maxIterations = Number.isFinite(rawIterations) && rawIterations > 0 ? rawIterations : 3;
+    return {
+        enabled,
+        logLevel,
+        maxIterations,
+        models,
+    };
+};
+
 const DEFAULT_GOOGLE_SHEETS_CONFIG = {
     enabled: false,
     spreadsheetId: null,
@@ -1297,6 +1342,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.analysisFrequency = process.env.ANALYSIS_FREQUENCY ?? nextCFG.analysisFrequency ?? 'hourly';
     nextCFG.openrouterApiKey = process.env.OPENROUTER_API_KEY ?? nextCFG.openrouterApiKey ?? null;
     nextCFG.openrouterModel = process.env.OPENROUTER_MODEL ?? nextCFG.openrouterModel ?? 'openrouter/sonoma-dusk-alpha';
+    nextCFG.kaiban = buildKaibanConfig(nextCFG.kaiban, nextCFG.openrouterModel);
     nextCFG.rag = buildRagConfig(nextCFG.rag);
     nextCFG.sentimentProvider = (process.env.SENTIMENT_PROVIDER ?? nextCFG.sentimentProvider ?? 'tfjs').toLowerCase();
     nextCFG.sentimentApiUrl = process.env.SENTIMENT_API_URL ?? nextCFG.sentimentApiUrl ?? null;
