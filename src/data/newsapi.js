@@ -25,9 +25,12 @@ export async function searchNews(asset) {
             return response;
         });
         const articles = Array.isArray(data?.articles) ? data.articles : [];
-        return articles.map(a => ({
-            title: a.title,
-            description: a.description || "",
+        return articles.map((article) => ({
+            title: article?.title ?? "",
+            description: article?.description ?? "",
+            url: article?.url ?? "",
+            source: article?.source?.name ?? null,
+            publishedAt: article?.publishedAt ?? article?.published_at ?? null,
         }));
     } catch (error) {
         log.error({ err: error }, 'Error fetching news');

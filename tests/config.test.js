@@ -100,3 +100,22 @@ describe('saveConfig minimum profit normalization', () => {
     });
   });
 });
+
+describe('rssSources defaults', () => {
+  it('provides baseline RSS feeds by default', async () => {
+    const { CFG } = await import("../src/config.js");
+
+    expect(CFG.rssSources).toBeDefined();
+    const wildcardSources = Array.isArray(CFG.rssSources?.["*"]) ? CFG.rssSources["*"] : [];
+    expect(wildcardSources.length).toBeGreaterThan(0);
+    expect(wildcardSources[0]).toMatchObject({ name: expect.any(String), url: expect.stringContaining('http') });
+  });
+
+  it('allows disabling RSS sources via saved configuration', async () => {
+    const { CFG, saveConfig } = await import("../src/config.js");
+
+    await saveConfig({ rssSources: null });
+
+    expect(CFG.rssSources).toBeNull();
+  });
+});

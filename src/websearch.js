@@ -3,8 +3,6 @@ import { config } from "./config.js";
 import { fetchWithRetry } from "./utils.js";
 import { logger, withContext } from "./logger.js";
 
-export const WEB_SNIPPETS = [];
-
 const BLOG_SOURCES = {
     BTC: "https://bitcoin.org/en/blog",
     ETH: "https://blog.ethereum.org",
@@ -46,10 +44,10 @@ async function fetchOfficialBlog(asset) {
 export async function searchWeb(asset) {
     const log = withContext(logger, { asset });
     log.info({ fn: 'searchWeb' }, `Fetching web results for ${asset}`);
-    WEB_SNIPPETS.length = 0;
     if (!config.serpapiApiKey || !asset) {
-        return WEB_SNIPPETS;
+        return [];
     }
+    const snippets = [];
     try {
         const params = {
             engine: "google",
@@ -62,7 +60,7 @@ export async function searchWeb(asset) {
         const results = data.organic_results || [];
         results.slice(0, 5).forEach(r => {
             if (r.snippet) {
-                WEB_SNIPPETS.push(r.snippet);
+                snippets.push(r.snippet);
             }
         });
     } catch (err) {
@@ -77,7 +75,7 @@ export async function searchWeb(asset) {
         }
     }
     if (official) {
-        WEB_SNIPPETS.unshift(official);
+        snippets.unshift(official);
     }
-    return WEB_SNIPPETS;
+    return snippets;
 }

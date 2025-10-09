@@ -7,6 +7,7 @@ import { callOpenRouter } from "./ai.js";
 import { fetchWithRetry } from "./utils.js";
 import { logger, withContext } from "./logger.js";
 import { filterFreshNewsItems, markNewsItemsAsSeen } from "./newsCache.js";
+import { searchNews } from "./data/newsapi.js";
 import { classifySentimentsLocal, normalizeSentiment, clampSentiment } from "./sentiment.js";
 
 const NEWS_CACHE_PATH = new URL("../data/news-cache.json", import.meta.url);
@@ -318,6 +319,7 @@ function getRssSourceEntries(symbol) {
 
 async function fetchSerpApiNews({ symbol, lookbackHours, limit, log }) {
     if (!config.serpapiApiKey) {
+        log.warn({ fn: "fetchSerpApiNews" }, "SerpAPI key not configured; skipping web headlines");
         return [];
     }
     try {
@@ -563,6 +565,7 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
 
     const now = Date.now();
     const cacheKey = getCacheKey(symbol, lookbackHours, limit);
+    const cutoffTimestamp = now - lookbackHours * 60 * 60 * 1000;
 
     try {
         const cached = await getCachedNews(cacheKey, now, log);
@@ -590,6 +593,42 @@ export async function getAssetNews({ symbol, lookbackHours = 24, limit = 6 }) {
         ]);
 
         let combined = [...serpItems, ...rssItems].filter((item) => item && item.title && item.url);
+
+        if (!combined.length) {
+            const fallbackArticles = await searchNews(symbol);
+            const fallbackItems = Array.isArray(fallbackArticles)
+                ? fallbackArticles
+                    .map((article) => {
+                        const title = typeof article?.title === "string" ? article.title.trim() : "";
+                        const url = typeof article?.url === "string" ? article.url.trim() : "";
+                        if (!title || !url) {
+                            return null;
+                        }
+                        let publishedAt = parseDate(article?.publishedAt);
+                        if (!publishedAt || Number.isNaN(publishedAt.getTime())) {
+                            publishedAt = new Date();
+                        }
+                        if (publishedAt.getTime() < cutoffTimestamp) {
+                            return null;
+                        }
+                        const snippet = typeof article?.description === "string" ? article.description.trim() : "";
+                        const sourceRaw = typeof article?.source === "string" ? article.source.trim() : "";
+                        const source = sourceRaw || getDomain(url);
+                        return {
+                            title,
+                            source,
+                            publishedAt,
+                            url,
+                            snippet,
+                        };
+                    })
+                    .filter(Boolean)
+                : [];
+            if (fallbackItems.length) {
+                log.info({ fn: "getAssetNews", count: fallbackItems.length }, "Falling back to NewsAPI articles");
+                combined = fallbackItems;
+            }
+        }
 
         if (!combined.length) {
             const emptyResult = { items: [], summary: "", avgSentiment: 0, weightedSentiment: 0 };

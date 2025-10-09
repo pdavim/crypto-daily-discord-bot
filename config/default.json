@@ -428,6 +428,18 @@
     "webhooks": {}
   },
   "newsApiKey": null,
+  "rssSources": {
+    "*": [
+      {
+        "name": "CoinDesk",
+        "url": "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml"
+      },
+      {
+        "name": "Cointelegraph",
+        "url": "https://cointelegraph.com/rss"
+      }
+    ]
+  },
   "serpapiApiKey": null,
   "dashboard": {
     "enabled": true,
