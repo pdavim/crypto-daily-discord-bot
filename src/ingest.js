@@ -1,7 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { ASSETS } from "./assets.js";
 import { CFG } from "./config.js";
 import { buildHash } from "./alertCache.js";
 import { getAssetNews } from "./news.js";
@@ -359,7 +358,8 @@ const defaultFetchPosts = async (log, options = {}) => {
     const lookbackHours = toPositiveIntOption(options.lookbackHours, 24);
     const limit = toPositiveIntOption(options.limit, 6);
     const posts = [];
-    for (const asset of ASSETS) {
+    const assets = Array.isArray(CFG.assets) ? CFG.assets : [];
+    for (const asset of assets) {
         const assetKey = typeof asset?.key === "string" ? asset.key : null;
         if (!assetKey) {
             continue;

@@ -30,7 +30,10 @@ const removeAssetFromWatch = vi.fn();
 const getWatchlist = vi.fn(() => []);
 const getForecastSnapshot = vi.fn(() => ({}));
 const getAccountOverview = vi.fn();
-const submitOrder = vi.fn();
+const placeOrder = vi.fn();
+const transferMargin = vi.fn();
+const borrowMargin = vi.fn();
+const repayMargin = vi.fn();
 const openPosition = vi.fn();
 const adjustMargin = vi.fn();
 const settingsStore = {};
@@ -52,11 +55,33 @@ const setSettingMock = vi.fn((key, value) => {
   return settingsStore[key];
 });
 
-vi.mock('../src/data/binance.js', () => ({ fetchOHLCV }));
+vi.mock('../src/data/marketData.js', () => ({ fetchOHLCV }));
 vi.mock('../src/chart.js', () => ({ renderChartPNG }));
 vi.mock('../src/watchlist.js', () => ({ addAssetToWatch, removeAssetFromWatch, getWatchlist }));
 vi.mock('../src/store.js', () => ({ getForecastSnapshot }));
-vi.mock('../src/trading/binance.js', () => ({ getAccountOverview, submitOrder }));
+const streamCandlesMock = vi.fn();
+const getExchangeConnectorMock = vi.fn(() => ({
+  id: 'binance',
+  getAccountOverview,
+  placeOrder,
+  transferMargin,
+  borrowMargin,
+  repayMargin,
+  streamCandles: streamCandlesMock,
+}));
+const resolveConnectorForAssetMock = vi.fn(() => ({
+  id: 'binance',
+  getAccountOverview,
+  placeOrder,
+  transferMargin,
+  borrowMargin,
+  repayMargin,
+  streamCandles: streamCandlesMock,
+}));
+vi.mock('../src/exchanges/index.js', () => ({
+  getExchangeConnector: getExchangeConnectorMock,
+  resolveConnectorForAsset: resolveConnectorForAssetMock,
+}));
 vi.mock('../src/trading/executor.js', () => ({ openPosition, adjustMargin }));
 vi.mock('../src/settings.js', () => ({
   loadSettings: loadSettingsMock,
@@ -67,6 +92,8 @@ vi.mock('../src/settings.js', () => ({
 // environment setup for assets
 process.env.BINANCE_SYMBOL_BTC = 'BTCUSDT';
 
+const { CFG } = await import("../src/config.js");
+
 async function loadBot() {
   return import("../src/discordBot.js");
 }
@@ -75,7 +102,31 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
   getAccountOverview.mockReset();
-  submitOrder.mockReset();
+  placeOrder.mockReset();
+  transferMargin.mockReset();
+  borrowMargin.mockReset();
+  repayMargin.mockReset();
+  streamCandlesMock.mockReset();
+  getExchangeConnectorMock.mockReset();
+  resolveConnectorForAssetMock.mockReset();
+  getExchangeConnectorMock.mockReturnValue({
+    id: 'binance',
+    getAccountOverview,
+    placeOrder,
+    transferMargin,
+    borrowMargin,
+    repayMargin,
+    streamCandles: streamCandlesMock,
+  });
+  resolveConnectorForAssetMock.mockReturnValue({
+    id: 'binance',
+    getAccountOverview,
+    placeOrder,
+    transferMargin,
+    borrowMargin,
+    repayMargin,
+    streamCandles: streamCandlesMock,
+  });
   openPosition.mockReset();
   adjustMargin.mockReset();
   getForecastSnapshot.mockReset();
@@ -84,6 +135,21 @@ beforeEach(() => {
     delete settingsStore[key];
   }
   delete process.env.ENABLE_BINANCE_COMMAND;
+  CFG.assets = [{
+    key: 'BTC',
+    exchange: 'binance',
+    symbol: 'BTCUSDT',
+    symbols: { spot: 'BTCUSDT', stream: 'BTCUSDT', market: 'BTCUSDT' },
+    capabilities: {
+      candles: true,
+      daily: true,
+      streaming: true,
+      trading: true,
+      margin: true,
+      forecasting: true,
+    },
+  }];
+  CFG.assetMap = new Map(CFG.assets.map(asset => [asset.key, asset]));
 });
 
 describe('discord bot interactions', () => {
@@ -106,7 +172,7 @@ describe('discord bot interactions', () => {
 
     await handleInteraction(interaction);
 
-    expect(fetchOHLCV).toHaveBeenCalledWith('BTCUSDT', '15m');
+    expect(fetchOHLCV).toHaveBeenCalledWith(expect.objectContaining({ key: 'BTC' }), '15m');
     expect(renderChartPNG).toHaveBeenCalledWith(
       'BTC',
       '15m',
@@ -707,7 +773,7 @@ describe('discord bot interactions', () => {
       maxLeverage: 1,
     };
 
-    submitOrder.mockResolvedValue({ orderId: 42, fillPrice: 25000 });
+    placeOrder.mockResolvedValue({ orderId: 42, fillPrice: 25000 });
 
     const options = {
       getSubcommand: () => 'buy',
@@ -729,7 +795,7 @@ describe('discord bot interactions', () => {
 
     await handleInteraction(interaction);
 
-    expect(submitOrder).toHaveBeenCalledWith(
+    expect(placeOrder).toHaveBeenCalledWith(
       expect.objectContaining({
         symbol: 'BTCUSDT',
         side: 'BUY',
@@ -826,7 +892,7 @@ describe('discord bot interactions', () => {
 
     await handleInteraction(interaction);
 
-    expect(submitOrder).not.toHaveBeenCalled();
+    expect(placeOrder).not.toHaveBeenCalled();
     expect(openPosition).not.toHaveBeenCalled();
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
     expect(interaction.reply.mock.calls[0][0].content).toContain('abaixo do notional mínimo');

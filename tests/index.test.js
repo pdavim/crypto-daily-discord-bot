@@ -40,7 +40,7 @@ const postMonthlyReportMock = vi.fn(() => Promise.resolve({ posted: true, webhoo
 const notifyOpsMock = vi.fn(() => Promise.resolve());
 const fetchDailyClosesMock = vi.fn(() => Promise.resolve([{ t: new Date(), o: 1, h: 1, l: 1, c: 1, v: 1 }]));
 const fetchOHLCVMock = vi.fn(() => Promise.resolve([]));
-const streamKlinesMock = vi.fn();
+const streamCandlesMock = vi.fn();
 const registerMock = {
     contentType: "text/plain",
     metrics: vi.fn(() => Promise.resolve("metrics")),
@@ -106,15 +106,17 @@ vi.mock("http", () => ({ createServer: vi.fn(() => ({ listen: listenMock })), de
 const onConfigChangeMock = vi.fn(() => () => {});
 vi.mock("../src/config.js", () => ({ CFG: cfgMock, onConfigChange: onConfigChangeMock }));
 vi.mock("../src/assets.js", () => ({
-    ASSETS: [{ key: "BTC", binance: "BTCUSDT" }],
     TIMEFRAMES: ["1h", "4h"],
-    BINANCE_INTERVALS: { "1h": "1h", "4h": "4h" },
+    EXCHANGE_INTERVAL_OVERRIDES: { binance: { "4h": "4h" } },
 }));
-vi.mock("../src/data/binance.js", () => ({
+vi.mock("../src/data/marketData.js", () => ({
     fetchOHLCV: fetchOHLCVMock,
     fetchDailyCloses: fetchDailyClosesMock,
 }));
-vi.mock("../src/data/binanceStream.js", () => ({ streamKlines: streamKlinesMock }));
+const resolveConnectorForAssetMock = vi.fn();
+vi.mock("../src/exchanges/index.js", () => ({
+    resolveConnectorForAsset: resolveConnectorForAssetMock,
+}));
 vi.mock("../src/indicators.js", () => ({
     sma: vi.fn(() => []),
     rsi: vi.fn(() => []),
@@ -244,7 +246,8 @@ describe("analysis scheduler", () => {
         notifyOpsMock.mockClear();
         fetchDailyClosesMock.mockClear();
         fetchOHLCVMock.mockClear();
-        streamKlinesMock.mockClear();
+        streamCandlesMock.mockClear();
+        resolveConnectorForAssetMock.mockReset();
         registerMock.metrics.mockClear();
         reportWeeklyPerfMock.mockClear();
         saveWeeklySnapshotMock.mockClear();
@@ -264,6 +267,28 @@ describe("analysis scheduler", () => {
         buildSnapshotForReportMock.mockClear();
         buildSummaryMock.mockClear();
         fetchOHLCVMock.mockImplementation(() => Promise.resolve([]));
+        const asset = {
+            key: "BTC",
+            exchange: "binance",
+            symbol: "BTCUSDT",
+            symbols: { stream: "BTCUSDT", market: "BTCUSDT" },
+            capabilities: { candles: true, daily: true, streaming: true },
+        };
+        cfgMock.assets = [asset];
+        cfgMock.assetMap = new Map([[asset.key, asset]]);
+        const connector = { id: "binance", streamCandles: streamCandlesMock };
+        resolveConnectorForAssetMock.mockImplementation((target) => {
+            if (!target) {
+                return null;
+            }
+            const resolved = typeof target === "string"
+                ? cfgMock.assetMap.get(target.toUpperCase())
+                : target;
+            if (resolved?.exchange === "binance") {
+                return connector;
+            }
+            return null;
+        });
         process.env.NODE_ENV = "test";
         process.argv = ["/usr/bin/node", "index.js"];
         cfgMock.analysisFrequency = "hourly";
@@ -584,7 +609,7 @@ describe("handleAnalysisSlashCommand", () => {
         fetchDailyClosesMock.mockClear();
 
         const summary = await handleAnalysisSlashCommand({
-            asset: { key: "BTC", binance: "BTCUSDT" },
+            asset: { ...cfgMock.assets[0] },
             timeframe: "4h",
         });
 

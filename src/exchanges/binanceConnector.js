@@ -1,22 +1,59 @@
-/**
- * Binance adapter consolidando requisições autenticadas, consulta de contas e utilidades
- * de stream utilizadas pelo executor automático e pelos relatórios de carteira.
- *
- * Além de assinar requests privadas com HMAC, o módulo formata saldos spot/margin,
- * calcula preço médio de fills e exporta helpers consumidos pelo comando `/binance`
- * e pelo simulador de crescimento de portfólio.
- */
 import axios from "axios";
 import crypto from "crypto";
 import WebSocket from "ws";
-import { logTrade } from "./tradeLog.js";
-import { logger, withContext } from "../logger.js";
+import { performance } from "node:perf_hooks";
+import { LRUCache } from "lru-cache";
+
 import { fetchWithRetry } from "../utils.js";
+import { CFG, onConfigChange } from "../config.js";
+import { logger, withContext } from "../logger.js";
+import { recordPerf } from "../perf.js";
+import { logTrade } from "../trading/tradeLog.js";
 
 const BASE = "https://api.binance.com";
+const DATA_BASE = `${BASE}/api/v3/klines`;
 const FUTURES_BASE = "https://fapi.binance.com";
 const WS_BASE = "wss://stream.binance.com:9443/ws";
 const DEFAULT_RECV_WINDOW = Number.parseInt(process.env.BINANCE_RECV_WINDOW ?? "5000", 10);
+const DEFAULT_LIMIT = 200;
+const RATE_LIMIT_MS = 200;
+
+let lastCall = 0;
+let binanceOffline = false;
+
+function getCacheTtlMs() {
+    const ttlMinutes = Number.parseFloat(CFG.binanceCacheTTL ?? "");
+    if (Number.isFinite(ttlMinutes) && ttlMinutes > 0) {
+        return ttlMinutes * 60 * 1000;
+    }
+    return 10 * 60 * 1000;
+}
+
+const cache = new LRUCache({
+    max: 500,
+    ttl: getCacheTtlMs(),
+});
+
+onConfigChange(() => {
+    cache.ttl = getCacheTtlMs();
+});
+
+function markOffline(err) {
+    const aggregateErrors = Array.isArray(err?.errors) ? err.errors : [];
+    const codes = [err?.code, ...aggregateErrors.map(e => e?.code)].filter(Boolean);
+    if (codes.includes("ENETUNREACH")) {
+        binanceOffline = true;
+    }
+}
+
+async function rateLimit() {
+    const now = Date.now();
+    const wait = Math.max(0, lastCall + RATE_LIMIT_MS - now);
+    if (wait > 0) {
+        await new Promise(resolve => setTimeout(resolve, wait));
+    }
+    lastCall = Date.now();
+}
 
 function getCredentials() {
     const key = process.env.BINANCE_API_KEY?.trim();
@@ -50,22 +87,22 @@ async function privateRequest(method, path, params = {}, { context, baseUrl = BA
     try {
         const { data } = await fetchWithRetry(async () => {
             attempt += 1;
-            log.info({ method, attempt }, 'Dispatching Binance private request');
+            log.info({ method, attempt }, "Dispatching Binance private request");
             const startedAt = Date.now();
             try {
                 const response = await axios({ method, url, headers: { "X-MBX-APIKEY": key } });
                 const durationMs = Date.now() - startedAt;
-                log.debug({ method, attempt, status: response?.status, durationMs }, 'Binance private request completed');
+                log.debug({ method, attempt, status: response?.status, durationMs }, "Binance private request completed");
                 return response;
             } catch (err) {
                 const durationMs = Date.now() - startedAt;
-                log.debug({ method, attempt, status: err?.response?.status, durationMs }, 'Binance private request failed');
+                log.debug({ method, attempt, status: err?.response?.status, durationMs }, "Binance private request failed");
                 throw err;
             }
         });
         return data;
     } catch (err) {
-        log.error({ method, status: err?.response?.status }, 'Binance request failed');
+        log.error({ method, status: err?.response?.status }, "Binance request failed");
         throw err;
     }
 }
@@ -85,7 +122,7 @@ function mapBalances(balances = [], { includeZero = false } = {}) {
                 asset: balance.asset,
                 free,
                 locked,
-                total
+                total,
             };
         })
         .filter(entry => includeZero || entry.total > 0);
@@ -103,7 +140,7 @@ function mapMarginAssets(userAssets = [], { includeZero = false } = {}) {
                 free,
                 borrowed,
                 interest,
-                netAsset
+                netAsset,
             };
         })
         .filter(entry => includeZero || entry.netAsset !== 0 || entry.free !== 0 || entry.borrowed !== 0 || entry.interest !== 0);
@@ -126,7 +163,12 @@ function mapFuturesBalances(balances = [], { includeZero = false } = {}) {
                 maxWithdrawAmount,
             };
         })
-        .filter(entry => includeZero || entry.balance !== 0 || entry.availableBalance !== 0 || entry.crossWalletBalance !== 0 || entry.crossUnrealizedPnl !== 0 || entry.maxWithdrawAmount !== 0);
+        .filter(entry => includeZero
+            || entry.balance !== 0
+            || entry.availableBalance !== 0
+            || entry.crossWalletBalance !== 0
+            || entry.crossUnrealizedPnl !== 0
+            || entry.maxWithdrawAmount !== 0);
 }
 
 function computeAverageFillPrice(fills = []) {
@@ -167,33 +209,123 @@ function extractFillPrice(data, fallbackPrice) {
     return Number.isFinite(fallbackPrice) && fallbackPrice > 0 ? fallbackPrice : null;
 }
 
-export async function submitOrder({
-    symbol,
-    side,
-    type = "MARKET",
-    quantity,
-    price,
-    params = {},
-} = {}, { context } = {}) {
+async function fetchCandles({ symbol, interval, limit = DEFAULT_LIMIT }) {
+    if (!symbol || !interval) {
+        throw new Error("Missing symbol or interval");
+    }
+    if (binanceOffline) {
+        throw new Error("Binance API unavailable");
+    }
+    const start = performance.now();
+    const cacheKey = `ohlcv:${symbol}:${interval}:${limit}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+        const ms = performance.now() - start;
+        recordPerf("fetchOHLCV", ms);
+        return cached;
+    }
+    const log = withContext(logger, { asset: symbol, timeframe: interval });
+    log.info({ fn: "fetchCandles" }, `Fetching OHLCV for ${symbol} ${interval}`);
+    const url = `${DATA_BASE}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    try {
+        const { data } = await fetchWithRetry(async () => {
+            await rateLimit();
+            return axios.get(url);
+        });
+        if (CFG.debug) {
+            log.info({ fn: "fetchCandles", data }, "OHLCV data");
+        }
+        const result = data.map(c => ({
+            t: new Date(c[0]),
+            o: +c[1],
+            h: +c[2],
+            l: +c[3],
+            c: +c[4],
+            v: +c[5],
+        }));
+        cache.set(cacheKey, result, { ttl: getCacheTtlMs() });
+        const ms = performance.now() - start;
+        recordPerf("fetchOHLCV", ms);
+        return result;
+    } catch (err) {
+        markOffline(err);
+        throw err;
+    }
+}
+
+async function fetchDailyCloses({ symbol, days = 32 }) {
+    if (!symbol) {
+        throw new Error("Missing symbol");
+    }
+    if (binanceOffline) {
+        throw new Error("Binance API unavailable");
+    }
+    const cacheKey = `daily:${symbol}:${days}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    const log = withContext(logger, { asset: symbol, timeframe: "1d" });
+    log.info({ fn: "fetchDailyCloses" }, `Fetching daily closes for ${symbol} last ${days} days`);
+    const url = `${DATA_BASE}?symbol=${symbol}&interval=1d&limit=${days}`;
+    try {
+        const { data } = await fetchWithRetry(async () => {
+            await rateLimit();
+            return axios.get(url);
+        });
+        if (CFG.debug) {
+            log.info({ fn: "fetchDailyCloses", data }, "Daily closes data");
+        }
+        const result = data.map(c => ({ t: new Date(c[0]), c: +c[4], v: +c[5] }));
+        cache.set(cacheKey, result, { ttl: getCacheTtlMs() });
+        return result;
+    } catch (err) {
+        markOffline(err);
+        throw err;
+    }
+}
+
+function streamCandles(pairs, onCandleClose) {
+    if (!Array.isArray(pairs) || pairs.length === 0) {
+        return null;
+    }
+    const streams = pairs.map(({ symbol, interval }) => `${symbol.toLowerCase()}@kline_${interval}`);
+    const ws = new WebSocket(`${WS_BASE}/${streams.join("/")}`);
+    ws.on("message", (msg) => {
+        try {
+            const { data } = JSON.parse(msg);
+            if (data?.k?.x) {
+                onCandleClose?.(data.s, data.k.i);
+            }
+        } catch (e) {
+            withContext(logger).error({ fn: "streamCandles", err: e }, "[BinanceWS] parse error");
+        }
+    });
+    ws.on("error", err => {
+        withContext(logger).error({ fn: "streamCandles", err }, "[BinanceWS] error");
+    });
+    ws.on("close", () => {
+        withContext(logger).warn({ fn: "streamCandles" }, "[BinanceWS] connection closed");
+    });
+    return ws;
+}
+
+async function placeOrder({ symbol, side, type = "MARKET", quantity, price, params = {} } = {}, { context } = {}) {
     if (!symbol || !side) {
         throw new Error("Missing required order parameters");
     }
-
     const payload = {
         symbol,
         side,
         type,
         ...params,
     };
-
     if (quantity !== undefined) {
         payload.quantity = quantity;
     }
-
     if (price !== undefined && type !== "MARKET") {
         payload.price = price;
     }
-
     const orderContext = {
         scope: "order",
         symbol,
@@ -201,27 +333,26 @@ export async function submitOrder({
         type,
         ...context,
     };
-
     const data = await privateRequest("POST", "/api/v3/order", payload, { context: orderContext });
     const fillPrice = extractFillPrice(data, price);
     logTrade({ id: data.orderId, symbol, side, quantity, entry: fillPrice, type });
     return { ...data, fillPrice };
 }
 
-export async function getSpotBalances(options = {}) {
+async function getSpotBalances(options = {}) {
     const data = await privateRequest("GET", "/api/v3/account", {}, { context: { scope: "spot" } });
     return mapBalances(data?.balances, options);
 }
 
-export async function getBalances(options = {}) {
+async function getBalances(options = {}) {
     return getSpotBalances(options);
 }
 
-export async function getAccountAssets() {
+async function getAccountAssets() {
     return privateRequest("GET", "/sapi/v1/capital/config/getall", {}, { context: { scope: "accountAssets" } });
 }
 
-export async function getMarginAccount(options = {}) {
+async function getMarginAccount(options = {}) {
     const data = await privateRequest("GET", "/sapi/v1/margin/account", {}, { context: { scope: "margin" } });
     return {
         ...data,
@@ -229,11 +360,11 @@ export async function getMarginAccount(options = {}) {
         totalLiabilityOfBtc: toNumber(data?.totalLiabilityOfBtc),
         totalNetAssetOfBtc: toNumber(data?.totalNetAssetOfBtc),
         marginLevel: toNumber(data?.marginLevel),
-        userAssets: mapMarginAssets(data?.userAssets, options)
+        userAssets: mapMarginAssets(data?.userAssets, options),
     };
 }
 
-export async function getMarginPositionRisk({ symbol } = {}) {
+async function getMarginPositionRisk({ symbol } = {}) {
     const params = symbol ? { symbol } : {};
     const data = await privateRequest("GET", "/sapi/v1/margin/positionRisk", params, { context: { scope: "marginPosition" } });
     return Array.isArray(data)
@@ -244,12 +375,12 @@ export async function getMarginPositionRisk({ symbol } = {}) {
             markPrice: toNumber(position.markPrice),
             unrealizedProfit: toNumber(position.unRealizedProfit),
             liquidationPrice: toNumber(position.liquidationPrice),
-            marginType: position.marginType
+            marginType: position.marginType,
         }))
         : [];
 }
 
-export async function getUsdFuturesBalances(options = {}) {
+async function getUsdFuturesBalances(options = {}) {
     const data = await privateRequest("GET", "/fapi/v2/balance", {}, {
         context: { scope: "usdMFutures" },
         baseUrl: FUTURES_BASE,
@@ -262,10 +393,10 @@ function logAccountSectionFailure(section, err) {
     const status = err?.response?.status;
     const code = err?.response?.data?.code ?? err?.code;
     const message = err?.message;
-    withContext(logger, context).warn({ fn: "getAccountOverview", status, code, message }, 'Failed to load Binance section');
+    withContext(logger, context).warn({ fn: "getAccountOverview", status, code, message }, "Failed to load Binance section");
 }
 
-export async function getAccountOverview(options = {}) {
+async function getAccountOverview(options = {}) {
     const tasks = [
         { key: "assets", loader: () => getAccountAssets() },
         { key: "spotBalances", loader: () => getSpotBalances(options.spot) },
@@ -316,35 +447,6 @@ export async function getAccountOverview(options = {}) {
     return overview;
 }
 
-export async function placeMarketOrder(symbol, side, quantity, params = {}) {
-    return submitOrder({ symbol, side, type: "MARKET", quantity, params });
-}
-
-export async function placeLimitOrder(symbol, side, quantity, price, params = {}) {
-    return submitOrder({
-        symbol,
-        side,
-        type: "LIMIT",
-        quantity,
-        price,
-        params: { timeInForce: "GTC", ...params },
-    });
-}
-
-export function subscribeTicker(symbol, onMessage) {
-    const stream = `${symbol.toLowerCase()}@ticker`;
-    const ws = new WebSocket(`${WS_BASE}/${stream}`);
-    ws.on("message", msg => {
-        try {
-            const data = JSON.parse(msg);
-            onMessage?.(data);
-        } catch (e) {
-            withContext(logger, { asset: symbol }).error({ fn: 'subscribeTicker', err: e }, "WS parse error");
-        }
-    });
-    return ws;
-}
-
 function ensurePositiveAmount(amount) {
     const parsed = Number.parseFloat(amount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -353,7 +455,7 @@ function ensurePositiveAmount(amount) {
     return parsed.toString();
 }
 
-export async function transferMargin({ asset, amount, direction = "toMargin" } = {}) {
+async function transferMargin({ asset, amount, direction = "toMargin" } = {}) {
     if (!asset) {
         throw new Error("Missing asset for margin transfer");
     }
@@ -366,7 +468,7 @@ export async function transferMargin({ asset, amount, direction = "toMargin" } =
     }, { context: { scope: "marginTransfer", asset, direction } });
 }
 
-export async function borrowMargin({ asset, amount } = {}) {
+async function borrowMargin({ asset, amount } = {}) {
     if (!asset) {
         throw new Error("Missing asset for margin borrow");
     }
@@ -377,7 +479,7 @@ export async function borrowMargin({ asset, amount } = {}) {
     }, { context: { scope: "marginBorrow", asset } });
 }
 
-export async function repayMargin({ asset, amount } = {}) {
+async function repayMargin({ asset, amount } = {}) {
     if (!asset) {
         throw new Error("Missing asset for margin repay");
     }
@@ -387,3 +489,58 @@ export async function repayMargin({ asset, amount } = {}) {
         amount: normalizedAmount,
     }, { context: { scope: "marginRepay", asset } });
 }
+
+function placeMarketOrder(symbol, side, quantity, params = {}) {
+    return placeOrder({ symbol, side, type: "MARKET", quantity, params });
+}
+
+function placeLimitOrder(symbol, side, quantity, price, params = {}) {
+    return placeOrder({
+        symbol,
+        side,
+        type: "LIMIT",
+        quantity,
+        price,
+        params: { timeInForce: "GTC", ...params },
+    });
+}
+
+function subscribeTicker(symbol, onMessage) {
+    const stream = `${symbol.toLowerCase()}@ticker`;
+    const ws = new WebSocket(`${WS_BASE}/${stream}`);
+    ws.on("message", msg => {
+        try {
+            const data = JSON.parse(msg);
+            onMessage?.(data);
+        } catch (e) {
+            withContext(logger, { asset: symbol }).error({ fn: "subscribeTicker", err: e }, "WS parse error");
+        }
+    });
+    return ws;
+}
+
+export const binanceConnector = {
+    id: "binance",
+    metadata: {
+        name: "Binance",
+    },
+    fetchCandles,
+    fetchDailyCloses,
+    streamCandles,
+    placeOrder,
+    placeMarketOrder,
+    placeLimitOrder,
+    getBalances,
+    getSpotBalances,
+    getAccountAssets,
+    getMarginAccount,
+    getMarginPositionRisk,
+    getUsdFuturesBalances,
+    getAccountOverview,
+    transferMargin,
+    borrowMargin,
+    repayMargin,
+    subscribeTicker,
+};
+
+export default binanceConnector;

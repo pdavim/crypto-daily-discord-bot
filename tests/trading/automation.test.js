@@ -5,8 +5,13 @@ const openPositionMock = vi.fn();
 const closePositionMock = vi.fn();
 const evaluateTradeIntentMock = vi.fn();
 
-vi.mock("../../src/trading/binance.js", () => ({
+const getExchangeConnectorMock = vi.fn(() => ({
+    id: 'binance',
     getMarginPositionRisk: getMarginPositionRiskMock,
+}));
+
+vi.mock("../../src/exchanges/index.js", () => ({
+    getExchangeConnector: getExchangeConnectorMock,
 }));
 
 vi.mock("../../src/trading/executor.js", () => ({
@@ -46,6 +51,8 @@ describe("automated trading integration", () => {
         Object.values(loggerMocks).forEach(mock => mock.mockReset());
         reportTradingDecisionMock.mockReset();
         evaluateTradeIntentMock.mockReset();
+        getExchangeConnectorMock.mockReset();
+        getExchangeConnectorMock.mockReturnValue({ id: 'binance', getMarginPositionRisk: getMarginPositionRiskMock });
         evaluateTradeIntentMock.mockImplementation((intent) => ({
             decision: "allow",
             quantity: intent.quantity,
@@ -73,6 +80,7 @@ describe("automated trading integration", () => {
         Object.values(loggerMocks).forEach(mock => mock.mockReset());
         reportTradingDecisionMock.mockReset();
         evaluateTradeIntentMock.mockReset();
+        getExchangeConnectorMock.mockReset();
     });
 
     it("skips when trading or automation are disabled", async () => {

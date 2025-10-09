@@ -1,4 +1,4 @@
-import { ASSETS } from "../assets.js";
+import { CFG } from "../config.js";
 
 const queue = [];
 
@@ -7,21 +7,27 @@ const queue = [];
  * dispatch ordering can prioritise the most relevant markets before falling
  * back to alphabetical sorting.
  */
-const assetMetadata = (() => {
-    const metadata = new Map();
-    for (const asset of ASSETS) {
-        if (!asset || typeof asset.key !== "string") {
-            continue;
-        }
-        const normalizedKey = asset.key;
-        const rank = Number.isFinite(asset.marketCapRank) ? asset.marketCapRank : null;
-        metadata.set(normalizedKey, {
-            key: normalizedKey,
-            rank,
-        });
+function getAssetMetadata(key) {
+    if (!key) {
+        return { key: null, rank: null };
     }
-    return metadata;
-})();
+    const map = CFG.assetMap;
+    const normalizedKey = key.toUpperCase?.() ?? key;
+    const asset = map && typeof map.get === 'function'
+        ? map.get(normalizedKey)
+        : null;
+    if (asset) {
+        const rank = Number.isFinite(asset.marketCapRank) ? asset.marketCapRank : null;
+        return { key: asset.key, rank };
+    }
+    const assets = Array.isArray(CFG.assets) ? CFG.assets : [];
+    const fallback = assets.find(item => item.key === normalizedKey);
+    if (fallback) {
+        const rank = Number.isFinite(fallback.marketCapRank) ? fallback.marketCapRank : null;
+        return { key: fallback.key, rank };
+    }
+    return { key: normalizedKey, rank: null };
+}
 
 /**
  * Compares two asset identifiers, preferring their market cap ranking when
@@ -32,8 +38,8 @@ const assetMetadata = (() => {
 function compareAssets(assetA, assetB) {
     const keyA = typeof assetA === "string" ? assetA : "";
     const keyB = typeof assetB === "string" ? assetB : "";
-    const metaA = assetMetadata.get(keyA);
-    const metaB = assetMetadata.get(keyB);
+    const metaA = getAssetMetadata(keyA);
+    const metaB = getAssetMetadata(keyB);
 
     const rankA = metaA?.rank;
     const rankB = metaB?.rank;

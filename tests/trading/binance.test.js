@@ -42,6 +42,11 @@ function fixedSignature(params, secret) {
     return crypto.createHmac("sha256", secret).update(query).digest("hex");
 }
 
+async function loadConnector() {
+    const { binanceConnector } = await import("../../src/exchanges/binanceConnector.js");
+    return binanceConnector;
+}
+
 describe("Binance trading integration", () => {
     beforeEach(() => {
         vi.resetModules();
@@ -66,8 +71,8 @@ describe("Binance trading integration", () => {
 
     it("throws when credentials are missing", async () => {
         process.env = { ...originalEnv, BINANCE_API_KEY: "", BINANCE_SECRET: "" };
-        const { getSpotBalances } = await import("../../src/trading/binance.js");
-        await expect(getSpotBalances()).rejects.toThrow("Missing Binance API credentials");
+        const connector = await loadConnector();
+        await expect(connector.getSpotBalances()).rejects.toThrow("Missing Binance API credentials");
     });
 
     it("fetches and normalizes spot balances", async () => {
@@ -80,8 +85,8 @@ describe("Binance trading integration", () => {
             }
         });
 
-        const { getSpotBalances } = await import("../../src/trading/binance.js");
-        const balances = await getSpotBalances();
+        const connector = await loadConnector();
+        const balances = await connector.getSpotBalances();
 
         expect(axios).toHaveBeenCalledTimes(1);
         const call = axios.mock.calls[0][0];
@@ -103,8 +108,8 @@ describe("Binance trading integration", () => {
     it("logs attempt and completion for private requests", async () => {
         axios.mockResolvedValueOnce({ status: 200, data: { balances: [] } });
 
-        const { getSpotBalances } = await import("../../src/trading/binance.js");
-        await getSpotBalances();
+        const connector = await loadConnector();
+        await connector.getSpotBalances();
 
         expect(fetchWithRetry).toHaveBeenCalledTimes(1);
         expect(loggerMock.info).toHaveBeenCalledWith({ method: "GET", attempt: 1 }, 'Dispatching Binance private request');
@@ -124,8 +129,8 @@ describe("Binance trading integration", () => {
             }
         });
 
-        const { getMarginAccount } = await import("../../src/trading/binance.js");
-        const account = await getMarginAccount();
+        const connector = await loadConnector();
+        const account = await connector.getMarginAccount();
 
         expect(account.totalAssetOfBtc).toBe(1.5);
         expect(account.totalLiabilityOfBtc).toBe(0.3);
@@ -158,8 +163,8 @@ describe("Binance trading integration", () => {
             ]
         });
 
-        const { getUsdFuturesBalances } = await import("../../src/trading/binance.js");
-        const balances = await getUsdFuturesBalances();
+        const connector = await loadConnector();
+        const balances = await connector.getUsdFuturesBalances();
 
         expect(axios).toHaveBeenCalledTimes(1);
         const call = axios.mock.calls[0][0];
@@ -191,8 +196,8 @@ describe("Binance trading integration", () => {
             ]
         });
 
-        const { getMarginPositionRisk } = await import("../../src/trading/binance.js");
-        const positions = await getMarginPositionRisk();
+        const connector = await loadConnector();
+        const positions = await connector.getMarginPositionRisk();
 
         expect(positions).toEqual([
             {
@@ -234,8 +239,8 @@ describe("Binance trading integration", () => {
                 ]
             });
 
-        const { getAccountOverview } = await import("../../src/trading/binance.js");
-        const overview = await getAccountOverview();
+        const connector = await loadConnector();
+        const overview = await connector.getAccountOverview();
 
         expect(overview).toEqual({
             assets: [{ asset: "BTC" }],
@@ -273,8 +278,8 @@ describe("Binance trading integration", () => {
             .mockResolvedValueOnce({ data: [{ symbol: "BTCUSDT", positionAmt: "0", entryPrice: "0", markPrice: "0", unRealizedProfit: "0", liquidationPrice: "0", marginType: "cross" }] })
             .mockRejectedValueOnce(futuresError);
 
-        const { getAccountOverview } = await import("../../src/trading/binance.js");
-        const overview = await getAccountOverview();
+        const connector = await loadConnector();
+        const overview = await connector.getAccountOverview();
 
         expect(overview.assets).toEqual([]);
         expect(overview.spotBalances).toEqual([]);
@@ -303,8 +308,8 @@ describe("Binance trading integration", () => {
         const failure = new Error("network down");
         axios.mockRejectedValue(failure);
 
-        const { getAccountOverview } = await import("../../src/trading/binance.js");
-        await expect(getAccountOverview()).rejects.toThrow("network down");
+        const connector = await loadConnector();
+        await expect(connector.getAccountOverview()).rejects.toThrow("network down");
     });
 
     it("submits generic order and records fill price", async () => {
@@ -318,8 +323,8 @@ describe("Binance trading integration", () => {
             }
         });
 
-        const { submitOrder } = await import("../../src/trading/binance.js");
-        const response = await submitOrder({
+        const connector = await loadConnector();
+        const response = await connector.placeOrder({
             symbol: "BTCUSDT",
             side: "BUY",
             type: "LIMIT",
@@ -344,8 +349,8 @@ describe("Binance trading integration", () => {
     it("transfers margin between accounts", async () => {
         axios.mockResolvedValueOnce({ data: { tranId: 321 } });
 
-        const { transferMargin } = await import("../../src/trading/binance.js");
-        await transferMargin({ asset: "USDT", amount: 25, direction: "toSpot" });
+        const connector = await loadConnector();
+        await connector.transferMargin({ asset: "USDT", amount: 25, direction: "toSpot" });
 
         const call = axios.mock.calls[0][0];
         const url = new URL(call.url);
@@ -360,9 +365,9 @@ describe("Binance trading integration", () => {
             .mockResolvedValueOnce({ data: { tranId: 1 } })
             .mockResolvedValueOnce({ data: { tranId: 2 } });
 
-        const { borrowMargin, repayMargin } = await import("../../src/trading/binance.js");
-        await borrowMargin({ asset: "BTC", amount: 0.1 });
-        await repayMargin({ asset: "BTC", amount: 0.05 });
+        const connector = await loadConnector();
+        await connector.borrowMargin({ asset: "BTC", amount: 0.1 });
+        await connector.repayMargin({ asset: "BTC", amount: 0.05 });
 
         const borrowCall = axios.mock.calls[0][0];
         const borrowUrl = new URL(borrowCall.url);
@@ -378,7 +383,7 @@ describe("Binance trading integration", () => {
     });
 
     it("validates margin amounts", async () => {
-        const { transferMargin } = await import("../../src/trading/binance.js");
-        await expect(transferMargin({ asset: "USDT", amount: 0 })).rejects.toThrow("Invalid margin amount");
+        const connector = await loadConnector();
+        await expect(connector.transferMargin({ asset: "USDT", amount: 0 })).rejects.toThrow("Invalid margin amount");
     });
 });

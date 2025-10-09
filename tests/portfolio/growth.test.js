@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fetchDailyClosesMock = vi.fn();
 const renderPortfolioGrowthChartMock = vi.fn();
 
-vi.mock("../../src/data/binance.js", () => ({
+vi.mock("../../src/data/marketData.js", () => ({
     fetchDailyCloses: fetchDailyClosesMock,
 }));
 
@@ -80,7 +80,8 @@ describe("portfolio growth simulation", () => {
                 },
             },
         };
-        fetchDailyClosesMock.mockImplementation(async (symbol) => {
+        fetchDailyClosesMock.mockImplementation(async (asset) => {
+            const symbol = asset?.symbol ?? asset?.symbols?.market ?? asset?.key ?? "";
             if (symbol.startsWith("BTC")) {
                 return buildSeries(20_000, 150);
             }
@@ -101,8 +102,20 @@ describe("portfolio growth simulation", () => {
 
     it("simula o crescimento do portfólio e salva relatórios", async () => {
         const assets = [
-            { key: "BTC", binance: "BTCUSDT" },
-            { key: "ETH", binance: "ETHUSDT" },
+            {
+                key: "BTC",
+                exchange: "binance",
+                symbol: "BTCUSDT",
+                symbols: { market: "BTCUSDT" },
+                capabilities: { candles: true, daily: true },
+            },
+            {
+                key: "ETH",
+                exchange: "binance",
+                symbol: "ETHUSDT",
+                symbols: { market: "ETHUSDT" },
+                capabilities: { candles: true, daily: true },
+            },
         ];
 
         const result = await runPortfolioGrowthSimulation({ assets });
@@ -146,7 +159,13 @@ describe("portfolio growth simulation", () => {
     it("retorna null quando o módulo está desativado", async () => {
         CFG.portfolioGrowth.enabled = false;
         const outcome = await runPortfolioGrowthSimulation({
-            assets: [{ key: "BTC", binance: "BTCUSDT" }],
+            assets: [{
+                key: "BTC",
+                exchange: "binance",
+                symbol: "BTCUSDT",
+                symbols: { market: "BTCUSDT" },
+                capabilities: { candles: true, daily: true },
+            }],
         });
         expect(outcome).toBeNull();
         expect(fetchDailyClosesMock).not.toHaveBeenCalled();

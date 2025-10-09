@@ -1,9 +1,9 @@
 import cron from "node-cron";
 import http from "http";
 import { CFG } from "./config.js";
-import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
-import { fetchOHLCV, fetchDailyCloses } from "./data/binance.js";
-import { streamKlines } from "./data/binanceStream.js";
+import { TIMEFRAMES, EXCHANGE_INTERVAL_OVERRIDES } from "./assets.js";
+import { fetchOHLCV, fetchDailyCloses } from "./data/marketData.js";
+import { resolveConnectorForAsset } from "./exchanges/index.js";
 import { sma, rsi, macd, bollinger, atr14, bollWidth, vwap, ema, adx, stochastic, williamsR, cci, obv, keltnerChannel } from "./indicators.js";
 import { buildSnapshotForReport, buildSummary } from "./reporter.js";
 import { postAnalysis, sendDiscordAlert, postMonthlyReport, sendDiscordAlertWithAttachments } from "./discord.js";
@@ -138,11 +138,18 @@ if (!ONCE) {
 }
 
 /**
- * Converts an internal timeframe label into a Binance interval string.
+ * Converts an internal timeframe label into an exchange-specific interval string.
+ * @param {Object} asset - Asset metadata.
  * @param {string} tf - Timeframe label (e.g. "4h").
- * @returns {string} Equivalent Binance interval.
+ * @returns {string} Equivalent connector interval.
  */
-function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
+function tfToInterval(asset, tf) {
+    const overrides = EXCHANGE_INTERVAL_OVERRIDES?.[asset?.exchange];
+    if (overrides && Object.prototype.hasOwnProperty.call(overrides, tf)) {
+        return overrides[tf];
+    }
+    return tf;
+}
 
 /**
  * Aggregates 15 minute candles into 45 minute candles.
@@ -170,7 +177,7 @@ function build45mCandles(candles15m) {
  * Performs the full analysis, alerting and chart generation pipeline for an asset.
  * @param {Object} asset - Asset metadata.
  * @param {string} asset.key - Asset identifier.
- * @param {string} asset.binance - Binance symbol.
+ * @param {string} asset.symbol - Default market symbol.
  * @param {Object} [options={}] - Configuration flags controlling side effects.
  * @param {boolean} [options.enableCharts]
  * @param {boolean} [options.enableAlerts]
@@ -189,7 +196,7 @@ async function runOnceForAsset(asset, options = {}) {
         forceFreshRun = false
     } = options;
     const assetLog = withContext(logger, { asset: asset.key });
-    const dailyPromise = fetchDailyCloses(asset.binance, 32).catch(err => {
+    const dailyPromise = fetchDailyCloses(asset, 32).catch(err => {
         assetLog.warn({ fn: 'runOnceForAsset', err }, 'Daily closes unavailable; continuing without historical context');
         return [];
     });
@@ -200,9 +207,9 @@ async function runOnceForAsset(asset, options = {}) {
 
     const intervalPromises = new Map();
     for (const tf of TIMEFRAMES) {
-        const interval = tfToInterval(tf);
+        const interval = tfToInterval(asset, tf);
         if (!intervalPromises.has(interval)) {
-            intervalPromises.set(interval, fetchOHLCV(asset.binance, interval));
+            intervalPromises.set(interval, fetchOHLCV(asset, interval));
         }
     }
     const intervalKeys = [...intervalPromises.keys()];
@@ -227,7 +234,7 @@ async function runOnceForAsset(asset, options = {}) {
             let candles;
             if (tf === "45m") {
                 if (!cached45mCandles) {
-                    const base = candlesByInterval.get(tfToInterval("15m"));
+                    const base = candlesByInterval.get(tfToInterval(asset, "15m"));
                     if (!base) {
                         return;
                     }
@@ -235,7 +242,7 @@ async function runOnceForAsset(asset, options = {}) {
                 }
                 candles = cached45mCandles;
             } else {
-                const interval = tfToInterval(tf);
+                const interval = tfToInterval(asset, tf);
                 candles = candlesByInterval.get(interval);
             }
             const min = tf === "45m" ? 40 : 120;
@@ -360,7 +367,7 @@ async function runOnceForAsset(asset, options = {}) {
             try {
                 await automateTrading({
                     assetKey: asset.key,
-                    symbol: asset.binance,
+                    symbol: asset.symbol,
                     timeframe: tf,
                     decision,
                     posture,
@@ -722,7 +729,7 @@ async function runAll() {
     jobLog.info('Starting runAll job');
     try {
         await runAssetsSafely({
-            assets: ASSETS,
+            assets: CFG.assets,
             limitFactory: () => pLimit(calcConcurrency()),
             runAsset: runOnceForAsset,
             logger,
@@ -849,7 +856,12 @@ async function runDailyAnalysis() {
     let status = 'success';
     log.info('Starting daily analysis job');
     try {
-        const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 2);
+        const firstAsset = CFG.assets?.[0];
+        if (!firstAsset) {
+            log.warn('No assets configured; skipping daily analysis job');
+            return;
+        }
+        const dailyCandles = await fetchDailyCloses(firstAsset, 2);
         const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
         const key = "DAILY:1d";
         if (lastTime != null && getSignature(key) === lastTime) {
@@ -967,7 +979,12 @@ async function generateWeeklySnapshot() {
     let status = 'success';
     log.info('Starting weekly snapshot job');
     try {
-        const dailyCandles = await fetchDailyCloses(ASSETS[0].binance, 8);
+        const firstAsset = CFG.assets?.[0];
+        if (!firstAsset) {
+            log.warn('No assets configured; skipping weekly snapshot job');
+            return;
+        }
+        const dailyCandles = await fetchDailyCloses(firstAsset, 8);
         const lastTime = dailyCandles.at(-1)?.t?.getTime?.();
         const signatureKey = 'WEEKLY:SNAPSHOT';
         const weekMs = 7 * DAY_MS;
@@ -978,10 +995,10 @@ async function generateWeeklySnapshot() {
         }
 
         const assets = {};
-        for (const asset of ASSETS) {
+        for (const asset of CFG.assets) {
             const assetLog = withContext(logger, { fn: 'generateWeeklySnapshot', asset: asset.key });
             try {
-                const candles = await fetchDailyCloses(asset.binance, 8);
+                const candles = await fetchDailyCloses(asset, 8);
                 const last = candles.at(-1);
                 const prev = candles.at(-8);
                 const variation = (last?.c != null && prev?.c != null)
@@ -1172,15 +1189,44 @@ async function handleAnalysisSlashCommand({ asset, timeframe }) {
 }
 
 if (!ONCE) {
-    const intervals = Array.from(new Set(TIMEFRAMES.map(tf => tfToInterval(tf))));
-    const pairs = [];
-    ASSETS.forEach(a => intervals.forEach(i => pairs.push({ symbol: a.binance, interval: i })));
-    streamKlines(pairs, (symbol) => {
-        const asset = ASSETS.find(a => a.binance === symbol);
-        if (asset) {
-            scheduleRun(asset);
+    const connectorStreams = new Map();
+    for (const asset of CFG.assets) {
+        const connector = resolveConnectorForAsset(asset);
+        if (!connector || typeof connector.streamCandles !== 'function') {
+            continue;
         }
-    });
+        const symbol = asset.symbols?.stream ?? asset.symbol;
+        if (!symbol) {
+            continue;
+        }
+        const entry = connectorStreams.get(connector.id) ?? {
+            connector,
+            pairs: new Map(),
+            symbolAssets: new Map(),
+        };
+        const symbolAssets = entry.symbolAssets.get(symbol) ?? new Set();
+        symbolAssets.add(asset);
+        entry.symbolAssets.set(symbol, symbolAssets);
+        for (const tf of TIMEFRAMES) {
+            const interval = tfToInterval(asset, tf);
+            const key = `${symbol}:${interval}`;
+            if (!entry.pairs.has(key)) {
+                entry.pairs.set(key, { symbol, interval });
+            }
+        }
+        connectorStreams.set(connector.id, entry);
+    }
+
+    for (const { connector, pairs, symbolAssets } of connectorStreams.values()) {
+        const uniquePairs = Array.from(pairs.values());
+        if (uniquePairs.length === 0) {
+            continue;
+        }
+        connector.streamCandles(uniquePairs, (symbol) => {
+            const assetsForSymbol = symbolAssets.get(symbol) ?? new Set();
+            assetsForSymbol.forEach(scheduleRun);
+        });
+    }
     const scheduleLog = withContext(logger);
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     const ragCronExpression = typeof CFG?.rag?.ingestCron === "string"

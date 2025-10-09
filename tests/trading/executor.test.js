@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const submitOrderMock = vi.fn();
+const placeOrderMock = vi.fn();
 const transferMarginMock = vi.fn();
 const borrowMarginMock = vi.fn();
 const repayMarginMock = vi.fn();
@@ -8,11 +8,25 @@ const reportTradingExecutionMock = vi.fn();
 const reportTradingMarginMock = vi.fn();
 const evaluateTradeIntentMock = vi.fn();
 
-vi.mock("../../src/trading/binance.js", () => ({
-    submitOrder: submitOrderMock,
+const getExchangeConnectorMock = vi.fn(() => ({
+    id: 'binance',
+    placeOrder: placeOrderMock,
     transferMargin: transferMarginMock,
     borrowMargin: borrowMarginMock,
     repayMargin: repayMarginMock,
+}));
+
+const resolveConnectorForAssetMock = vi.fn(() => ({
+    id: 'binance',
+    placeOrder: placeOrderMock,
+    transferMargin: transferMarginMock,
+    borrowMargin: borrowMarginMock,
+    repayMargin: repayMarginMock,
+}));
+
+vi.mock("../../src/exchanges/index.js", () => ({
+    getExchangeConnector: getExchangeConnectorMock,
+    resolveConnectorForAsset: resolveConnectorForAssetMock,
 }));
 
 vi.mock("../../src/trading/notifier.js", () => ({
@@ -35,10 +49,21 @@ const { register } = await import("../../src/metrics.js");
 
 describe("trading executor", () => {
     beforeEach(() => {
-        submitOrderMock.mockReset();
+        placeOrderMock.mockReset();
         transferMarginMock.mockReset();
         borrowMarginMock.mockReset();
         repayMarginMock.mockReset();
+        getExchangeConnectorMock.mockReset();
+        resolveConnectorForAssetMock.mockReset();
+        const connector = {
+            id: 'binance',
+            placeOrder: placeOrderMock,
+            transferMargin: transferMarginMock,
+            borrowMargin: borrowMarginMock,
+            repayMargin: repayMarginMock,
+        };
+        getExchangeConnectorMock.mockReturnValue(connector);
+        resolveConnectorForAssetMock.mockReturnValue(connector);
         reportTradingExecutionMock.mockReset();
         reportTradingMarginMock.mockReset();
         reportTradingExecutionMock.mockResolvedValue(undefined);
@@ -70,20 +95,22 @@ describe("trading executor", () => {
     });
 
     afterEach(() => {
-        submitOrderMock.mockReset();
+        placeOrderMock.mockReset();
         transferMarginMock.mockReset();
         borrowMarginMock.mockReset();
         repayMarginMock.mockReset();
         reportTradingExecutionMock.mockReset();
         reportTradingMarginMock.mockReset();
         evaluateTradeIntentMock.mockReset();
+        getExchangeConnectorMock.mockReset();
+        resolveConnectorForAssetMock.mockReset();
     });
 
     it("skips trading when disabled", async () => {
         CFG.trading.enabled = false;
         const result = await openPosition({ symbol: "BTCUSDT", quantity: 0.1, price: 30000 });
         expect(result).toEqual({ executed: false, reason: 'disabled', details: {} });
-        expect(submitOrderMock).not.toHaveBeenCalled();
+        expect(placeOrderMock).not.toHaveBeenCalled();
         expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'skipped', reason: 'disabled' }));
         const metrics = await register.getMetricsAsJSON();
         const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
@@ -94,12 +121,12 @@ describe("trading executor", () => {
     it("rejects orders below minimum notional", async () => {
         const result = await openPosition({ symbol: "BTCUSDT", quantity: 0.0001, price: 100 });
         expect(result.reason).toBe("belowMinNotional");
-        expect(submitOrderMock).not.toHaveBeenCalled();
+        expect(placeOrderMock).not.toHaveBeenCalled();
         expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({ reason: 'belowMinNotional', status: 'skipped' }));
     });
 
     it("submits qualifying orders with safeguards", async () => {
-        submitOrderMock.mockResolvedValueOnce({ orderId: 1, fillPrice: 30500 });
+        placeOrderMock.mockResolvedValueOnce({ orderId: 1, fillPrice: 30500 });
         const result = await openPosition({
             symbol: "BTCUSDT",
             direction: "long",
@@ -107,7 +134,7 @@ describe("trading executor", () => {
             price: 30500,
         });
         expect(result.executed).toBe(true);
-        expect(submitOrderMock).toHaveBeenCalledWith({
+        expect(placeOrderMock).toHaveBeenCalledWith({
             symbol: "BTCUSDT",
             side: "BUY",
             type: "MARKET",
@@ -130,7 +157,7 @@ describe("trading executor", () => {
     });
 
     it("propagates submission failures", async () => {
-        submitOrderMock.mockRejectedValueOnce(new Error("rejected"));
+        placeOrderMock.mockRejectedValueOnce(new Error("rejected"));
         await expect(openPosition({ symbol: "BTCUSDT", quantity: 0.005, price: 30000 })).rejects.toThrow("rejected");
         const metrics = await register.getMetricsAsJSON();
         const tradeMetric = metrics.find(m => m.name === 'app_trading_execution_total');
@@ -156,7 +183,7 @@ describe("trading executor", () => {
 
         expect(result.executed).toBe(false);
         expect(result.reason).toBe('risk:maxExposure');
-        expect(submitOrderMock).not.toHaveBeenCalled();
+        expect(placeOrderMock).not.toHaveBeenCalled();
         expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({
             status: 'skipped',
             reason: 'risk:maxExposure',
@@ -172,12 +199,12 @@ describe("trading executor", () => {
             notional: intent.notional ? intent.notional / 2 : null,
             compliance: { status: "scaled", breaches: [{ type: "maxExposure" }] },
         }));
-        submitOrderMock.mockResolvedValueOnce({ orderId: 10, fillPrice: 29500 });
+        placeOrderMock.mockResolvedValueOnce({ orderId: 10, fillPrice: 29500 });
 
         const result = await openPosition({ symbol: "BTCUSDT", direction: "long", quantity: 0.02, price: 29500 });
 
         expect(result.executed).toBe(true);
-        expect(submitOrderMock).toHaveBeenCalledWith(expect.objectContaining({ quantity: 0.01 }), expect.any(Object));
+        expect(placeOrderMock).toHaveBeenCalledWith(expect.objectContaining({ quantity: 0.01 }), expect.any(Object));
         expect(reportTradingExecutionMock).toHaveBeenCalledWith(expect.objectContaining({
             status: 'executed',
             metadata: expect.objectContaining({ compliance: expect.objectContaining({ status: 'scaled' }) }),
@@ -185,10 +212,10 @@ describe("trading executor", () => {
     });
 
     it("closes positions using reduce only orders", async () => {
-        submitOrderMock.mockResolvedValueOnce({ orderId: 2, fillPrice: 29800 });
+        placeOrderMock.mockResolvedValueOnce({ orderId: 2, fillPrice: 29800 });
         const result = await closePosition({ symbol: "BTCUSDT", direction: "long", quantity: 0.01, price: 29800 });
         expect(result.executed).toBe(true);
-        expect(submitOrderMock).toHaveBeenCalledWith({
+        expect(placeOrderMock).toHaveBeenCalledWith({
             symbol: "BTCUSDT",
             side: "SELL",
             type: "MARKET",
