@@ -4,7 +4,7 @@ import AlertFeed from "./AlertFeed.jsx";
 import PortfolioPanel from "./PortfolioPanel.jsx";
 import HealthPanel from "./HealthPanel.jsx";
 
-export default function DashboardView({ data, token, client, onRefresh, onLogout }) {
+export default function DashboardView({ data, token, client, onRefresh, onLogout, refreshing }) {
     return (
         <div className="dashboard-layout">
             <header className="dashboard-header">
@@ -13,7 +13,9 @@ export default function DashboardView({ data, token, client, onRefresh, onLogout
                     <p>Live trading telemetry and forecasting snapshots.</p>
                 </div>
                 <div className="header-actions">
-                    <button type="button" onClick={onRefresh}>Refresh now</button>
+                    <button type="button" onClick={onRefresh} disabled={refreshing}>
+                        {refreshing ? "Refreshing…" : "Refresh now"}
+                    </button>
                     <button type="button" onClick={onLogout} className="secondary">Sign out</button>
                 </div>
             </header>
