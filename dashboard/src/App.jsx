@@ -14,6 +14,7 @@ export default function App() {
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState({ assets: [], alerts: [], portfolio: null, health: null });
     const [pollingEnabled, setPollingEnabled] = useState(Boolean(token));
+    const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
         if (token) {
@@ -42,9 +43,10 @@ export default function App() {
     }, [client]);
 
     const refresh = useCallback(async () => {
-        if (!token) {
+        if (!token || refreshing) {
             return;
         }
+        setRefreshing(true);
         try {
             await loadAll(token);
             setAuthError(null);
@@ -57,8 +59,10 @@ export default function App() {
             } else {
                 setAuthError(error?.message ?? "Failed to refresh data.");
             }
+        } finally {
+            setRefreshing(false);
         }
-    }, [token, loadAll]);
+    }, [token, loadAll, refreshing]);
 
     usePolling(refresh, { enabled: pollingEnabled && Boolean(token), interval: 15000 });
 
@@ -102,6 +106,7 @@ export default function App() {
         setPollingEnabled(false);
         setData({ assets: [], alerts: [], portfolio: null, health: null });
         setAuthError(null);
+        setRefreshing(false);
     };
 
     if (!token) {
@@ -111,7 +116,14 @@ export default function App() {
     return (
         <>
             {authError && <div className="banner error">{authError}</div>}
-            <DashboardView data={data} token={token} client={client} onRefresh={refresh} onLogout={handleLogout} />
+            <DashboardView
+                data={data}
+                token={token}
+                client={client}
+                onRefresh={refresh}
+                onLogout={handleLogout}
+                refreshing={refreshing}
+            />
         </>
     );
 }

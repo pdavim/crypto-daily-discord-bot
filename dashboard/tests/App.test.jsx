@@ -13,6 +13,14 @@ const mockClient = {
     withTokenQuery: vi.fn((path) => path),
 };
 
+function createDeferred() {
+    let resolve;
+    const promise = new Promise((res) => {
+        resolve = res;
+    });
+    return { promise, resolve };
+}
+
 function createStorage() {
     const data = new Map();
     return {
@@ -60,5 +68,39 @@ describe("App", () => {
         fireEvent.submit(input.closest("form"));
         await waitFor(() => expect(mockClient.login).toHaveBeenCalledWith("token"));
         await waitFor(() => expect(screen.getByText(/Crypto Daily Operations/)).toBeInTheDocument());
+    });
+
+    it("disables refresh button while data reload is pending", async () => {
+        render(<App />);
+        const [input] = screen.getAllByPlaceholderText(/Dashboard token/);
+        fireEvent.change(input, { target: { value: "token" } });
+        fireEvent.submit(input.closest("form"));
+
+        await waitFor(() => expect(mockClient.login).toHaveBeenCalledWith("token"));
+
+        const refreshButton = await screen.findByRole("button", { name: /Refresh now/i });
+
+        const assetsDeferred = createDeferred();
+        const alertsDeferred = createDeferred();
+        const portfolioDeferred = createDeferred();
+        const healthDeferred = createDeferred();
+
+        mockClient.fetchAssets.mockReturnValueOnce(assetsDeferred.promise);
+        mockClient.fetchAlerts.mockReturnValueOnce(alertsDeferred.promise);
+        mockClient.fetchPortfolio.mockReturnValueOnce(portfolioDeferred.promise);
+        mockClient.fetchHealth.mockReturnValueOnce(healthDeferred.promise);
+
+        fireEvent.click(refreshButton);
+
+        await waitFor(() => expect(refreshButton).toBeDisabled());
+        expect(refreshButton).toHaveTextContent(/Refreshing/);
+
+        assetsDeferred.resolve({ assets: [] });
+        alertsDeferred.resolve({ alerts: [] });
+        portfolioDeferred.resolve({ portfolio: null });
+        healthDeferred.resolve({ uptime: 1, pid: 1, memory: {} });
+
+        await waitFor(() => expect(refreshButton).not.toBeDisabled());
+        expect(refreshButton).toHaveTextContent(/Refresh now/);
     });
 });
