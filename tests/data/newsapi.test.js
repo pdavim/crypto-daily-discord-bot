@@ -23,7 +23,17 @@ describe("searchNews", () => {
         vi.clearAllMocks();
         axiosGet.mockResolvedValue({
             status: 200,
-            data: { articles: [{ title: "foo", description: "bar" }] },
+            data: {
+                articles: [
+                    {
+                        title: "foo",
+                        description: "bar",
+                        url: "https://example.com/foo",
+                        source: { name: "Example" },
+                        publishedAt: "2024-01-02T03:04:05Z",
+                    },
+                ],
+            },
         });
     });
 
@@ -41,6 +51,14 @@ describe("searchNews", () => {
         expect(loggerStub.debug).toHaveBeenCalledWith({ attempt: 1 }, 'Requesting headlines from NewsAPI');
         expect(loggerStub.info).toHaveBeenCalledWith({ attempt: 1, status: 200, articles: 1 }, 'NewsAPI request succeeded');
         expect(loggerStub.error).not.toHaveBeenCalled();
-        expect(articles).toEqual([{ title: "foo", description: "bar" }]);
+        expect(articles).toEqual([
+            {
+                title: "foo",
+                description: "bar",
+                url: "https://example.com/foo",
+                source: "Example",
+                publishedAt: "2024-01-02T03:04:05Z",
+            },
+        ]);
     });
 });

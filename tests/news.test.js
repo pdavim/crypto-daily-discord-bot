@@ -61,6 +61,11 @@ vi.mock("../src/config.js", () => ({
     CFG: CFGMock,
 }));
 
+const searchNewsMock = vi.fn();
+vi.mock("../src/data/newsapi.js", () => ({
+    searchNews: searchNewsMock,
+}));
+
 const callOpenRouterMock = vi.fn();
 vi.mock("../src/ai.js", () => ({
     callOpenRouter: callOpenRouterMock,
@@ -91,6 +96,7 @@ describe("getAssetNews", () => {
         readFileMock.mockReset();
         writeFileMock.mockReset();
         callOpenRouterMock.mockReset();
+        searchNewsMock.mockReset();
         Object.keys(CFGMock).forEach((key) => delete CFGMock[key]);
         Object.assign(configMock, { serpapiApiKey: "test-serp-key" });
         vi.useFakeTimers();
@@ -161,6 +167,7 @@ describe("getAssetNews", () => {
         const result = await getAssetNews({ symbol: "BTC", lookbackHours: 24, limit: 2 });
 
         expect(fetchWithRetryMock).toHaveBeenCalledTimes(2);
+        expect(searchNewsMock).not.toHaveBeenCalled();
         expect(parseUrlMock).toHaveBeenCalledTimes(1);
         expect(filterFreshNewsItemsMock).toHaveBeenCalledTimes(1);
         expect(filterFreshNewsItemsMock.mock.calls[0][0].map((item) => item.title)).toEqual([
@@ -198,6 +205,7 @@ describe("getAssetNews", () => {
         markNewsItemsAsSeenMock.mockResolvedValue();
         clampSentimentMock.mockImplementation((value) => value);
         normalizeSentimentMock.mockImplementation((value) => value);
+        searchNewsMock.mockResolvedValue([]);
 
         const { getAssetNews } = await import("../src/news.js");
         const result = await getAssetNews({ symbol: "BTC", lookbackHours: 24, limit: 3 });
@@ -206,9 +214,47 @@ describe("getAssetNews", () => {
         expect(fetchWithRetryMock).toHaveBeenCalledTimes(1);
         expect(parseUrlMock).not.toHaveBeenCalled();
         expect(classifySentimentsLocalMock).not.toHaveBeenCalled();
+        expect(searchNewsMock).toHaveBeenCalledWith("BTC");
         expect(writeFileMock).toHaveBeenCalledTimes(1);
         expect(writeFileMock.mock.calls[0][0]).toBeInstanceOf(URL);
         expect(writeFileMock.mock.calls[0][0].pathname).toMatch(/\/?data\/news-cache\.json$/);
+    });
+
+    it("falls back to NewsAPI articles when SerpAPI and RSS return nothing", async () => {
+        readFileMock.mockRejectedValueOnce(Object.assign(new Error("missing"), { code: "ENOENT" }));
+        fetchWithRetryMock.mockImplementation(async (task) => task());
+        axiosGetMock.mockResolvedValue({ data: { news_results: [] } });
+        CFGMock.rssSources = {};
+        CFGMock.sentimentProvider = "tfjs";
+        CFGMock.openrouterApiKey = null;
+        translateMock.mockImplementation(async (text) => ({
+            text: `${text} [translated]`,
+            from: { language: { iso: "en" } },
+        }));
+        filterFreshNewsItemsMock.mockImplementation(async (items) => items);
+        markNewsItemsAsSeenMock.mockResolvedValue();
+        clampSentimentMock.mockImplementation((value) => value);
+        normalizeSentimentMock.mockImplementation((value) => value);
+        classifySentimentsLocalMock.mockResolvedValue([0.25]);
+        searchNewsMock.mockResolvedValue([
+            {
+                title: "BTC steadies above $40k",
+                url: "https://example.com/fallback",
+                description: "Bitcoin holds gains after rally.",
+                source: "Example",
+                publishedAt: "2024-01-01T00:00:00Z",
+            },
+        ]);
+
+        const { getAssetNews } = await import("../src/news.js");
+        const result = await getAssetNews({ symbol: "BTC", lookbackHours: 24, limit: 3 });
+
+        expect(searchNewsMock).toHaveBeenCalledWith("BTC");
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].title).toBe("BTC steadies above $40k");
+        expect(result.items[0].translations.snippet.en).toBe("Bitcoin holds gains after rally. [translated]");
+        expect(result.avgSentiment).toBe(0.25);
+        expect(result.summary).toContain("BTC steadies above $40k");
     });
 
     it("falls back to concatenated headlines when OpenRouter summary fails", async () => {
