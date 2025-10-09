@@ -32,6 +32,7 @@ import { recordFeedback, recordInteraction } from "./feedback.js";
 
 
 const startTime = Date.now();
+const IS_TEST_ENV = Boolean(import.meta?.vitest);
 
 function getWatchlist(userId) {
     return loadWatchlist(userId);
@@ -1369,7 +1370,7 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
 
 function getClient() {
     const log = withContext(logger);
-    if (!CFG.botToken) {
+    if (!CFG.botToken && !IS_TEST_ENV) {
         log.warn({ fn: 'getClient' }, 'Missing bot token; skipping Discord bot');
         return null;
     }
