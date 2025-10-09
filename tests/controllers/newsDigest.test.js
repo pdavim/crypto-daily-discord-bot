@@ -31,8 +31,27 @@ vi.mock("../../src/logger.js", () => ({
     withContext: vi.fn(() => baseLogger),
 }));
 
+const assetDefinitions = [
+    {
+        key: "BTC",
+        exchange: "binance",
+        symbol: "BTCUSDT",
+        symbols: { market: "BTCUSDT" },
+        capabilities: { candles: true, daily: true },
+    },
+    {
+        key: "ETH",
+        exchange: "binance",
+        symbol: "ETHUSDT",
+        symbols: { market: "ETHUSDT" },
+        capabilities: { candles: true, daily: true },
+    },
+];
+
 vi.mock("../../src/config.js", () => ({
     CFG: {
+        assets: assetDefinitions,
+        assetMap: new Map(assetDefinitions.map(asset => [asset.key, asset])),
         newsDigest: {
             enabled: true,
             cron: "0 9 * * *",
@@ -100,7 +119,8 @@ describe("newsDigest controller", () => {
         expect(digest.content).toContain("[BTC jumps to new monthly high](https://news.example/btc-high)");
         expect(digest.content).toContain("Bullish (0.60)");
         expect(digest.content).toContain("**ETH** — Bearish (-0.37)");
-        expect(digest.content).toContain("Neutral");
+        expect(digest.content).toContain("_ETH: ETH faces selling pressure_");
+        expect(digest.content).toContain("Bearish (-0.50)");
         expect(digest.topHeadlines).toHaveLength(2);
         expect(digest.topHeadlines[0]).toMatchObject({ asset: "BTC", title: "BTC jumps to new monthly high" });
         expect(digest.sentiments).toEqual([

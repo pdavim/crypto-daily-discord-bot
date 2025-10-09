@@ -119,6 +119,30 @@ Para tornar o feed de alertas mais digerível, as notificações agregadas agora
 
 Com essa organização, fica mais simples acompanhar o que está acontecendo com BTC, ETH e demais moedas sem saltos ou inversões de ordem no canal de alertas.
 
+## Configuração de ativos por exchange
+
+> ✅ **Novidade:** o arquivo `config/default.json` agora descreve cada ativo monitorado com metadados completos sobre a exchange, símbolo e capacidades disponíveis. Isso permite habilitar novos mercados apenas via configuração, sem modificar o código-fonte.
+
+- **`exchange`**: identificador do conector registrado (ex.: `"binance"`, `"paper"`). O bot usa esse valor para resolver qual implementação de exchange deve atender o ativo.
+- **`symbol`**: símbolo principal usado nas chamadas REST. Continue sobrescrevendo via variáveis como `BINANCE_SYMBOL_BTC` quando necessário.
+- **`symbols`**: mapa opcional para símbolos específicos por finalidade (`spot`, `margin`, `stream`, `market`). Caso um campo esteja ausente, o valor de `symbol` é reutilizado.
+- **`metadata`**: informações adicionais do mercado (base, quote, rank, descrição) que alimentam relatórios e ordenações.
+- **`capabilities`**: flags booleanas que indicam o que o conector suporta para aquele ativo (`candles`, `daily`, `streaming`, `trading`, `margin`, `forecasting`). O scheduler e os módulos de trading ignoram recursos não disponíveis.
+
+Um ativo mínimo agora fica assim:
+
+```json
+{
+  "key": "SOL",
+  "exchange": "binance",
+  "symbol": "SOLUSDT",
+  "symbols": { "stream": "solusdt" },
+  "capabilities": { "candles": true, "daily": true, "streaming": true }
+}
+```
+
+Ao adicionar uma nova exchange, basta registrar o conector em `src/exchanges/index.js` (ou chamar `registerExchangeConnector`) e preencher `CFG.assets` com os ativos desejados. A rotina de coleta, alertas e trading passa a consumir o novo mercado automaticamente.
+
 ## Forecasts de fechamento e gráficos históricos
 
 O módulo de forecasting (em `src/forecasting.js`) calcula uma projeção do próximo preço de fechamento para cada timeframe monitorado utilizando regressão linear. A cada execução do bot:

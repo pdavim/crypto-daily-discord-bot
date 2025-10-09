@@ -47,8 +47,7 @@
 
 import OpenAi from "openai";
 import { CFG } from "./config.js";
-import { ASSETS } from "./assets.js";
-import { fetchOHLCV } from "./data/binance.js";
+import { fetchOHLCV } from "./data/marketData.js";
 import { getAssetNews } from "./news.js";
 import { searchWeb } from "./websearch.js";
 import { sma, rsi, macd, atr14, bollinger, bollWidth, crossUp, crossDown, parabolicSAR, semaforo, isBBSqueeze, sparkline, volumeDivergence, trendFromMAs, scoreHeuristic, vwap, ema, stochastic, williamsR, cci, obv } from "./indicators.js";
@@ -102,15 +101,17 @@ async function runLegacyAgent() {
     const reports = [];
     const macro = await getMacroContext();
 
-    for (const { key, binance } of ASSETS) {
+    const assets = Array.isArray(CFG.assets) ? CFG.assets : [];
+    for (const asset of assets) {
+        const { key, symbol } = asset;
         try {
-            if (!binance) {
-                reports.push(`**${key}**\n- No Binance symbol configured.`);
+            if (!symbol) {
+                reports.push(`**${key}**\n- No market symbol configured.`);
                 continue;
             }
 
-            const hourly = await fetchOHLCV(binance, "1h");
-            const daily = await fetchOHLCV(binance, "1d");
+            const hourly = await fetchOHLCV(asset, "1h");
+            const daily = await fetchOHLCV(asset, "1d");
             if (!hourly.length || !daily.length) {
                 reports.push(`**${key}**\n- No candle data.`);
                 continue;

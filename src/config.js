@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { existsSync, readFileSync, watch } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { ASSETS } from "./assets.js";
+import { DEFAULT_ASSETS, buildAssetsConfig } from "./assets.js";
 import { logger, withContext } from "./logger.js";
 import { DEFAULT_ALERT_MODULES } from "./alerts/registry.js";
 import { loadSettings, getSetting, setSetting } from "./settings.js";
@@ -1445,6 +1445,10 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
 
     const nextCFG = clone(mergedConfig);
 
+    const resolvedAssets = buildAssetsConfig(nextCFG.assets, { env: process.env, defaults: DEFAULT_ASSETS });
+    nextCFG.assets = resolvedAssets;
+    nextCFG.assetMap = new Map(resolvedAssets.map(asset => [asset.key, asset]));
+
     nextCFG.webhook = process.env.DISCORD_WEBHOOK_URL ?? nextCFG.webhook ?? null;
     nextCFG.webhookGeneral = process.env.DISCORD_WEBHOOK_GENERAL ?? nextCFG.webhookGeneral ?? null;
     nextCFG.webhookAlerts = process.env.DISCORD_WEBHOOK_ALERTS_URL ?? nextCFG.webhookAlerts ?? null;
@@ -1471,7 +1475,7 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
         nextCFG.webhooks[key] = process.env[envKey] ?? nextCFG.webhooks[key] ?? defaultWebhookMap[key] ?? null;
     }
 
-    for (const { key } of ASSETS) {
+    for (const { key } of resolvedAssets) {
         const cfgKey = `webhookReports_${key}`;
         const envKey = `DISCORD_WEBHOOK_REPORTS_${key}`;
         const defaultValue = mergedConfig[cfgKey];
@@ -1715,9 +1719,14 @@ export function validateConfig() {
         missing.push('DISCORD_WEBHOOK_URL');
     }
 
-    for (const { key } of ASSETS) {
-        if (!process.env[`BINANCE_SYMBOL_${key}`]) {
-            missing.push(`BINANCE_SYMBOL_${key}`);
+    const configuredAssets = Array.isArray(CFG.assets) ? CFG.assets : [];
+    if (configuredAssets.length === 0) {
+        missing.push('assets');
+    } else {
+        for (const asset of configuredAssets) {
+            if (!asset?.symbol) {
+                missing.push(`asset:${asset?.key ?? 'unknown'}`);
+            }
         }
     }
 
@@ -1745,3 +1754,15 @@ export function validateConfig() {
 
 rebuildConfig();
 ensureCustomConfigWatcher();
+
+export function getAssetConfig(key) {
+    if (!key || typeof key !== 'string') {
+        return null;
+    }
+    const map = CFG.assetMap;
+    if (map && typeof map.get === 'function') {
+        return map.get(key.toUpperCase()) ?? null;
+    }
+    const assets = Array.isArray(CFG.assets) ? CFG.assets : [];
+    return assets.find(asset => asset.key === key.toUpperCase()) ?? null;
+}

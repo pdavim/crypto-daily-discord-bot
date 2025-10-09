@@ -21,6 +21,12 @@ const mockCFG = {
 };
 
 const mockAssets = [];
+const addAsset = (asset) => {
+    mockAssets.push(asset);
+    if (mockCFG.assetMap && typeof mockCFG.assetMap.set === "function") {
+        mockCFG.assetMap.set(asset.key, asset);
+    }
+};
 
 const buildCandle = (index) => ({
     t: new Date(1700000000000 + index * 60_000),
@@ -79,9 +85,16 @@ const indicatorsStub = {
 const runKaibanWorkflowMock = vi.fn();
 
 vi.mock("../src/config.js", () => ({ CFG: mockCFG }));
-vi.mock("../src/assets.js", () => ({ ASSETS: mockAssets }));
-vi.mock("../src/data/binance.js", () => ({
-    fetchOHLCV: vi.fn(async (symbol, timeframe) => {
+vi.mock("../src/assets.js", () => ({
+    DEFAULT_ASSETS: mockAssets,
+    TIMEFRAMES: ["1h", "1d"],
+    EXCHANGE_INTERVAL_OVERRIDES: {},
+}));
+vi.mock("../src/data/marketData.js", () => ({
+    fetchOHLCV: vi.fn(async (assetOrSymbol, timeframe) => {
+        const symbol = typeof assetOrSymbol === "string"
+            ? assetOrSymbol
+            : assetOrSymbol?.symbol ?? assetOrSymbol?.symbols?.market ?? "";
         if (symbol === "EMPTY") {
             return [];
         }
@@ -141,6 +154,8 @@ beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     mockAssets.length = 0;
+    mockCFG.assets = mockAssets;
+    mockCFG.assetMap = new Map();
     mockCFG.openrouterApiKey = null;
     mockCFG.openrouterModel = "gpt-4";
     mockCFG.kaiban.enabled = false;
@@ -161,15 +176,25 @@ describe("ai module", () => {
     });
 
     it("produces fallback content when asset lacks Binance symbol", async () => {
-        mockAssets.push({ key: "NO_BINANCE", binance: null });
+        addAsset({
+            key: "NO_BINANCE",
+            exchange: "binance",
+            symbol: null,
+            symbols: {},
+        });
         const { runAgent } = await import("../src/ai.js");
         const output = await runAgent();
-        expect(output).toContain("No Binance symbol configured.");
+        expect(output).toContain("No market symbol configured.");
         expect(runKaibanWorkflowMock).not.toHaveBeenCalled();
     });
 
     it("skips assets that return no candles", async () => {
-        mockAssets.push({ key: "EMPTY", binance: "EMPTY" });
+        addAsset({
+            key: "EMPTY",
+            exchange: "binance",
+            symbol: "EMPTY",
+            symbols: { market: "EMPTY" },
+        });
         const { runAgent } = await import("../src/ai.js");
         const output = await runAgent();
         expect(output).toContain("No candle data.");
@@ -177,7 +202,12 @@ describe("ai module", () => {
     });
 
     it("combines indicators, alerts and context when data is available", async () => {
-        mockAssets.push({ key: "BTC", binance: "BTCUSDT" });
+        addAsset({
+            key: "BTC",
+            exchange: "binance",
+            symbol: "BTCUSDT",
+            symbols: { market: "BTCUSDT" },
+        });
         const { runAgent } = await import("../src/ai.js");
         const { getAssetNews } = await import("../src/news.js");
         const output = await runAgent();
@@ -212,7 +242,12 @@ describe("ai module", () => {
     it("falls back to legacy analysis when Kaiban fails", async () => {
         mockCFG.openrouterApiKey = "token";
         mockCFG.kaiban.enabled = true;
-        mockAssets.push({ key: "BTC", binance: "BTCUSDT" });
+        addAsset({
+            key: "BTC",
+            exchange: "binance",
+            symbol: "BTCUSDT",
+            symbols: { market: "BTCUSDT" },
+        });
         runKaibanWorkflowMock.mockRejectedValue(new Error("Kaiban failed"));
 
         const { runAgent } = await import("../src/ai.js");

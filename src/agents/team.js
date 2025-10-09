@@ -1,6 +1,5 @@
 import { CFG } from "../config.js";
-import { ASSETS } from "../assets.js";
-import { fetchOHLCV } from "../data/binance.js";
+import { fetchOHLCV } from "../data/marketData.js";
 import { getAssetNews } from "../news.js";
 import { searchWeb } from "../websearch.js";
 import {
@@ -49,20 +48,22 @@ const safeSlice = (value, limit) => {
     return value.slice(0, limit);
 };
 
-async function buildAssetSnapshot({ key, binance }) {
+async function buildAssetSnapshot(asset) {
+    const key = asset?.key;
+    const symbol = asset?.symbol;
     const log = withContext(logger, { fn: "buildAssetSnapshot", asset: key });
-    if (!binance) {
+    if (!symbol) {
         return {
             key,
             status: "missing-symbol",
-            message: "No Binance symbol configured.",
+            message: "No market symbol configured.",
         };
     }
 
     try {
         const [hourly, daily] = await Promise.all([
-            fetchOHLCV(binance, "1h"),
-            fetchOHLCV(binance, "1d"),
+            fetchOHLCV(asset, "1h"),
+            fetchOHLCV(asset, "1d"),
         ]);
 
         if (!hourly.length || !daily.length) {
@@ -70,7 +71,7 @@ async function buildAssetSnapshot({ key, binance }) {
                 key,
                 status: "no-data",
                 message: "No candle data.",
-                meta: { binance },
+                meta: { symbol },
             };
         }
 
@@ -172,7 +173,7 @@ async function buildAssetSnapshot({ key, binance }) {
         return {
             key,
             status: "ready",
-            meta: { binance },
+            meta: { symbol },
             snapshot: {
                 market: {
                     lastDaily,
@@ -230,7 +231,7 @@ async function buildAssetSnapshot({ key, binance }) {
             key,
             status: "error",
             message: error.message,
-            meta: { binance },
+            meta: { symbol },
         };
     }
 }
@@ -240,7 +241,8 @@ async function buildMarketSnapshot() {
     log.info({ fn: "buildMarketSnapshot" }, 'Collecting market snapshot for Kaiban workflow');
     const macro = await getMacroContext();
     const assets = [];
-    for (const asset of ASSETS) {
+    const configuredAssets = Array.isArray(CFG.assets) ? CFG.assets : [];
+    for (const asset of configuredAssets) {
         const snapshot = await buildAssetSnapshot(asset);
         assets.push(snapshot);
     }

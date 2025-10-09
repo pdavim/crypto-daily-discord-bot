@@ -14,8 +14,8 @@ import {
 import path from "path";
 import { CFG } from "./config.js";
 import { logger, withContext } from "./logger.js";
-import { ASSETS, TIMEFRAMES, BINANCE_INTERVALS } from "./assets.js";
-import { fetchOHLCV } from "./data/binance.js";
+import { TIMEFRAMES, EXCHANGE_INTERVAL_OVERRIDES } from "./assets.js";
+import { fetchOHLCV } from "./data/marketData.js";
 import { renderChartPNG } from "./chart.js";
 import { addAssetToWatch, removeAssetFromWatch, getWatchlist as loadWatchlist } from "./watchlist.js";
 import { getForecastSnapshot } from "./store.js";
@@ -25,7 +25,7 @@ import {
     setDefaultMinimumProfit,
     setPersonalMinimumProfit,
 } from "./minimumProfit.js";
-import { getAccountOverview, submitOrder } from "./trading/binance.js";
+import { getExchangeConnector } from "./exchanges/index.js";
 import { openPosition, adjustMargin } from "./trading/executor.js";
 import { answerWithRAG } from "./rag.js";
 import { recordFeedback, recordInteraction } from "./feedback.js";
@@ -57,6 +57,25 @@ const priceFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2
 const percentFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const DISCORD_MESSAGE_LIMIT = 2000;
+
+function getConfiguredAssets() {
+    return Array.isArray(CFG.assets) ? CFG.assets : [];
+}
+
+function findConfiguredAsset(key) {
+    if (!key) {
+        return null;
+    }
+    return getConfiguredAssets().find(asset => asset.key === key);
+}
+
+function requireConnector(id) {
+    const connector = getExchangeConnector(id);
+    if (!connector) {
+        throw new Error(`Connector ${id} is not registered`);
+    }
+    return connector;
+}
 
 function truncateDiscordMessage(content) {
     if (typeof content !== "string") {
@@ -324,7 +343,7 @@ const COMMAND_BLUEPRINTS = [
                 description: "Ativo a ser analisado.",
                 type: ApplicationCommandOptionType.String,
                 required: true,
-                choices: ASSETS.map(asset => ({ name: asset.key, value: asset.key }))
+                choices: getConfiguredAssets().map(asset => ({ name: asset.key, value: asset.key }))
             },
             {
                 name: "tf",
@@ -350,7 +369,7 @@ const COMMAND_BLUEPRINTS = [
                         description: "Ativo que será incluído na watchlist.",
                         type: ApplicationCommandOptionType.String,
                         required: true,
-                        choices: ASSETS.map(asset => ({ name: asset.key, value: asset.key }))
+                        choices: getConfiguredAssets().map(asset => ({ name: asset.key, value: asset.key }))
                     }
                 ]
             },
@@ -364,7 +383,7 @@ const COMMAND_BLUEPRINTS = [
                         description: "Ativo que será removido da watchlist.",
                         type: ApplicationCommandOptionType.String,
                         required: true,
-                        choices: ASSETS.map(asset => ({ name: asset.key, value: asset.key }))
+                        choices: getConfiguredAssets().map(asset => ({ name: asset.key, value: asset.key }))
                     }
                 ]
             }
@@ -402,7 +421,7 @@ const COMMAND_BLUEPRINTS = [
                 description: "Ativo a ser analisado.",
                 type: ApplicationCommandOptionType.String,
                 required: true,
-                choices: ASSETS.map(asset => ({ name: asset.key, value: asset.key }))
+                choices: getConfiguredAssets().map(asset => ({ name: asset.key, value: asset.key }))
             },
             {
                 name: "tf",
@@ -890,7 +909,13 @@ function buildAccountOverviewMessage(overview) {
 
 let clientPromise;
 let analysisCommandHandler;
-function tfToInterval(tf) { return BINANCE_INTERVALS[tf] || tf; }
+function tfToInterval(asset, tf) {
+    const overrides = EXCHANGE_INTERVAL_OVERRIDES?.[asset?.exchange];
+    if (overrides && Object.prototype.hasOwnProperty.call(overrides, tf)) {
+        return overrides[tf];
+    }
+    return tf;
+}
 
 function build45mCandles(candles15m) {
     const out = [];
@@ -924,15 +949,19 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
     if (interaction.commandName === 'chart') {
         const assetKey = interaction.options.getString('ativo', true).toUpperCase();
         const tf = interaction.options.getString('tf', true);
-        const asset = ASSETS.find(a => a.key === assetKey);
+        const asset = findConfiguredAsset(assetKey);
         if (!asset || !TIMEFRAMES.includes(tf)) {
             await interaction.reply({ content: 'Ativo ou timeframe não suportado', ephemeral: true });
             return;
         }
         await interaction.deferReply();
         try {
-            let candles = await fetchOHLCV(asset.binance, tfToInterval(tf));
-            if (tf === '45m') candles = build45mCandles(candles);
+            const interval = tfToInterval(asset, tf);
+            let candles = await fetchOHLCV(asset, interval);
+            if (tf === '45m') {
+                const baseCandles = await fetchOHLCV(asset, tfToInterval(asset, '15m'));
+                candles = build45mCandles(baseCandles);
+            }
             const chartPath = await renderChartPNG(asset.key, tf, candles);
             await interaction.editReply({ files: [chartPath] });
         } catch (e) {
@@ -943,7 +972,7 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
     } else if (interaction.commandName === 'watch') {
         const sub = interaction.options.getSubcommand();
         const assetKey = interaction.options.getString('ativo', true).toUpperCase();
-        const asset = ASSETS.find(a => a.key === assetKey);
+        const asset = findConfiguredAsset(assetKey);
         if (!asset) {
             await interaction.reply({ content: 'Ativo não suportado', ephemeral: true });
             return;
@@ -1011,7 +1040,7 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
     } else if (interaction.commandName === 'analysis') {
         const assetKey = interaction.options.getString('ativo', true).toUpperCase();
         const tf = interaction.options.getString('tf', true);
-        const asset = ASSETS.find(a => a.key === assetKey);
+        const asset = findConfiguredAsset(assetKey);
         if (!asset || !TIMEFRAMES.includes(tf)) {
             await interaction.reply({ content: 'Ativo ou timeframe não suportado', ephemeral: true });
             return;
@@ -1123,6 +1152,14 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
             return;
         }
 
+        let spotConnector;
+        try {
+            spotConnector = requireConnector('binance');
+        } catch (err) {
+            await interaction.reply({ content: 'Conector da Binance indisponível no momento.', ephemeral: true });
+            return;
+        }
+
         const params = {};
         if (notionalProvided !== null && (!derivedQuantity || derivedQuantity <= 0)) {
             params.quoteOrderQty = notionalProvided;
@@ -1164,7 +1201,7 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
                     return;
                 }
             } else {
-                const order = await submitOrder({
+                const order = await spotConnector.placeOrder({
                     symbol,
                     side,
                     type: orderType,
@@ -1208,7 +1245,11 @@ export async function handleInteraction(interaction, { helpMessageBuilder = buil
         await interaction.deferReply({ ephemeral: true });
         const log = withContext(logger, { command: 'binance' });
         try {
-            const overview = await getAccountOverview();
+            const connector = requireConnector('binance');
+            if (typeof connector.getAccountOverview !== 'function') {
+                throw new Error('Conector não suporta resumo de conta.');
+            }
+            const overview = await connector.getAccountOverview();
             const content = buildAccountOverviewMessage(overview);
             await interaction.editReply(content);
         } catch (err) {

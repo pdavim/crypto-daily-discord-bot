@@ -9,9 +9,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
-import { ASSETS } from "../assets.js";
 import { CFG } from "../config.js";
-import { fetchDailyCloses } from "../data/binance.js";
+import { fetchDailyCloses } from "../data/marketData.js";
 import { renderPortfolioGrowthChart } from "../chart.js";
 import { logger, withContext } from "../logger.js";
 import { buildPortfolioGrowthDiscordMessage } from "./growthSummary.js";
@@ -361,7 +360,7 @@ const checkAllocationDrift = ({ positions, prices, totalValue, weights, toleranc
     return false;
 };
 
-export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = CFG.portfolioGrowth } = {}) {
+export async function runPortfolioGrowthSimulation({ assets = CFG.assets, config = CFG.portfolioGrowth } = {}) {
     if (!config?.enabled) {
         return null;
     }
@@ -369,12 +368,13 @@ export async function runPortfolioGrowthSimulation({ assets = ASSETS, config = C
     const start = performance.now();
     const log = withContext(logger, { fn: "runPortfolioGrowthSimulation" });
 
-    const assetList = Array.isArray(assets) && assets.length > 0 ? assets : ASSETS;
+    const configuredAssets = Array.isArray(CFG.assets) ? CFG.assets : [];
+    const assetList = Array.isArray(assets) && assets.length > 0 ? assets : configuredAssets;
     const historyDays = Math.max(30, Math.min(config.simulation?.historyDays ?? 365, 3650));
 
     const results = await Promise.all(assetList.map(async (asset) => {
         try {
-            const candles = await fetchDailyCloses(asset.binance, historyDays + 1);
+            const candles = await fetchDailyCloses(asset, historyDays + 1);
             return { asset, candles };
         } catch (error) {
             log.warn({ asset: asset.key, err: error }, "Failed to load daily closes for portfolio simulation");

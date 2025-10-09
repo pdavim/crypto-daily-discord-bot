@@ -3,11 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 async function importDispatcher({ assets } = {}) {
   vi.resetModules();
-  if (assets) {
-    vi.doMock('../../src/assets.js', () => ({ ASSETS: assets }));
-  } else {
-    vi.unmock('../../src/assets.js');
-  }
+  const assetList = assets ?? [];
+  vi.doMock('../../src/config.js', () => ({
+    CFG: {
+      assets: assetList,
+      assetMap: new Map(assetList.map(asset => [asset.key, asset])),
+    },
+  }));
   const module = await import("../../src/alerts/dispatcher.js");
 
   return module;
@@ -16,7 +18,7 @@ async function importDispatcher({ assets } = {}) {
 describe('alert dispatcher', () => {
   afterEach(() => {
     vi.resetModules();
-    vi.unmock('../../src/assets.js');
+    vi.unmock('../../src/config.js');
   });
 
   it('sorts queued payloads alphabetically when no market cap data is provided', async () => {

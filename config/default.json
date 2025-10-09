@@ -22,6 +22,138 @@
     "SOL": null,
     "TRX": null
   },
+  "assets": [
+    {
+      "key": "BTC",
+      "exchange": "binance",
+      "symbol": "BTCUSDT",
+      "symbols": {
+        "spot": "BTCUSDT",
+        "margin": "BTCUSDT",
+        "stream": "BTCUSDT"
+      },
+      "metadata": {
+        "baseAsset": "BTC",
+        "quoteAsset": "USDT"
+      },
+      "capabilities": {
+        "candles": true,
+        "daily": true,
+        "streaming": true,
+        "trading": true,
+        "margin": true,
+        "forecasting": true
+      },
+      "marketCapRank": 1
+    },
+    {
+      "key": "ETH",
+      "exchange": "binance",
+      "symbol": "ETHUSDT",
+      "symbols": {
+        "spot": "ETHUSDT",
+        "margin": "ETHUSDT",
+        "stream": "ETHUSDT"
+      },
+      "metadata": {
+        "baseAsset": "ETH",
+        "quoteAsset": "USDT"
+      },
+      "capabilities": {
+        "candles": true,
+        "daily": true,
+        "streaming": true,
+        "trading": true,
+        "margin": true,
+        "forecasting": true
+      },
+      "marketCapRank": 2
+    },
+    {
+      "key": "SOL",
+      "exchange": "binance",
+      "symbol": "SOLUSDT",
+      "symbols": {
+        "spot": "SOLUSDT",
+        "stream": "SOLUSDT"
+      },
+      "metadata": {
+        "baseAsset": "SOL",
+        "quoteAsset": "USDT"
+      },
+      "capabilities": {
+        "candles": true,
+        "daily": true,
+        "streaming": true,
+        "trading": true,
+        "forecasting": true
+      },
+      "marketCapRank": 5
+    },
+    {
+      "key": "TRX",
+      "exchange": "binance",
+      "symbol": "TRXUSDT",
+      "symbols": {
+        "spot": "TRXUSDT",
+        "stream": "TRXUSDT"
+      },
+      "metadata": {
+        "baseAsset": "TRX",
+        "quoteAsset": "USDT"
+      },
+      "capabilities": {
+        "candles": true,
+        "daily": true,
+        "streaming": true,
+        "trading": true,
+        "forecasting": true
+      },
+      "marketCapRank": 13
+    },
+    {
+      "key": "POL",
+      "exchange": "binance",
+      "symbol": "POLUSDT",
+      "symbols": {
+        "spot": "POLUSDT",
+        "stream": "POLUSDT"
+      },
+      "metadata": {
+        "baseAsset": "POL",
+        "quoteAsset": "USDT"
+      },
+      "capabilities": {
+        "candles": true,
+        "daily": true,
+        "streaming": true,
+        "trading": true,
+        "forecasting": true
+      },
+      "marketCapRank": 17
+    },
+    {
+      "key": "SUI",
+      "exchange": "binance",
+      "symbol": "SUIUSDT",
+      "symbols": {
+        "spot": "SUIUSDT",
+        "stream": "SUIUSDT"
+      },
+      "metadata": {
+        "baseAsset": "SUI",
+        "quoteAsset": "USDT"
+      },
+      "capabilities": {
+        "candles": true,
+        "daily": true,
+        "streaming": true,
+        "trading": true,
+        "forecasting": true
+      },
+      "marketCapRank": 58
+    }
+  ],
   "googleSheets": {
     "enabled": false,
     "spreadsheetId": null,

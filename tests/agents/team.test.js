@@ -20,8 +20,20 @@ const mockCFG = {
 };
 
 const mockAssets = [
-    { key: "BTC", binance: "BTCUSDT" },
-    { key: "ETH", binance: null },
+    {
+        key: "BTC",
+        exchange: "binance",
+        symbol: "BTCUSDT",
+        symbols: { market: "BTCUSDT" },
+        capabilities: { candles: true, daily: true, forecasting: true },
+    },
+    {
+        key: "ETH",
+        exchange: "binance",
+        symbol: "ETHUSDT",
+        symbols: { market: "ETHUSDT" },
+        capabilities: { candles: true, daily: true, forecasting: true },
+    },
 ];
 
 const buildCandle = (base, step) => ({
@@ -75,7 +87,10 @@ const indicatorsMock = {
     obv: vi.fn(() => indicatorReturnArray(10)),
 };
 
-const fetchOHLCVMock = vi.fn(async (symbol, timeframe) => {
+const fetchOHLCVMock = vi.fn(async (assetOrSymbol, timeframe) => {
+    const symbol = typeof assetOrSymbol === "string"
+        ? assetOrSymbol
+        : assetOrSymbol?.symbol ?? assetOrSymbol?.symbols?.market ?? "";
     if (symbol === "BTCUSDT" && timeframe === "1h") {
         return hourlyCandles;
     }
@@ -162,8 +177,12 @@ class MockTeam {
 
 vi.mock("kaibanjs", () => ({ Agent: MockAgent, Task: MockTask, Team: MockTeam }));
 vi.mock("../../src/config.js", () => ({ CFG: mockCFG }));
-vi.mock("../../src/assets.js", () => ({ ASSETS: mockAssets }));
-vi.mock("../../src/data/binance.js", () => ({ fetchOHLCV: fetchOHLCVMock }));
+vi.mock("../../src/assets.js", () => ({
+    DEFAULT_ASSETS: mockAssets,
+    TIMEFRAMES: ["1h", "1d"],
+    EXCHANGE_INTERVAL_OVERRIDES: {},
+}));
+vi.mock("../../src/data/marketData.js", () => ({ fetchOHLCV: fetchOHLCVMock }));
 vi.mock("../../src/news.js", () => ({ getAssetNews: getAssetNewsMock }));
 vi.mock("../../src/websearch.js", () => ({ searchWeb: searchWebMock }));
 vi.mock("../../src/indicators.js", () => indicatorsMock);
@@ -244,6 +263,8 @@ beforeEach(() => {
     getAssetNewsMock.mockClear();
     searchWebMock.mockClear();
     Object.values(indicatorsMock).forEach((fn) => fn.mockClear());
+    mockCFG.assets = mockAssets.map(asset => ({ ...asset }));
+    mockCFG.assetMap = new Map(mockCFG.assets.map(asset => [asset.key, asset]));
     Object.assign(mockCFG.kaiban, {
         enabled: true,
         logLevel: "debug",
@@ -313,8 +334,8 @@ describe("Kaiban team workflow", () => {
         const { runKaibanWorkflow } = await import("../../src/agents/team.js");
         await runKaibanWorkflow();
 
-        expect(fetchOHLCVMock).toHaveBeenCalledWith("BTCUSDT", "1h");
-        expect(fetchOHLCVMock).toHaveBeenCalledWith("BTCUSDT", "1d");
+        expect(fetchOHLCVMock).toHaveBeenCalledWith(expect.objectContaining({ key: "BTC" }), "1h");
+        expect(fetchOHLCVMock).toHaveBeenCalledWith(expect.objectContaining({ key: "BTC" }), "1d");
         expect(getAssetNewsMock).toHaveBeenCalledWith({ symbol: "BTC" });
         expect(searchWebMock).toHaveBeenCalledWith("BTC");
         expect(indicatorsMock.sma).toHaveBeenCalled();

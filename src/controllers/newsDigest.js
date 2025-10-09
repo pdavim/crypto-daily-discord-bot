@@ -1,4 +1,3 @@
-import { ASSETS } from "../assets.js";
 import { CFG } from "../config.js";
 import { logger, withContext } from "../logger.js";
 import { getAssetNews } from "../news.js";
@@ -78,8 +77,9 @@ export async function buildNewsDigest({
 } = {}) {
     const log = withContext(logger, { fn: "buildNewsDigest" });
     const now = new Date();
+    const assets = Array.isArray(CFG.assets) ? CFG.assets : [];
     const assetResults = await Promise.all(
-        ASSETS.map(async ({ key }) => {
+        assets.map(async ({ key }) => {
             const assetLog = withContext(log, { asset: key });
             try {
                 const { items = [], summary = "", weightedSentiment = 0, avgSentiment = 0 } = await getAssetNews({

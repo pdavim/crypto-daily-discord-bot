@@ -1,9 +1,9 @@
 import { CFG } from "../config.js";
 import { logger, withContext } from "../logger.js";
-import { getMarginPositionRisk } from "./binance.js";
 import { openPosition, closePosition } from "./executor.js";
 import { reportTradingDecision } from "./notifier.js";
 import { evaluateTradeIntent } from "./riskManager.js";
+import { getExchangeConnector } from "../exchanges/index.js";
 
 function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -77,6 +77,20 @@ function findPositionForSymbol(positions, symbol, epsilon) {
         return null;
     }
     return positions.find(position => normalizeSymbol(position?.symbol) === normalized && Math.abs(toFinite(position?.positionAmt) ?? 0) > epsilon) ?? null;
+}
+
+async function fetchMarginPositions(options = {}) {
+    const connector = getExchangeConnector('binance');
+    if (!connector || typeof connector.getMarginPositionRisk !== 'function') {
+        return [];
+    }
+    try {
+        const positions = await connector.getMarginPositionRisk(options);
+        return Array.isArray(positions) ? positions : [];
+    } catch (error) {
+        withContext(logger, { fn: 'fetchMarginPositions' }).warn({ err: error }, 'Failed to fetch margin positions');
+        return [];
+    }
 }
 
 function computeQuantity({ price, positionPct }) {
@@ -255,7 +269,7 @@ export async function automateTrading({
     }
 
     if (direction === "flat") {
-        const positions = filterActivePositions(await getMarginPositionRisk({ symbol }), automationCfg.positionEpsilon);
+        const positions = filterActivePositions(await fetchMarginPositions({ symbol }), automationCfg.positionEpsilon);
         const existing = findPositionForSymbol(positions, symbol, automationCfg.positionEpsilon);
         if (!existing) {
             await emitDecision({ status: "skipped", reason: "noPosition", direction: "flat" });
@@ -315,7 +329,7 @@ export async function automateTrading({
         }
     }
 
-    const positions = filterActivePositions(await getMarginPositionRisk(), automationCfg.positionEpsilon);
+    const positions = filterActivePositions(await fetchMarginPositions(), automationCfg.positionEpsilon);
     const existing = findPositionForSymbol(positions, symbol, automationCfg.positionEpsilon);
     const price = snapshot?.kpis?.price;
     const baseRiskContext = buildRiskContext({ positions, symbol, price, snapshot });

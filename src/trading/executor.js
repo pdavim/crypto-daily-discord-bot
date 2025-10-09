@@ -1,10 +1,10 @@
-import { CFG } from "../config.js";
+import { CFG, getAssetConfig } from "../config.js";
 import { logger, withContext } from "../logger.js";
 import { tradingExecutionCounter, tradingNotionalHistogram } from "../metrics.js";
 
-import { submitOrder, transferMargin, borrowMargin, repayMargin } from "./binance.js";
 import { reportTradingExecution, reportTradingMargin } from "./notifier.js";
 import { evaluateTradeIntent, mergeCompliance } from "./riskManager.js";
+import { getExchangeConnector, resolveConnectorForAsset } from "../exchanges/index.js";
 
 function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -28,6 +28,69 @@ function computeMaxNotionalLimit(tradingCfg) {
     }
     const lev = leverage !== null && leverage > 0 ? leverage : 1;
     return equity * maxPct * lev;
+}
+
+function primarySymbolForAsset(asset) {
+    if (!asset) {
+        return null;
+    }
+    const direct = typeof asset.symbol === "string" ? asset.symbol.trim() : "";
+    if (direct) {
+        return direct;
+    }
+    const symbols = asset.symbols ?? {};
+    for (const key of ["market", "spot", "stream"]) {
+        const value = typeof symbols[key] === "string" ? symbols[key].trim() : "";
+        if (value) {
+            return value;
+        }
+    }
+    for (const value of Object.values(symbols)) {
+        if (typeof value === "string" && value.trim() !== "") {
+            return value.trim();
+        }
+    }
+    return null;
+}
+
+function findAssetByKeyOrSymbol(assetKey, symbol) {
+    if (typeof assetKey === "string" && assetKey.trim() !== "") {
+        const asset = getAssetConfig(assetKey.trim().toUpperCase());
+        if (asset) {
+            return asset;
+        }
+    }
+    if (typeof symbol === "string" && symbol.trim() !== "") {
+        const normalized = symbol.trim().toUpperCase();
+        const assets = Array.isArray(CFG.assets) ? CFG.assets : [];
+        for (const asset of assets) {
+            const candidates = new Set();
+            const direct = primarySymbolForAsset(asset);
+            if (direct) {
+                candidates.add(direct.toUpperCase());
+            }
+            const symbols = asset.symbols ?? {};
+            for (const value of Object.values(symbols)) {
+                if (typeof value === "string" && value.trim() !== "") {
+                    candidates.add(value.trim().toUpperCase());
+                }
+            }
+            if (candidates.has(normalized)) {
+                return asset;
+            }
+        }
+    }
+    return null;
+}
+
+function resolveConnectorContext({ assetKey, symbol }) {
+    const asset = findAssetByKeyOrSymbol(assetKey, symbol);
+    let connector = asset ? resolveConnectorForAsset(asset) : null;
+    if (!connector) {
+        connector = getExchangeConnector('binance');
+    }
+    const resolvedSymbol = symbol ?? primarySymbolForAsset(asset);
+    return { asset, connector, symbol: resolvedSymbol };
 }
 
 function recordTradeOutcome(action, result, { notional } = {}) {
@@ -241,16 +304,31 @@ export async function openPosition({
     }
 
     const orderParams = buildOrderParams(params);
+    const { connector, asset: assetConfig, symbol: resolvedSymbol } = resolveConnectorContext({ assetKey, symbol });
+    const effectiveAssetKey = assetKey ?? assetConfig?.key ?? symbol;
+
+    if (!connector || typeof connector.placeOrder !== 'function' || !resolvedSymbol) {
+        return abortTrade(log, 'openPosition', 'connectorUnavailable', {}, {
+            assetKey: effectiveAssetKey,
+            symbol,
+            action: 'open',
+            direction,
+            quantity: qty,
+            price: referencePrice,
+            notional,
+            metadata: metadataPayload,
+        });
+    }
 
     try {
-        const order = await submitOrder({
-            symbol,
+        const order = await connector.placeOrder({
+            symbol: resolvedSymbol,
             side,
             type,
             quantity: qty,
             price: type === 'MARKET' ? undefined : referencePrice,
             params: orderParams,
-        }, { context: { asset: assetKey ?? symbol, direction: side } });
+        }, { context: { asset: effectiveAssetKey, direction: side } });
         const payload = {
             fn: 'openPosition',
             orderId: order.orderId,
@@ -262,8 +340,8 @@ export async function openPosition({
         log.info(payload, 'Opened automated trade');
         try {
             await reportTradingExecution({
-                assetKey,
-                symbol,
+                assetKey: effectiveAssetKey,
+                symbol: resolvedSymbol,
                 action: 'open',
                 status: 'executed',
                 side,
@@ -282,8 +360,8 @@ export async function openPosition({
         log.error({ fn: 'openPosition', err }, 'Failed to open position');
         try {
             await reportTradingExecution({
-                assetKey,
-                symbol,
+                assetKey: effectiveAssetKey,
+                symbol: resolvedSymbol,
                 action: 'open',
                 status: 'error',
                 side,
@@ -413,15 +491,31 @@ export async function closePosition({
         notional = referencePrice !== null ? qty * referencePrice : notional;
     }
 
-    try {
-        const order = await submitOrder({
+    const { connector, asset: assetConfig, symbol: resolvedSymbol } = resolveConnectorContext({ assetKey, symbol });
+    const effectiveAssetKey = assetKey ?? assetConfig?.key ?? symbol;
+
+    if (!connector || typeof connector.placeOrder !== 'function' || !resolvedSymbol) {
+        return abortTrade(log, 'closePosition', 'connectorUnavailable', {}, {
+            assetKey: effectiveAssetKey,
             symbol,
+            action: 'close',
+            direction,
+            quantity: qty,
+            price: referencePrice,
+            notional,
+            metadata: metadataPayload,
+        });
+    }
+
+    try {
+        const order = await connector.placeOrder({
+            symbol: resolvedSymbol,
             side,
             type,
             quantity: qty,
             price: type === 'MARKET' ? undefined : referencePrice,
             params: orderParams,
-        }, { context: { asset: assetKey ?? symbol, direction: side, intent: 'close' } });
+        }, { context: { asset: effectiveAssetKey, direction: side, intent: 'close' } });
         const payload = {
             fn: 'closePosition',
             orderId: order.orderId,
@@ -433,8 +527,8 @@ export async function closePosition({
         log.info(payload, 'Closed automated trade');
         try {
             await reportTradingExecution({
-                assetKey,
-                symbol,
+                assetKey: effectiveAssetKey,
+                symbol: resolvedSymbol,
                 action: 'close',
                 status: 'executed',
                 side,
@@ -453,8 +547,8 @@ export async function closePosition({
         log.error({ fn: 'closePosition', err }, 'Failed to close position');
         try {
             await reportTradingExecution({
-                assetKey,
-                symbol,
+                assetKey: effectiveAssetKey,
+                symbol: resolvedSymbol,
                 action: 'close',
                 status: 'error',
                 side,
@@ -483,6 +577,22 @@ export async function adjustMargin({
     const baseAmount = toFiniteNumber(amount);
     const fallbackAmount = baseAmount ?? toFiniteNumber(marginCfg.transferAmount);
     const log = withContext(logger, { asset: resolvedAsset, action: 'adjustMargin' });
+    const connector = getExchangeConnector('binance');
+
+    if (!connector || typeof connector.transferMargin !== 'function') {
+        log.warn({ fn: 'adjustMargin' }, 'Connector does not support margin adjustments');
+        recordTradeOutcome('adjustMargin', 'skipped');
+        try {
+            await reportTradingMargin({
+                asset: resolvedAsset,
+                amount: fallbackAmount,
+                operation,
+                status: 'skipped',
+                reason: 'connectorUnavailable',
+            });
+        } catch (_) {}
+        return { adjusted: false, reason: 'connectorUnavailable' };
+    }
 
     if (!tradingCfg.enabled) {
         recordTradeOutcome('adjustMargin', 'skipped');
@@ -532,7 +642,7 @@ export async function adjustMargin({
 
     try {
         if (operation === 'transferIn') {
-            const response = await transferMargin({ asset: resolvedAsset, amount: fallbackAmount, direction: 'toMargin' });
+            const response = await connector.transferMargin({ asset: resolvedAsset, amount: fallbackAmount, direction: 'toMargin' });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Transferred funds to margin');
             recordTradeOutcome('adjustMargin', 'success');
             try {
@@ -546,7 +656,7 @@ export async function adjustMargin({
             return { adjusted: true, response };
         }
         if (operation === 'transferOut') {
-            const response = await transferMargin({ asset: resolvedAsset, amount: fallbackAmount, direction: 'toSpot' });
+            const response = await connector.transferMargin({ asset: resolvedAsset, amount: fallbackAmount, direction: 'toSpot' });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Transferred funds to spot');
             recordTradeOutcome('adjustMargin', 'success');
             try {
@@ -560,7 +670,10 @@ export async function adjustMargin({
             return { adjusted: true, response };
         }
         if (operation === 'borrow') {
-            const response = await borrowMargin({ asset: resolvedAsset, amount: fallbackAmount });
+            if (typeof connector.borrowMargin !== 'function') {
+                throw new Error('Connector does not support margin borrow');
+            }
+            const response = await connector.borrowMargin({ asset: resolvedAsset, amount: fallbackAmount });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Borrowed margin asset');
             recordTradeOutcome('adjustMargin', 'success');
             try {
@@ -574,7 +687,10 @@ export async function adjustMargin({
             return { adjusted: true, response };
         }
         if (operation === 'repay') {
-            const response = await repayMargin({ asset: resolvedAsset, amount: fallbackAmount });
+            if (typeof connector.repayMargin !== 'function') {
+                throw new Error('Connector does not support margin repay');
+            }
+            const response = await connector.repayMargin({ asset: resolvedAsset, amount: fallbackAmount });
             log.info({ fn: 'adjustMargin', amount: fallbackAmount, operation }, 'Repaid margin loan');
             recordTradeOutcome('adjustMargin', 'success');
             try {
