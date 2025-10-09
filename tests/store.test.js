@@ -56,4 +56,24 @@ describe('store persistence', () => {
     store.resetAlertHashes();
     expect(store.getAlertHash('weekly', 'digest')).toBeUndefined();
   });
+
+  it('tracks alert history with bounded capacity', async () => {
+    const store = await loadStore();
+    for (let i = 0; i < 205; i += 1) {
+      store.appendAlertHistory({ message: `Alert ${i}`, timestamp: i });
+    }
+    const history = store.getAlertHistory({ limit: 250 });
+    expect(history.length).toBe(200);
+    expect(history[0].message).toBe('Alert 5');
+    const last = history.at(-1);
+    expect(last.message).toBe('Alert 204');
+
+    const limited = store.getAlertHistory({ limit: 10 });
+    expect(limited.length).toBe(10);
+    expect(limited[0].message).toBe('Alert 195');
+    expect(limited.at(-1).message).toBe('Alert 204');
+
+    const defaultWindow = store.getAlertHistory();
+    expect(defaultWindow.length).toBe(50);
+  });
 });

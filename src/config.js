@@ -1543,6 +1543,22 @@ function rebuildConfig({ reloadFromDisk = true, emitLog = false } = {}) {
     nextCFG.alertThresholds = clone(mergedConfig.alertThresholds ?? nextCFG.alertThresholds ?? {});
     nextCFG.discordRateLimit = buildDiscordRateLimit(mergedConfig.discordRateLimit ?? nextCFG.discordRateLimit ?? {});
 
+    const dashboardBase = isPlainObject(nextCFG.dashboard) ? nextCFG.dashboard : {};
+    const dashboardEnabled = toBoolean(process.env.DASHBOARD_ENABLED, dashboardBase.enabled ?? true);
+    const rawDashboardPort = toInt(process.env.DASHBOARD_PORT, dashboardBase.port ?? 3100);
+    const dashboardPort = Number.isInteger(rawDashboardPort) && rawDashboardPort > 0 ? rawDashboardPort : 3100;
+    const dashboardToken = normalizeStringOrNull(process.env.DASHBOARD_TOKEN, dashboardBase.token ?? "local-dev-token");
+    const dashboardUploadBaseUrl = normalizeStringOrNull(
+        process.env.DASHBOARD_UPLOAD_BASE_URL,
+        dashboardBase.uploadBaseUrl ?? null,
+    );
+    nextCFG.dashboard = {
+        enabled: dashboardEnabled,
+        port: dashboardPort,
+        token: dashboardToken ?? "local-dev-token",
+        uploadBaseUrl: dashboardUploadBaseUrl,
+    };
+
     const googleSheetsBase = isPlainObject(nextCFG.googleSheets) ? nextCFG.googleSheets : {};
     const googleSheetsConfig = {
         ...DEFAULT_GOOGLE_SHEETS_CONFIG,

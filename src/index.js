@@ -19,6 +19,7 @@ import {
     updateAlertHash,
     resetAlertHashes,
     updateForecastSnapshot,
+    appendAlertHistory,
 } from "./store.js";
 import { fetchEconomicEvents } from "./data/economic.js";
 import { logger, withContext } from "./logger.js";
@@ -41,6 +42,7 @@ import { automateTrading } from "./trading/automation.js";
 import { forecastNextClose, persistForecastEntry } from "./forecasting.js";
 import { runPortfolioGrowthSimulation } from "./portfolio/growth.js";
 import { ingestPosts, ingestReports, ingestInteractions } from "./ingest.js";
+import { startDashboardServer } from "./dashboard/server.js";
 
 const ONCE = process.argv.includes("--once");
 
@@ -134,6 +136,11 @@ if (!ONCE) {
     }).listen(METRICS_PORT, () => {
         const log = withContext(logger);
         log.info({ fn: 'metrics' }, `Metrics server listening on port ${METRICS_PORT}`);
+    });
+
+    startDashboardServer()?.catch(error => {
+        const log = withContext(logger, { fn: 'dashboardServer' });
+        log.error({ err: error }, 'Failed to start dashboard server');
     });
 }
 
@@ -612,7 +619,7 @@ async function runOnceForAsset(asset, options = {}) {
                 const windowMs = CFG.alertDedupMinutes * 60 * 1000;
                 const scope = "aggregate";
                 if (shouldSend({ asset: asset.key, tf: scope, hash }, windowMs)) {
-                    enqueueAlertPayload({
+                    const payload = {
                         asset: asset.key,
                         timeframe: scope,
                         message: alertMsg,
@@ -622,6 +629,15 @@ async function runOnceForAsset(asset, options = {}) {
                             timeframeSummaries,
                             variationByTimeframe,
                         },
+                    };
+                    enqueueAlertPayload(payload);
+                    appendAlertHistory({
+                        id: hash,
+                        asset: asset.key,
+                        timeframe: scope,
+                        messageType: payload.messageType,
+                        message: alertMsg,
+                        metadata: payload.metadata,
                     });
                 }
             }
@@ -686,7 +702,7 @@ async function runOnceForAsset(asset, options = {}) {
                 const windowMs = CFG.alertDedupMinutes * 60 * 1000;
                 const scope = "guidance";
                 if (shouldSend({ asset: asset.key, tf: scope, hash }, windowMs)) {
-                    enqueueAlertPayload({
+                    const payload = {
                         asset: asset.key,
                         timeframe: scope,
                         message: guidanceMessage,
@@ -697,6 +713,15 @@ async function runOnceForAsset(asset, options = {}) {
                             variationByTimeframe,
                         },
                         options: { webhookUrl },
+                    };
+                    enqueueAlertPayload(payload);
+                    appendAlertHistory({
+                        id: hash,
+                        asset: asset.key,
+                        timeframe: scope,
+                        messageType: payload.messageType,
+                        message: guidanceMessage,
+                        metadata: payload.metadata,
                     });
                 }
             }
