@@ -35,7 +35,8 @@ vi.mock("../src/db.js", () => ({
     query: (...args) => queryMock(...args),
 }));
 
-let withContextMock = vi.fn((logger, ctx) => ({
+const withContextMock = vi.fn();
+withContextMock.mockImplementation((logger, ctx) => ({
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
@@ -78,7 +79,8 @@ describe("runFineTune", () => {
         accessMock = vi.fn();
         createReadStreamMock = vi.fn();
         queryMock = vi.fn();
-        withContextMock = vi.fn((logger, ctx) => ({
+        withContextMock.mockReset();
+        withContextMock.mockImplementation((logger, ctx) => ({
             info: vi.fn(),
             error: vi.fn(),
             warn: vi.fn(),
