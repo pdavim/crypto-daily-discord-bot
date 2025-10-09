@@ -155,7 +155,7 @@
     }
   ],
   "googleSheets": {
-    "enabled": false,
+    "enabled": true,
     "spreadsheetId": null,
     "credentialsFile": null,
     "channelMap": {
@@ -174,17 +174,17 @@
   "openrouterApiKey": null,
   "openrouterModel": "openrouter/sonoma-dusk-alpha",
   "kaiban": {
-    "enabled": false,
+    "enabled": true,
     "logLevel": "info",
     "maxIterations": 3,
     "models": {
-      "technical": "openrouter/sonoma-dusk-alpha",
-      "news": "openrouter/sonoma-dusk-alpha",
-      "sentiment": "openrouter/sonoma-dusk-alpha",
-      "research": "openrouter/sonoma-dusk-alpha",
-      "trader": "openrouter/sonoma-dusk-alpha",
-      "risk": "openrouter/sonoma-dusk-alpha",
-      "execution": "openrouter/sonoma-dusk-alpha"
+      "technical": "mistralai/mistral-small-3.2-24b-instruct:free",
+      "news": "mistralai/mistral-small-3.2-24b-instruct:free",
+      "sentiment": "mistralai/mistral-small-3.2-24b-instruct:free",
+      "research": "mistralai/mistral-small-3.2-24b-instruct:free",
+      "trader": "mistralai/mistral-small-3.2-24b-instruct:free",
+      "risk": "mistralai/mistral-small-3.2-24b-instruct:free",
+      "execution": "mistralai/mistral-small-3.2-24b-instruct:free"
     }
   },
   "rag": {
@@ -215,10 +215,10 @@
   "enableAnalysis": true,
   "enableReports": true,
   "enableBinanceCommand": true,
-  "debug": false,
+  "debug": true,
   "newsDigest": {
-    "enabled": false,
-    "cron": "0 9 * * *",
+    "enabled": true,
+    "cron": "0 5 * * *",
     "webhookUrl": null,
     "channelId": null,
     "sheetMapKey": "newsDigest",
@@ -234,7 +234,7 @@
   "binanceCacheTTL": 10,
   "maxConcurrency": null,
   "trading": {
-    "enabled": false,
+    "enabled": true,
     "minNotional": 10,
     "maxPositionPct": 0.1,
     "maxLeverage": 3,
@@ -243,7 +243,7 @@
       "minimumConfidence": 0.35
     },
     "discord": {
-      "enabled": false,
+      "enabled": true,
       "webhookUrl": null,
       "channelId": null,
       "mention": ""
@@ -262,7 +262,7 @@
       "maxDailyLossPct": 0.08,
       "maxDailyLossValue": null,
       "volatilityTriggers": {
-        "enabled": false,
+        "enabled": true,
         "maxAtrPct": null,
         "maxChangePct": null,
         "maxVolatilityPct": null
@@ -273,7 +273,7 @@
       }
     },
     "automation": {
-      "enabled": false,
+      "enabled": true,
       "timeframe": "4h",
       "minConfidence": 0.55,
       "positionPct": 0.05,
@@ -307,11 +307,11 @@
       "enabled": true,
       "historyPoints": 120,
       "directory": "charts/forecasts",
-      "appendToUploads": false
+      "appendToUploads": true
     }
   },
   "portfolioGrowth": {
-    "enabled": false,
+    "enabled": true,
     "initialCapital": 100,
     "targetCapital": 10000000,
     "simulation": {
@@ -339,10 +339,10 @@
     "enabled": true,
     "directory": "reports/growth",
     "chartDirectory": "charts/growth",
-    "appendToUploads": false
+    "appendToUploads": true
   },
   "discord": {
-    "enabled": false,
+    "enabled": true,
     "mention": "",
     "webhookUrl": "",
     "channelId": "",
