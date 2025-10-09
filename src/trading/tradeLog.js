@@ -38,3 +38,7 @@ export function logOutcome(id, exitPrice, quantity) {
         writeLog(trades);
     }
 }
+
+export function getTradeHistory() {
+    return readLog().map(trade => ({ ...trade }));
+}

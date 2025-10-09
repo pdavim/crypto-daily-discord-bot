@@ -7,11 +7,42 @@ const STORE_FILE = process.env.RUN_SIGNATURES_FILE
     : path.join(DATA_DIR, "run-signatures.json");
 const STORE_DIR = path.dirname(STORE_FILE);
 
+const MAX_ALERT_HISTORY = 200;
+
+function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function createDefaultStore() {
     return {
         signatures: {},
         alertHashes: {},
         forecasts: {},
+        alerts: [],
+    };
+}
+
+function normalizeAlertHistoryEntry(entry) {
+    if (!isPlainObject(entry)) {
+        return null;
+    }
+    const timestamp = Number.isFinite(entry.timestamp) ? Number(entry.timestamp) : Date.now();
+    const asset = typeof entry.asset === "string" ? entry.asset : null;
+    const timeframe = typeof entry.timeframe === "string" ? entry.timeframe : null;
+    const messageType = typeof entry.messageType === "string" ? entry.messageType : null;
+    const message = typeof entry.message === "string" ? entry.message : null;
+    if (!message) {
+        return null;
+    }
+    const metadata = isPlainObject(entry.metadata) ? { ...entry.metadata } : {};
+    return {
+        id: typeof entry.id === "string" ? entry.id : `${timestamp}-${Math.random().toString(36).slice(2, 10)}`,
+        timestamp,
+        asset,
+        timeframe,
+        messageType,
+        message,
+        metadata,
     };
 }
 
@@ -52,6 +83,23 @@ function normalizeStore(raw) {
             if (Object.keys(snapshot).length > 0) {
                 base.forecasts[assetKey] = snapshot;
             }
+        }
+    }
+
+    if (Array.isArray(raw.alerts)) {
+        const normalizedAlerts = [];
+        for (const entry of raw.alerts) {
+            const normalized = normalizeAlertHistoryEntry(entry);
+            if (normalized) {
+                normalizedAlerts.push(normalized);
+            }
+        }
+        if (normalizedAlerts.length > 0) {
+            normalizedAlerts.sort((a, b) => a.timestamp - b.timestamp);
+            if (normalizedAlerts.length > MAX_ALERT_HISTORY) {
+                normalizedAlerts.splice(0, normalizedAlerts.length - MAX_ALERT_HISTORY);
+            }
+            base.alerts = normalizedAlerts;
         }
     }
 
@@ -198,6 +246,50 @@ export function getForecastSnapshot(assetKey) {
         }
     }
     return clone;
+}
+
+export function getForecastSnapshots() {
+    const map = {};
+    if (!store.forecasts || typeof store.forecasts !== "object") {
+        return map;
+    }
+    for (const [assetKey, forecasts] of Object.entries(store.forecasts)) {
+        if (!forecasts || typeof forecasts !== "object" || Array.isArray(forecasts)) {
+            continue;
+        }
+        const normalized = {};
+        for (const [timeframe, forecast] of Object.entries(forecasts)) {
+            if (forecast && typeof forecast === "object" && !Array.isArray(forecast)) {
+                normalized[timeframe] = { ...forecast };
+            }
+        }
+        if (Object.keys(normalized).length > 0) {
+            map[assetKey] = normalized;
+        }
+    }
+    return map;
+}
+
+export function appendAlertHistory(entry) {
+    const normalized = normalizeAlertHistoryEntry(entry);
+    if (!normalized) {
+        return;
+    }
+    store.alerts.push(normalized);
+    if (store.alerts.length > MAX_ALERT_HISTORY) {
+        store.alerts.splice(0, store.alerts.length - MAX_ALERT_HISTORY);
+    }
+}
+
+export function getAlertHistory({ limit = 50 } = {}) {
+    const size = Number.isFinite(limit) && limit > 0 ? Math.trunc(limit) : 50;
+    const history = Array.isArray(store.alerts) ? store.alerts : [];
+    if (size >= history.length) {
+        return history.map(entry => ({ ...entry, metadata: { ...entry.metadata } }));
+    }
+    return history
+        .slice(history.length - size)
+        .map(entry => ({ ...entry, metadata: { ...entry.metadata } }));
 }
 
 /**

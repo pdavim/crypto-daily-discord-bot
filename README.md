@@ -327,6 +327,36 @@ Para agendar o pipeline automaticamente, habilite `rag.enableFineTune` e defina 
 
 O bot registra avisos quando webhooks obrigatórios não estão configurados e interrompe execuções críticas, garantindo falhas rápidas em ambientes de produção.
 
+## Dashboard web
+
+O projeto inclui um painel opcional para monitorar forecasts, alertas e métricas de saúde do bot em tempo real.
+
+### Como iniciar as APIs
+
+1. Ajuste o `config/default.json` ou `config/custom.json` caso deseje alterar porta, token ou desativar o painel (`dashboard.enabled`).
+2. Execute o bot normalmente (`npm run start`). O servidor de métricas continuará exposto em `/metrics` e o novo endpoint JSON ficará disponível em `http://localhost:3100` (ou na porta definida).
+3. Use a variável `DASHBOARD_TOKEN` para definir o token local esperado nas requisições HTTP (o padrão é `local-dev-token`).
+
+Endpoints principais:
+
+- `GET /api/assets`: retorna ativos configurados, snapshots de forecast e links para gráficos.
+- `GET /api/alerts`: expõe o histórico recente de alertas agregados ou de guidance.
+- `GET /api/portfolio`: consolida trades gravados no `tradeLog` em métricas de PnL e posições abertas.
+- `GET /api/health`: replica o estado atual do registro Prometheus e estatísticas de processo.
+
+### Como executar o front-end
+
+1. Instale as dependências do painel: `npm install` dentro da pasta `dashboard/`.
+2. Inicie o modo desenvolvimento: `npm run dev -- --host` (em `dashboard/`). O Vite abrirá o painel em `http://localhost:5173`.
+3. Informe o token configurado (por padrão `local-dev-token`). A aplicação passa a realizar polling a cada 15 segundos para atualizar cards, feed de alertas e curva de equity.
+
+Para build de produção utilize `npm run build` seguido de `npm run preview` na pasta `dashboard/`.
+
+### Testes e smoke tests
+
+- Testes do bot principal: `npm test`.
+- Smoke tests do painel: `npm run test` dentro de `dashboard/` (usa Vitest + Testing Library).
+
 ## FAQ
 
 ### O que é este crypto trading bot?

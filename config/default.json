@@ -428,5 +428,11 @@
     "webhooks": {}
   },
   "newsApiKey": null,
-  "serpapiApiKey": null
+  "serpapiApiKey": null,
+  "dashboard": {
+    "enabled": true,
+    "port": 3100,
+    "token": "local-dev-token",
+    "uploadBaseUrl": null
+  }
 }
