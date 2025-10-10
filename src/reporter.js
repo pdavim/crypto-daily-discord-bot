@@ -76,7 +76,7 @@ export async function buildSummaryPdf(summary, options = {}) {
             printBackground: true,
             margin: { top: "20mm", bottom: "20mm", left: "15mm", right: "15mm" }
         });
-        return pdf;
+        return Buffer.isBuffer(pdf) ? pdf : Buffer.from(pdf);
     } finally {
         await page.close();
     }
